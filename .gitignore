@@ -40,3 +40,22 @@ paper/
 
 # macOS Finder metadata
 .DS_Store
+.claude/worktrees/
+.claude/settings.local.json
+bin/
+obj/
+.vs/
+packages/
+TestResults/
+artifacts/
+*.user
+*.suo
+
+# graphify-lang: the Claude harness files ARE tracked here (upstream ignores .claude/ wholesale).
+!.claude/
+.claude/*
+!.claude/CLAUDE.md
+!.claude/docs/
+!.claude/docs/**
+.claude/settings.local.json
+.claude/worktrees/

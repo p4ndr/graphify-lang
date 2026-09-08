@@ -397,3 +397,12 @@ here if a second CLI is wanted on `PATH`.
 
 No code yet. As of 2026-09-07 the fork consists of this README, the moved
 upstream README, and `.claude/CLAUDE.md`.
+
+## Requirements summary
+
+The design goals, open questions, and roadmap above were refined on
+8 September 2026 into a full software requirements summary at
+[.claude/docs/cc-RS000.001.md](.claude/docs/cc-RS000.001.md), backed by
+three research documents (`cc-RF010.001.md` prior art, `cc-RF010.002.md`
+upstream state, `cc-RF010.003.md` AutoLISP and DCL resources) in the same
+directory. Where this file and the SRS differ, the SRS is current.

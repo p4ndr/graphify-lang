@@ -1,0 +1,23 @@
+# repo-docs policy. Read by the MCP server and the CLI, never by the model.
+# Absent file = these values, which are also the behaviour of a repo that has
+# never been updated, so deleting this file is always safe.
+
+# continuous       the agent picks its own task order and keeps going
+# confirm-each-task it stops after each TASK and waits for the owner
+# ask-before-write  it confirms every change before writing it
+autonomy: continuous
+
+# Owner questions allowed per run before pending_add refuses.
+# 0 = only a real owner decision (a missing credential, a product choice, an
+# external service that is down) may be raised; anything else the agent decides.
+# Leave it null for no limit.
+ask_budget: null
+
+# When the treadmill guard lets a session end.
+stop_when: no_open_unblocked_tasks
+
+# Record every tool call in the write-ahead journal, so a crash loses nothing.
+journal: true
+
+# Unrecorded tool calls before a directive starts asking for progress_add.
+stale_after: 8

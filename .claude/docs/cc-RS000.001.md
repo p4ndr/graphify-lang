@@ -96,18 +96,18 @@ to prove the project did what it set out to do, not to fail a build
 serves only recorded measurements is at most Should Have.
 
 **The corpus, pinned.** 'Corpus' means the AutoLITHP repository
-(`~/repos/autolithp`) at commit **`f7ab804`**, restricted to the four
+(`~/repos/autolithp`) at commit **`d5a20743b007431521c4f9a0507560d5feb94b27`**, restricted to the four
 directories `src/`, `tests/`, `Import-Refactor/` and `build/`. Measured on
-this host 2026-09-08 at that commit, clean tree:
+this host 2026-09-21 at that commit, clean tree:
 
 | Quantity | Value | Instrument |
 |:---------|------:|:-----------|
-| `.lsp` files | 80 | `find src tests Import-Refactor build -name '*.lsp' \| wc -l` |
-| `(defun` / `(defun-q` forms | 2,980 | the same set through `grep -Eio '\(\s*defun(-q)?\s'` |
-| `(defun C:` forms | 49 | the same set through `grep -Eio '\(\s*defun\s+c:'` |
+| `.lsp` files | 81 | `find src tests Import-Refactor build -name '*.lsp' \| wc -l` |
+| `(defun` / `(defun-q` forms | 4,027 | the same set through `grep -Eio '\(\s*defun(-q)?\s'` |
+| `(defun C:` forms | 52 | the same set through `grep -Eio '\(\s*defun\s+c:'` |
 | `.dcl` files | 3 | `src/ui/manager.dcl`, `Import-Refactor/Archive/dialogs/{cbc,dtk}_app_dialogs.dcl` |
 | `name : dialog {` declarations | 8 | 1 + 2 + 5 across those three files |
-| total `.lsp` bytes | 2.24 MB | `find … -printf '%s\n'`, summed |
+| total `.lsp` bytes | 3.1 MiB | `find … -printf '%s\n'`, summed |
 
 Two requirements follow, and both fall on the fork, never on AutoLITHP
 (RQ-2):

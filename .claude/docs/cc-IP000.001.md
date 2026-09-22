@@ -191,13 +191,12 @@ on unmodified `v8`, any later failure or skip is unattributable.
    `_HOOK_SOURCE_EXTS`, `[r.name for r in registered_resolvers()]`. Run it
    on `v8` into `tests/upstream_tables.json`. This is SC2's comparison
    snapshot and is regenerated at every rebase.
-6. **Pin the corpus.** Verify `~/repos/autolithp` HEAD is `f7ab804` and the
-   tree is clean. Re-measure the six SRS §1.3 counts (80 `.lsp`, 2,980
-   defuns, 49 `C:`, 3 `.dcl`, 8 dialogs, 2.24 MB). If HEAD has moved,
+6. **Pin the corpus.** Verify `~/repos/autolithp` HEAD is `d5a20743b007431521c4f9a0507560d5feb94b27` and the
+   tree is clean. Re-measure the six SRS §1.3 counts (81 `.lsp`, 4,027
+   defuns, 52 `C:`, 3 `.dcl`, 8 dialogs, 3.1 MiB). If HEAD has moved,
    **stop and update SRS §1.3 before continuing** — the criteria are
    defined against a SHA, not against `HEAD`. The checked-in file list is
    generated in S005 (it belongs on the `autolisp` branch).
-
 **Files.** `tests/lang_baseline.txt`, `tests/upstream_tables.json`,
 `scripts/snapshot_tables.py`. No `graphify/` file.
 
@@ -208,7 +207,7 @@ confirmed.
 ```bash
 uv run pytest tests/ -q                      # matches tests/lang_baseline.txt
 uv run python scripts/snapshot_tables.py | diff -u tests/upstream_tables.json -
-git -C ~/repos/autolithp rev-parse --short HEAD   # f7ab804
+git -C ~/repos/autolithp rev-parse --short HEAD   # d5a2074
 guard-all
 ```
 

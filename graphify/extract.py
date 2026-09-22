@@ -1,3 +1,4 @@
+# @sidecar extract.md
 """Deterministic structural extraction from source code using tree-sitter. Outputs nodes+edges dicts."""
 from __future__ import annotations
 
@@ -156,11 +157,7 @@ from graphify.extractors.julia import extract_julia  # noqa: E402,F401
 
 _RECURSION_LIMIT = 10_000
 
-# Language built-in globals that AST may classify as call targets when used as
-# constructors or coercion functions (e.g. String(x), Number(x), Boolean(x)).
-# Without this filter they become god-nodes accumulating spurious edges from
-# every call site. Filter applied at same-file and cross-file resolution.
-# See issue #726.
+# @doc extract.md#C0001
 
 
 def _raise_recursion_limit() -> None:
@@ -225,8 +222,7 @@ def _repoint_python_package_imports(paths, all_nodes, all_edges, root) -> None:
             continue  # top-level file: scan-root-relative id already matches
         d = Path(p).resolve().parent
         levels = 0
-        # Bounded by the number of dirs between the file and the scan root, so a
-        # pathological `/__init__.py` chain can't loop forever.
+        # @doc extract.md#C0002
         while levels < len(parts) - 1 and (d / "__init__.py").is_file():
             levels += 1
             d = d.parent
@@ -250,10 +246,7 @@ def _repoint_python_package_imports(paths, all_nodes, all_edges, root) -> None:
     if not alias_map:
         return
     for e in all_edges:
-        # Only repoint edges emitted from a Python file: a non-Python import edge
-        # (e.g. C# `using Pkg.Mod;`, Java/Go dotted imports) can have a dangling
-        # target string that coincides with a Python alias, and repointing it
-        # would fabricate a cross-language import edge (#2072 review).
+        # @doc extract.md#C0003
         if (
             isinstance(e, dict)
             and e.get("relation") in ("imports", "imports_from")
@@ -270,9 +263,7 @@ SEMANTIC_RELATIONS = frozenset({
 })
 
 
-# Condition keys consulted when resolving an `exports` target, in priority
-# order. `default` is Node's catch-all and must be consulted LAST so a more
-# specific condition (source/import/module/etc.) wins when several match.
+# @doc extract.md#C0004
 
 
 # ── LanguageConfig dataclass ─────────────────────────────────────────────────
@@ -281,19 +272,10 @@ SEMANTIC_RELATIONS = frozenset({
 # ── Generic helpers ───────────────────────────────────────────────────────────
 
 
-# Scalar builtins and test-mock names that appear as type annotations but carry
-# no useful semantic meaning as graph nodes (#1147). Suppressed at the annotation
-# walker level so they are never created as nodes or emitted as edges.
+# @doc extract.md#C0005
 
 
-# java.lang (auto-imported) plus the ubiquitous java.util / java.io / java.time /
-# java.util.{stream,function,concurrent} / java.math / java.nio.file types that
-# appear as field, parameter, return, and generic-argument annotations. They never
-# resolve to a project node, so emitting `references` edges to them is pure noise
-# (mirrors _GO_PREDECLARED_TYPES / _PYTHON_ANNOTATION_NOISE). Suppressed at the
-# type-ref walker so they are never created as nodes or emitted as edges. The
-# boxed-scalar/`void` primitives are already dropped by grammar node type above;
-# these are the class/interface names the grammar reports as identifiers.
+# @doc extract.md#C0006
 
 
 # ── C / C++ type-ref helpers ─────────────────────────────────────────────────
@@ -338,10 +320,7 @@ def _import_python(node, source: bytes, file_nid: str, stem: str, edges: list, s
                     "weight": 1.0,
                 }
                 if raw_alias:
-                    # `import pkg.mod as alias` binds the local name `alias`, not
-                    # `mod`'s own stem, to the module -- stash it so the cross-file
-                    # member-call resolver can match `alias.func()` against this
-                    # edge instead of dropping it (#2082).
+                    # @doc extract.md#C0007
                     edge["local_alias"] = raw_alias.strip()
                 edges.append(edge)
     elif t == "import_from_statement":
@@ -356,13 +335,7 @@ def _import_python(node, source: bytes, file_nid: str, stem: str, edges: list, s
                 base = Path(str_path).parent
                 for _ in range(dots - 1):
                     base = base.parent
-                # A relative import can name a subpackage (a directory with an
-                # __init__.py), not a module file. Probing the candidate on disk
-                # (mirroring the companion `imports` edge's
-                # _resolve_python_module_path) resolves `graphs` -> graphs/__init__.py
-                # instead of a nonexistent graphs.py: without it the target keeps an
-                # absolute-path-derived slug that the target_file stamp below can't
-                # heal, so it dangles per-checkout (#2455).
+                # @doc extract.md#C0008
                 candidate = base / module_name.replace(".", "/") if module_name else base
                 resolved = _probe_python_module_candidate(candidate)
                 if resolved is not None:
@@ -383,14 +356,7 @@ def _import_python(node, source: bytes, file_nid: str, stem: str, edges: list, s
                 "source_location": f"L{node.start_point[0] + 1}",
                 "weight": 1.0,
             }
-            # Stamp the resolved target file (mirroring _import_js, #1814) so
-            # the #2169 remap pass can canonicalize this edge's target on an
-            # incremental run where the target file itself is not in the
-            # batch — without it the target keeps an absolute-path-derived id
-            # that matches no node in the merged graph and dangles (#2213).
-            # Existence-gated: a speculative import of a nonexistent sibling
-            # must stay dangling, exactly as before. The stamp is transient
-            # and popped before graph.json ships.
+            # @doc extract.md#C0009
             if target_path is not None:
                 try:
                     if target_path.is_file():
@@ -402,8 +368,7 @@ def _import_python(node, source: bytes, file_nid: str, stem: str, edges: list, s
 
 def _import_js(node, source: bytes, file_nid: str, stem: str, edges: list, str_path: str, scope_stack: list[str] | None = None) -> None:
     is_reexport = node.type == "export_statement"
-    # Only handle export_statement if it has a `from` clause (re-export).
-    # Pure exports like `export const x = 1` or `export { localVar }` have no source module.
+    # @doc extract.md#C0010
     if is_reexport:
         has_from = any(child.type == "from" or (_read_text(child, source) == "from") for child in node.children if child.type in ("from", "identifier"))
         if not has_from:
@@ -412,16 +377,7 @@ def _import_js(node, source: bytes, file_nid: str, stem: str, edges: list, str_p
             if not has_from:
                 return
 
-    # `import type {...} from` / `export type {...} from` are erased by the
-    # TypeScript compiler: no runtime emit, no module-graph edge. The
-    # dependency is still real for "what references this type", so the edge is
-    # stamped `type_only` rather than dropped, and Import Cycles excludes it
-    # the way it already excludes deferred `import(...)` (#1241) - on the
-    # reporter's corpus all 3 reported cycles closed only through these
-    # (#3123). The grammar keeps `import type from './x'` (a default binding
-    # NAMED type) distinct: there `type` sits inside the import_clause, not as
-    # a bare keyword child of the statement. A mixed `import { type B, C }`
-    # stays a runtime edge - C is a runtime import.
+    # @doc extract.md#C0011
     is_type_only = any(
         child.type == "type" and not child.is_named for child in node.children
     )
@@ -432,9 +388,7 @@ def _import_js(node, source: bytes, file_nid: str, stem: str, edges: list, str_p
             module_string = child
             break
         if child.type == "import_require_clause":
-            # TS import-equals form: `import x = require("./m")`. The module
-            # string sits inside the clause, not on the import_statement
-            # itself, so the direct-child scan above never sees it.
+            # @doc extract.md#C0012
             module_string = next(
                 (sub for sub in child.children if sub.type == "string"), None
             )
@@ -444,9 +398,7 @@ def _import_js(node, source: bytes, file_nid: str, stem: str, edges: list, str_p
         resolved = _resolve_js_import_target(raw, str_path)
         if resolved is not None:
             tgt_nid, resolved_path = resolved
-            # `_resolve_js_import_path` returns the attempted path when no
-            # local file exists. Static ES imports must treat that as unresolved
-            # rather than minting a checkout-specific target ID (#2457).
+            # @doc extract.md#C0013
             if resolved_path is not None and not resolved_path.is_file():
                 tgt_nid = _make_id("ref", raw)
                 resolved_path = None
@@ -460,29 +412,20 @@ def _import_js(node, source: bytes, file_nid: str, stem: str, edges: list, str_p
                 "source_location": f"L{node.start_point[0] + 1}",
                 "weight": 1.0,
             }
-            # Stamp the resolved target file so a same-basename cross-extension
-            # sibling (foo.ts importing/re-exporting ./foo.mjs) keys its target salt
-            # by the TARGET's file rather than the importer's. Both files collapse to
-            # the base id `foo`; without this the salted lookup mis-points the target
-            # back onto the importer's own variant, a phantom self-loop (#1814).
+            # @doc extract.md#C0014
             if resolved_path is not None:
                 edge["target_file"] = str(resolved_path)
             if is_type_only:
                 edge["type_only"] = True
             edges.append(edge)
 
-    # Emit symbol-level edges for named imports/re-exports from local/aliased files.
-    # e.g. `import { Foo, type Bar } from './bar'` → file → Foo, file → Bar (EXTRACTED)
-    # e.g. `export { Foo } from './bar'` → file → Foo (re_exports edge)
-    # Uses the same _make_id(target_stem, name) key that _extract_generic emits when
-    # defining the symbol, so these edges wire importers directly to existing symbol nodes.
+    # @doc extract.md#C0015
     if resolved_path is not None:
         target_stem = _file_stem(resolved_path)
         line = node.start_point[0] + 1
 
         if is_reexport:
-            # Handle: export { foo, bar } from './module'
-            #         export { default as baz } from './module'
+            # @doc extract.md#C0016
             for child in node.children:
                 if child.type == "export_clause":
                     for spec in child.children:
@@ -503,11 +446,7 @@ def _import_js(node, source: bytes, file_nid: str, stem: str, edges: list, str_p
                                     "source_file": str_path,
                                     "source_location": f"L{line}",
                                     "weight": 1.0,
-                                    # Which file this symbol target was synthesized
-                                    # from, so the id-remap post-pass can repoint a
-                                    # target the candidates rewrite never learns —
-                                    # a barrel defines no symbols (#1983). Transient,
-                                    # stripped at build like the #1814 stamp.
+                                    # @doc extract.md#C0017
                                     "target_file": str(resolved_path),
                                 })
         else:
@@ -578,8 +517,7 @@ def _import_c(node, source: bytes, file_nid: str, stem: str, edges: list, str_pa
     for child in node.children:
         if child.type in ("string_literal", "system_lib_string", "string"):
             raw = _read_text(child, source).strip('"<> ')
-            # Quoted includes: try to resolve to a real file so the target ID
-            # matches the node ID _extract_generic creates for that file.
+            # @doc extract.md#C0018
             if child.type != "system_lib_string":
                 resolved = _resolve_c_include_path(raw, str_path)
                 if resolved is not None:
@@ -593,10 +531,7 @@ def _import_c(node, source: bytes, file_nid: str, stem: str, edges: list, str_pa
                         "source_file": str_path,
                         "source_location": f"L{node.start_point[0] + 1}",
                         "weight": 1.0,
-                        # Stamp the resolved target, mirroring _import_python (#1814):
-                        # without it, an include whose header lives outside this
-                        # batch's paths keeps the raw absolute-path id no later pass
-                        # ever learns to relativize (#2243).
+                        # @doc extract.md#C0019
                         "target_file": str(resolved),
                     })
                     break
@@ -648,13 +583,7 @@ def _import_csharp(node, source: bytes, file_nid: str, stem: str, edges: list, s
 
 
 def _import_kotlin(node, source: bytes, file_nid: str, stem: str, edges: list, str_path: str, scope_stack: list[str] | None = None) -> None:
-    # Grammar 1.1.0 (PyPI tree_sitter_kotlin) emits an `import` node whose
-    # children are the `import` keyword and a `qualified_identifier` (the dotted
-    # path), optionally followed by `.` `*` (wildcard) or `as` + `identifier`
-    # (alias). There is no `path` field. Older forks emit `import_header` with a
-    # `path` field or a bare `identifier` child; keep those branches so the
-    # extractor works across grammar generations (#2526, adapted from PR #2531
-    # by @Mustaqeem66).
+    # @doc extract.md#C0020
     path_node = node.child_by_field_name("path")
     if path_node is None:
         path_node = next(
@@ -670,9 +599,7 @@ def _import_kotlin(node, source: bytes, file_nid: str, stem: str, edges: list, s
         )
     if not raw:
         return
-    # Wildcard (`import a.b.*`): imports a whole package, not a symbol. The last
-    # path segment is a PACKAGE name, so a symbol-level edge would dangle on (or
-    # collide with) an unrelated node that happens to share the package's name.
+    # @doc extract.md#C0021
     if raw.endswith(".*") or raw == "*" or any(c.type == "*" for c in node.children):
         return
     # Alias (`import a.b.C as D`): the alias is the identifier child after `as`.
@@ -687,10 +614,7 @@ def _import_kotlin(node, source: bytes, file_nid: str, stem: str, edges: list, s
     module_name = raw.split(".")[-1].strip()
     if not module_name:
         return
-    # Target is the bare last segment for now; _resolve_kotlin_import_targets
-    # rewrites it to the real node id via the target_fqn stamped here, once the
-    # per-file package index exists. Unresolved targets stay dangling like other
-    # languages' external imports.
+    # @doc extract.md#C0022
     edges.append({
         "source": file_nid,
         "target": _make_id(module_name),
@@ -763,9 +687,7 @@ def _get_c_func_name(node, source: bytes) -> str | None:
 # ── JS/TS extra walk for arrow functions ──────────────────────────────────────
 
 
-# Node types whose value is a callable, for the JS/TS assignment / class-field
-# / function-expression forms below. Older tree-sitter-javascript grammars
-# label a function expression `function`; current ones use `function_expression`.
+# @doc extract.md#C0023
 
 
 # ── TS extra walk for namespace / module declarations ─────────────────────────
@@ -806,13 +728,7 @@ _JS_CONFIG = LanguageConfig(
     call_accessor_node_types=frozenset({"member_expression"}),
     call_accessor_field="property",
     call_accessor_object_field="object",
-    # `function_expression` belongs here so UNTRACKED inline/nested expressions
-    # reach walk_calls' existing closure handler, which already names the type
-    # (`_JS_CLOSURE_TYPES`). Without it the gate never opens, so such an
-    # expression's parameters and locals never fold into extra_locals for its
-    # subtree and read as by-name references (#2241 family). A top-level
-    # `const f = function (…) {}` is tracked via its declarator and was already
-    # fine; the inline/nested forms are what this covers.
+    # @doc extract.md#C0024
     function_boundary_types=frozenset({"function_declaration", "generator_function_declaration", "arrow_function", "method_definition", "function_expression", "generator_function"}),
     import_handler=_import_js,
 )
@@ -839,10 +755,7 @@ _TS_CONFIG = LanguageConfig(
     import_handler=_import_js,
 )
 
-# .tsx files must use the TSX grammar (JSX-aware), not the plain TypeScript grammar.
-# tree-sitter-typescript ships two languages: language_typescript (for .ts) and
-# language_tsx (for .tsx). Parsing .tsx with language_typescript silently fails on
-# JSX expressions, dropping any call_expression nested inside JSX (e.g. {fmtDate(x)}).
+# @doc extract.md#C0025
 _TSX_CONFIG = LanguageConfig(
     ts_module="tree_sitter_typescript",
     ts_language_fn="language_tsx",
@@ -860,17 +773,14 @@ _TSX_CONFIG = LanguageConfig(
 
 _JAVA_CONFIG = LanguageConfig(
     ts_module="tree_sitter_java",
-    # record_declaration shares class_declaration's name/body/interfaces fields,
-    # so it becomes a first-class type node instead of an isolated file (#1373).
-    # Enums and annotation declarations use the same name/body contract.
+    # @doc extract.md#C0026
     class_types=frozenset({
         "class_declaration", "interface_declaration", "record_declaration",
         "enum_declaration", "annotation_type_declaration",
     }),
     function_types=frozenset({"method_declaration", "constructor_declaration"}),
     import_types=frozenset({"import_declaration"}),
-    # object_creation_expression (`new Foo(...)`) is handled by a dedicated Java
-    # branch in walk_calls below — its callee is in the `type` field, not `name`.
+    # @doc extract.md#C0027
     call_types=frozenset({"method_invocation", "object_creation_expression"}),
     call_function_field="name",
     call_accessor_node_types=frozenset(),
@@ -933,11 +843,7 @@ def _ruby_sanitize_method_name(name: str) -> str:
 
 _RUBY_CONFIG = LanguageConfig(
     ts_module="tree_sitter_ruby",
-    # `module Foo` is a container node just like `class Foo` in tree-sitter's
-    # Ruby grammar (name in a `constant` child, body in `body_statement`), so it
-    # gets a node and its methods attach via `method` (#1640). Without it, plain
-    # utility/`module_function` modules produced no node and their methods hung
-    # off the file via `contains` with dot-less labels.
+    # @doc extract.md#C0028
     class_types=frozenset({"class", "module"}),
     function_types=frozenset({"method", "singleton_method"}),
     import_types=frozenset(),
@@ -961,8 +867,7 @@ _CSHARP_CONFIG = LanguageConfig(
     }),
     function_types=frozenset({"method_declaration"}),
     import_types=frozenset({"using_directive"}),
-    # `object_creation_expression` joins the invocation node so `new Foo(...)`
-    # links the constructing method to Foo, the way Java has since #1373.
+    # @doc extract.md#C0029
     call_types=frozenset({"invocation_expression", "object_creation_expression"}),
     call_function_field="function",
     call_accessor_node_types=frozenset({"member_access_expression"}),
@@ -976,17 +881,13 @@ _KOTLIN_CONFIG = LanguageConfig(
     ts_module="tree_sitter_kotlin",
     class_types=frozenset({"class_declaration", "object_declaration"}),
     function_types=frozenset({"function_declaration"}),
-    # Grammar 1.1.0 (PyPI tree_sitter_kotlin) names the import node `import`;
-    # older forks use `import_header`. Accept both (#2526).
+    # @doc extract.md#C0030
     import_types=frozenset({"import_header", "import"}),
     call_types=frozenset({"call_expression"}),
     call_function_field="",
     call_accessor_node_types=frozenset({"navigation_expression"}),
     call_accessor_field="",
-    # Different tree-sitter-kotlin grammar versions name plain identifier
-    # nodes differently: PyPI's `tree_sitter_kotlin` uses `identifier`,
-    # older forks use `simple_identifier`. Accept both so the extractor
-    # works across grammar generations.
+    # @doc extract.md#C0031
     name_fallback_child_types=("simple_identifier", "identifier"),
     body_fallback_child_types=("function_body", "class_body", "enum_class_body"),
     function_boundary_types=frozenset({"function_declaration"}),
@@ -995,8 +896,7 @@ _KOTLIN_CONFIG = LanguageConfig(
 
 _SCALA_CONFIG = LanguageConfig(
     ts_module="tree_sitter_scala",
-    # traits are class-like containers with their own heritage (extends / with),
-    # so they need a node and the heritage walk just like classes and objects.
+    # @doc extract.md#C0032
     class_types=frozenset({"class_definition", "object_definition", "trait_definition"}),
     function_types=frozenset({"function_definition"}),
     import_types=frozenset({"import_declaration"}),
@@ -1013,8 +913,7 @@ _SCALA_CONFIG = LanguageConfig(
 _PHP_CONFIG = LanguageConfig(
     ts_module="tree_sitter_php",
     ts_language_fn="language_php",
-    # interfaces/enums/traits are class-like containers whose heritage
-    # (extends/implements) and members must be captured, same as classes.
+    # @doc extract.md#C0033
     class_types=frozenset({
         "class_declaration",
         "interface_declaration",
@@ -1023,10 +922,7 @@ _PHP_CONFIG = LanguageConfig(
     }),
     function_types=frozenset({"function_definition", "method_declaration"}),
     import_types=frozenset({"namespace_use_clause"}),
-    # object_creation_expression joins the dispatch set so `new Foo(...)` links
-    # the constructing method to Foo (engine has a dedicated PHP branch: the
-    # class sits in a bare name/qualified_name child, not a field) - the PHP
-    # twin of Java #1373 / C# #2997 (#3115).
+    # @doc extract.md#C0034
     call_types=frozenset({"function_call_expression", "member_call_expression", "scoped_call_expression", "class_constant_access_expression", "object_creation_expression"}),
     static_prop_types=frozenset({"scoped_property_access_expression"}),
     helper_fn_names=frozenset({"config"}),
@@ -1036,8 +932,7 @@ _PHP_CONFIG = LanguageConfig(
     call_accessor_node_types=frozenset({"member_call_expression"}),
     call_accessor_field="name",
     name_fallback_child_types=("name",),
-    # enums wrap their members in an enum_declaration_list rather than a
-    # declaration_list, so the body walk needs it to reach enum methods/cases.
+    # @doc extract.md#C0035
     body_fallback_child_types=("declaration_list", "compound_statement", "enum_declaration_list"),
     function_boundary_types=frozenset({"function_definition", "method_declaration"}),
     import_handler=_import_php,
@@ -1131,9 +1026,7 @@ _SWIFT_CONFIG = LanguageConfig(
 # ── Ruby local type inference (for member-call resolution) ─────────────────────
 
 
-# `Const = <factory>(...)` shapes that define a lightweight class named after the
-# constant. tree-sitter parses each as an `assignment`, not a `class`, so the
-# generic class branch never saw them (#1640).
+# @doc extract.md#C0036
 
 
 # ── Generic extractor ─────────────────────────────────────────────────────────
@@ -1232,10 +1125,7 @@ def _extract_python_rationale(path: Path, result: dict) -> None:
         return None
 
     def _add_rationale(text: str, line: int, parent_nid: str) -> None:
-        # Normalize whitespace before truncating, not after: slicing raw text
-        # first can land mid-word, leave a run of literal spaces where a
-        # newline + indentation used to be, or end on a "." that turns into
-        # an Obsidian "..md" filename once export.py appends the extension.
+        # @doc extract.md#C0037
         label = _shorten_rationale_label(text)
         rid = _make_id(stem, "rationale", str(line))
         if rid not in seen_ids:
@@ -1257,9 +1147,7 @@ def _extract_python_rationale(path: Path, result: dict) -> None:
             "weight": 1.0,
         })
 
-    # Module-level docstring — skip for auto-generated files (Alembic, Django
-    # migrations, protobuf stubs, etc.) whose module docstrings are revision
-    # annotations, not architectural rationale.
+    # @doc extract.md#C0038
     if not _is_autogenerated_python(source):
         ds = _get_docstring(root)
         if ds:
@@ -1303,15 +1191,7 @@ def _extract_python_rationale(path: Path, result: dict) -> None:
             _add_rationale(stripped, lineno, file_nid)
 
 
-# ── TypeScript import type normalization (#3154) ──────────────────────────────
-# tree-sitter-typescript misparses `import(...)` types used inside explicit call-
-# expression type arguments (e.g. `f<typeof import("mod")>()` or
-# `f<import("mod").Foo>()`) as binary comparison expressions (`<` and `>`).
-# The trailing `();` generates an ERROR node, leaving an open `binary_expression`
-# that absorbs subsequent declarations as anonymous `function_expression` or `class`
-# expressions, silently dropping them from extraction. Normalizing `import(...)`
-# within generic call type arguments `<...>(...)` to a valid type identifier of
-# identical byte length keeps AST parsing clean while preserving source offsets.
+# @doc extract.md#C0039
 
 _TS_IMPORT_CALL_RE = re.compile(
     rb"\bimport\s*\(\s*['\"][^'\"\r\n]+['\"]\s*\)"
@@ -1328,9 +1208,7 @@ def _ts_import_is_code(root: Any, start: int) -> bool:
     """
     node = root.descendant_for_byte_range(start, start + 1)
     if node is None:
-        # A malformed tree can leave a byte range uncovered. Treat it as code
-        # and let the structural pass decide whether it belongs to a type list;
-        # never turn an uncertain lexical result into a crash.
+        # @doc extract.md#C0040
         return True
     in_template_substitution = False
     while node is not None:
@@ -1391,16 +1269,12 @@ def _ts_mask_candidate_is_malformed(
     start, end = masked_range
     opener = original_root.descendant_for_byte_range(start, start + 1)
     if opener is None or opener.type != "<":
-        # A grammar that already gives us a structural type_arguments node is
-        # safe to normalize; no binary/comparison ambiguity is present.
+        # @doc extract.md#C0041
         return True
     if opener.parent is None or opener.parent.type != "binary_expression":
         return True
 
-    # A malformed generic's ERROR starts at the closing `>` (or at the call
-    # punctuation immediately following it). Keep this window deliberately
-    # narrow so an unrelated syntax error elsewhere cannot authorize masking a
-    # valid runtime comparison.
+    # @doc extract.md#C0042
     for error in errors:
         if error.start_byte <= end + 2 and error.end_byte >= end - 1:
             return True
@@ -1423,10 +1297,7 @@ def _normalize_ts_import_types(source: bytes, *, tsx: bool = False) -> bytes | N
     if not raw_matches:
         return None
 
-    # tree-sitter is already a required TypeScript dependency for extraction.
-    # If it cannot be loaded here, leave the source untouched; the normal AST
-    # path will report its own dependency/parser error rather than applying an
-    # unsafe textual guess.
+    # @doc extract.md#C0043
     try:
         import tree_sitter_typescript as ts_typescript
         from tree_sitter import Language, Parser
@@ -1446,10 +1317,7 @@ def _normalize_ts_import_types(source: bytes, *, tsx: bool = False) -> bytes | N
     if not matches:
         return None
 
-    # If the original tree already has a type_arguments node around a match,
-    # its syntax is parseable as written. This includes the grammar's deliberate
-    # comparison-vs-generic ambiguity (`a < b, import("...") > (d)`); retaining
-    # that source is essential because it is a runtime expression, not a type.
+    # @doc extract.md#C0044
     original_type_ranges = _ts_type_argument_ranges(original_root, call_only=False)
     matches = [
         match for match in matches
@@ -1459,9 +1327,7 @@ def _normalize_ts_import_types(source: bytes, *, tsx: bool = False) -> bytes | N
         return None
 
     def placeholder(match: "re.Match[bytes]") -> bytes:
-        # Keep CR/LF bytes intact. The first byte becomes an ordinary type
-        # identifier and the remaining bytes are padding, so every downstream
-        # byte offset remains identical to the user's source.
+        # @doc extract.md#C0045
         matched = match.group(0)
         return b"T" + re.sub(rb"[^\r\n]", b" ", matched[1:])
 
@@ -1471,10 +1337,7 @@ def _normalize_ts_import_types(source: bytes, *, tsx: bool = False) -> bytes | N
 
     root = parser.parse(bytes(masked)).root_node
 
-    # Only call/new-expression type arguments need this workaround. Ordinary
-    # type annotations already parse ``import(...)`` correctly and should keep
-    # their native AST shape. A range from an outer call's type_arguments also
-    # covers nested generic arguments.
+    # @doc extract.md#C0046
     type_argument_ranges = _ts_type_argument_ranges(root, call_only=True)
     errors = _ts_error_nodes(original_root)
 
@@ -1571,22 +1434,7 @@ def _rescue_js_dynamic_imports(path: Path, result: dict) -> None:
         for e in result.get("edges", []):
             # Only a FILE-level deferred edge makes the rescue redundant (#2584).
             #
-            # `_dynamic_import_js` emits `caller_nid -> target`, and `caller_nid` is this
-            # file's node only when the `import()` sits at module scope. Written inside a
-            # function it is that function's node — a different fact, at a granularity
-            # `affected` does not walk. Matching on target alone treated the two as one and
-            # skipped the rescue, so a dynamic import inside a function ended up with no
-            # file-level edge at all. The reverse walk then reached the enclosing function
-            # and stopped: the only edge pointing at it is `contains`, deliberately kept out
-            # of DEFAULT_AFFECTED_RELATIONS.
-            #
-            # Measured on a ~700-file TS repo: `affected --depth 3` returned 39 of 49 truly
-            # affected files (recall 0.80, precision 1.00) and deeper traversal did not help,
-            # which is a dead end rather than a depth limit. It stayed hidden because the
-            # usual case still resolves — when the next importer imports that exact symbol
-            # by name there IS an edge into the function. Switch that importer to
-            # `import * as ns` or a side-effect `import './dyn'` and the same graph goes
-            # silent.
+            # @doc extract.md#C0047
             if (e.get("deferred") and e.get("relation") == "imports_from"
                     and e.get("source") == file_node_id):
                 deferred_ids.add(e.get("target"))
@@ -1596,10 +1444,7 @@ def _rescue_js_dynamic_imports(path: Path, result: dict) -> None:
                         deferred_files.add(str(Path(tf).resolve()))
                     except OSError:
                         deferred_files.add(str(tf))
-        # `(?<!\w)` so `fooimport('x')` and `_import('x')` do not match. The
-        # backtick alternative mirrors _dynamic_import_js's template-string
-        # handling: a literal `import(`./x`)` resolves, `${`-substituted ones
-        # are excluded (no `$` in the class) as statically unresolvable.
+        # @doc extract.md#C0048
         for m in _re.finditer(
             r"""(?<!\w)import\s*\(\s*(?:'([^'\n]+)'|"([^"\n]+)"|`([^`$\n]+)`)\s*\)""",
             src,
@@ -1614,8 +1459,7 @@ def _rescue_js_dynamic_imports(path: Path, result: dict) -> None:
             if resolution is None:
                 continue
             node_id, _stub_sf, resolved_file = resolution
-            # AST-captured already: same resolved target id, same resolved
-            # on-disk file, or the engine's ref-namespaced external id.
+            # @doc extract.md#C0049
             if node_id in deferred_ids or _make_id("ref", raw) in deferred_ids:
                 continue
             if resolved_file is not None:
@@ -1624,12 +1468,7 @@ def _rescue_js_dynamic_imports(path: Path, result: dict) -> None:
                         continue
                 except OSError:
                     pass
-            # One file depending on one module is one file-level fact, however many
-            # call sites defer it. Pre-existing (two module-scope `import('./x')` in one
-            # file already emitted two identical edges on v8), but #2584 routes every
-            # in-function dynamic import through here too, which would turn an edge case
-            # into the common one — a hub module deferred from eight functions of the same
-            # file would carry eight identical arrows.
+            # @doc extract.md#C0050
             emit_key = str(resolved_file.resolve()) if resolved_file is not None else raw
             if emit_key in rescued_targets:
                 continue
@@ -1644,14 +1483,7 @@ def _rescue_js_dynamic_imports(path: Path, result: dict) -> None:
 
 # ── JS/TS rationale + doc-reference extraction ────────────────────────────────
 #
-# Parity with _extract_python_rationale: Python files get rationale nodes from
-# docstrings and `# NOTE:`-style comments, but JS/TS comments were discarded
-# entirely. That silently drops two high-value signals in mixed corpora:
-#   1. rationale comments (`// NOTE:`, `// WHY:`, ...) — same as Python;
-#   2. architecture-decision references (`ADR-0011`, `RFC 793`) that teams
-#      conventionally cite in file/function headers. These are the natural
-#      join points between code and design docs in the same graph — without
-#      them, code<->ADR edges never form even when the code cites the ADR.
+# @doc extract.md#C0051
 
 _JS_RATIONALE_PREFIXES = (
     "// NOTE:", "// IMPORTANT:", "// HACK:", "// WHY:", "// RATIONALE:",
@@ -1660,9 +1492,7 @@ _JS_RATIONALE_PREFIXES = (
     "* TODO:", "* FIXME:",
 )
 
-# Doc-reference tokens worth first-classing as graph nodes. Deliberately
-# conservative: ADR-NNNN (Architecture Decision Records, any zero padding)
-# and RFC NNNN / RFC-NNNN.
+# @doc extract.md#C0052
 _JS_DOC_REF_RE = re.compile(r"\b(ADR[- ]?\d{1,5}|RFC[- ]?\d{1,5})\b", re.IGNORECASE)
 
 # Only look for doc references inside comments, not string literals or code.
@@ -1687,10 +1517,7 @@ def _extract_js_rationale(path: Path, result: dict) -> None:
     seen_doc_refs: set[str] = set()
 
     def _add_rationale(text: str, line: int) -> None:
-        # Normalize whitespace before truncating, not after: slicing raw text
-        # first can land mid-word, leave a run of literal spaces where a
-        # newline + indentation used to be, or end on a "." that turns into
-        # an Obsidian "..md" filename once export.py appends the extension.
+        # @doc extract.md#C0053
         label = _shorten_rationale_label(text)
         rid = _make_id(stem, "rationale", str(line))
         if rid not in seen_ids:
@@ -1713,8 +1540,7 @@ def _extract_js_rationale(path: Path, result: dict) -> None:
         })
 
     def _add_doc_ref(token: str, line: int) -> None:
-        # Normalize "adr 11" / "ADR-0011" spellings to a canonical "ADR-0011"
-        # style label so references to the same document collapse to one node.
+        # @doc extract.md#C0054
         kind, num = re.match(r"([A-Za-z]+)[- ]?(\d+)", token).groups()
         kind = kind.upper()
         label = f"{kind}-{num.zfill(4)}" if kind == "ADR" else f"{kind}-{num}"
@@ -1772,18 +1598,14 @@ def _resolve_rescued_specifier(
         )
         resolved_file = resolved if resolved is not None and resolved.is_file() else None
         return _make_id(str(resolved)), str(resolved), resolved_file
-    # Check tsconfig.json path aliases (e.g. "$lib/" -> "src/lib/",
-    # "@/" -> "src/") before treating as external. Mirrors _import_js
-    # logic so alias imports resolve to the same file node IDs the
-    # extractor creates (#701).
+    # @doc extract.md#C0055
     resolved_alias = _resolve_tsconfig_alias(raw, aliases, base_url=base_url)
     if resolved_alias is not None:
         resolved_alias = _resolve_js_module_path(resolved_alias)
         resolved_file = (resolved_alias if resolved_alias is not None
                          and resolved_alias.is_file() else None)
         return _make_id(str(resolved_alias)), str(resolved_alias), resolved_file
-    # Bare/scoped import (node_modules) - use last segment;
-    # build_from_json drops as external if no matching node exists.
+    # @doc extract.md#C0056
     module_name = raw.split("/")[-1]
     if not module_name:
         return None
@@ -1827,8 +1649,7 @@ def _emit_rescued_import(
         "source_file": str(path),
     }
     if resolved_file is not None:
-        # Real file on disk: edge only (no stub node), stamped so the #2169
-        # canonicalization pass repoints it at the real node (#2195).
+        # @doc extract.md#C0057
         edge["target_file"] = str(resolved_file)
         result.setdefault("edges", []).append(edge)
         return
@@ -1857,9 +1678,7 @@ def extract_svelte(path: Path) -> dict:
         import re as _re
         src = path.read_text(encoding="utf-8", errors="replace")
         existing_ids = {n["id"] for n in result.get("nodes", [])}
-        # Source file node ID must match the one _extract_generic creates:
-        # _make_id(str(path)) - single arg, no stem prefix. Otherwise the source
-        # endpoint is a phantom node and build_from_json drops the edge (#701).
+        # @doc extract.md#C0058
         file_node_id = _make_id(str(path))
         aliases = _load_tsconfig_aliases(path.parent)
         base_url = _load_tsconfig_base_url(path.parent)
@@ -1867,19 +1686,12 @@ def extract_svelte(path: Path) -> dict:
             raw = m.group(1)
             if not raw:
                 continue
-            # Resolution + emit shared with the static pass below: relative
-            # paths and tsconfig aliases probe real on-disk extensions (#716,
-            # #701), and a target that IS a real file emits an edge stamped
-            # with target_file instead of an absolute-id ghost stub (#2195).
+            # @doc extract.md#C0059
             _emit_rescued_import(
                 result, existing_ids, file_node_id, path, raw,
                 "dynamic_import", aliases, base_url,
             )
-        # Static imports inside <script> blocks. The JS tree-sitter parser fed
-        # the full .svelte file produces a top-level ERROR node (HTML markup
-        # is not valid JS), so import_statement nodes are never reached and
-        # static imports are silently dropped (#713). Regex over each script
-        # body recovers them.
+        # @doc extract.md#C0060
         script_re = _re.compile(
             r"<script\b[^>]*>([\s\S]*?)</script\s*>", _re.IGNORECASE
         )
@@ -1922,8 +1734,7 @@ def extract_astro(path: Path) -> dict:
         file_node_id = _make_id(str(path))
         aliases = _load_tsconfig_aliases(path.parent)
         base_url = _load_tsconfig_base_url(path.parent)
-        # Dynamic imports anywhere in the file: `import('./X.astro')` is legal in
-        # frontmatter setup code and inside expression slots.
+        # @doc extract.md#C0061
         for m in _re.finditer(r"""import\(\s*['"]([^'"]+)['"]\s*\)""", src):
             raw = m.group(1)
             if not raw:
@@ -1932,9 +1743,7 @@ def extract_astro(path: Path) -> dict:
                 result, existing_ids, file_node_id, path, raw,
                 "dynamic_import", aliases, base_url,
             )
-        # Static imports: scan the `---...---` frontmatter at the file head plus any
-        # client-side <script> blocks. Both are TS/JS regions but live inside a file
-        # the JS tree-sitter parser cannot validate as a whole.
+        # @doc extract.md#C0062
         frontmatter_re = _re.compile(
             r"\A\s*---\s*\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|\Z)"
         )
@@ -1964,9 +1773,7 @@ def extract_astro(path: Path) -> dict:
     return result
 
 
-# The open-tag matcher skips over quoted attribute values so a `>` inside one
-# (e.g. Vue 3.3+ generic components: `<script setup lang="ts"
-# generic="T extends Record<string, unknown>">`) doesn't prematurely end the tag.
+# @doc extract.md#C0063
 
 
 def extract_vue(path: Path) -> dict:
@@ -1997,8 +1804,7 @@ def extract_vue(path: Path) -> dict:
 
     result = _extract_generic(path, config, source_override=masked_bytes)
 
-    # Dynamic `import('…')` calls aren't edged by the AST pass; recover by regex,
-    # mirroring extract_svelte/extract_astro.
+    # @doc extract.md#C0064
     try:
         existing_ids = {n["id"] for n in result.get("nodes", [])}
         file_node_id = _make_id(str(path))
@@ -2043,9 +1849,7 @@ def _extract_spock_fallback(path: Path, ts_result: dict) -> dict:
     str_path = str(path)
     stem = _file_stem(path)
 
-    # Only keep the file node from the tree-sitter pass (guaranteed present and
-    # correctly IDed) plus all import edges.  All other ts nodes are discarded to
-    # avoid orphaned method/constructor nodes whose parent edges were dropped.
+    # @doc extract.md#C0065
     file_node = next((n for n in ts_result.get("nodes", []) if n.get("label") == path.name), None)
     nodes: list[dict] = [file_node] if file_node else []
     edges: list[dict] = [e for e in ts_result.get("edges", []) if e.get("context") == "import"]
@@ -2078,9 +1882,7 @@ def _extract_spock_fallback(path: Path, ts_result: dict) -> dict:
 
     # Extract class declarations
     class_re = _re.compile(r"^\s*(?:[\w@]+\s+)*class\s+(\w+)")
-    # Extract Spock feature methods: def "..." () or def '...' ()
-    # Two separate capture groups per quote style so apostrophes inside
-    # double-quoted names (e.g. "shouldn't") are captured correctly.
+    # @doc extract.md#C0066
     feature_re = _re.compile(r"""^\s*def\s+(?:\"([^\"]+)\"|'([^']+)')\s*\(""")
     # Extract plain def methods (non-string names) as well
     plain_method_re = _re.compile(r"""^\s*def\s+(\w+)\s*\(""")
@@ -2143,22 +1945,11 @@ def extract_c(path: Path) -> dict:
     return _extract_generic(path, _C_CONFIG)
 
 
-# doctest / Catch2 name each test case with a string literal
-# (``TEST_CASE("name")``), which tree-sitter-cpp cannot parse: the construct
-# becomes an ERROR node and the whole test function is dropped from the graph
-# (issue #2594). Recover the test cases with a regex fallback, mirroring the
-# Spock handling of Groovy ``def "feature"()`` above. Scoped to doctest +
-# Catch2, which share this string-named-macro surface.
-#
-# Only the top-level test-declaration macros are recovered as callable nodes.
-# ``SUBCASE`` / ``SECTION`` are *nested* scopes inside a test body and
-# ``TEST_SUITE`` is a grouping wrapper, not a test function — emitting them as
-# file-contained nodes would fabricate wrong-granularity nodes and edges.
+# @doc extract.md#C0067
 _CPP_STRING_TEST_MACROS = (
     "TEST_CASE", "TEST_CASE_TEMPLATE", "SCENARIO",
 )
-# The name group consumes C-string escapes (``\"``, ``\\``) so a test whose
-# name embeds an escaped quote is captured whole, not truncated at the escape.
+# @doc extract.md#C0068
 _CPP_STRING_TEST_RE = re.compile(
     r'^[ \t]*(?:' + "|".join(_CPP_STRING_TEST_MACROS) + r')\s*\(\s*"((?:[^"\\]|\\.)+)"',
     re.MULTILINE,
@@ -2189,10 +1980,7 @@ def _augment_cpp_string_tests(path: Path, result: dict) -> dict:
     str_path = str(path)
     stem = _file_stem(path)
     file_nid = _make_id(str_path)
-    # A test name that is all punctuation (TEST_CASE("***")) normalizes to empty,
-    # so _make_id(stem, name) collapses onto this bare-stem id — colliding with
-    # the file's namespace and silently swallowing every later such test under
-    # one id (#1899). Detect that collapse and fall back to a line-positional id.
+    # @doc extract.md#C0069
     stem_collapse_id = _make_id(stem)
     nodes = result.setdefault("nodes", [])
     edges = result.setdefault("edges", [])
@@ -2207,8 +1995,7 @@ def _augment_cpp_string_tests(path: Path, result: dict) -> dict:
         if test_nid in seen_ids:
             continue
         seen_ids.add(test_nid)
-        # Keep the raw test name as the label (mirroring the Spock fallback,
-        # which labels feature methods with their quoted string name).
+        # @doc extract.md#C0070
         nodes.append({
             "id": test_nid,
             "label": f'"{test_name}"',
@@ -2228,15 +2015,9 @@ def _augment_cpp_string_tests(path: Path, result: dict) -> dict:
     return result
 
 
-# ── C++/CLI normalization (#2876) ────────────────────────────────────────────
-# tree-sitter-cpp implements none of `ref class`, `Type^`, `Type%`, `gcnew` or
-# `[assembly:…]`. The ERROR lands on the type header, which dissolves the whole
-# class body — a 141-method .NET interop wrapper yielded 12 junk symbols. These
-# rewrites map each spelling onto the nearest standard C++ one.
+# @doc extract.md#C0071
 
-# Only files carrying one of these engage the rewrite, so plain C/C++/CUDA is
-# parsed byte-for-byte as before. `^`/`%` alone are not markers: they are the
-# ordinary XOR and modulo operators.
+# @doc extract.md#C0072
 _CPP_CLI_MARKER_RE = re.compile(
     rb"\b(?:ref|value)\s+(?:class|struct)\b"
     rb"|\binterface\s+class\b"
@@ -2244,36 +2025,16 @@ _CPP_CLI_MARKER_RE = re.compile(
     rb"|\[\s*(?:assembly|module)\s*:"
 )
 
-# `public ref class Foo` / `value struct Bar` / `interface class Baz` → the
-# access specifier goes too: it is not legal at namespace scope, and leaving it
-# behind is what made recovery invent a stray `public` node.
+# @doc extract.md#C0073
 _CPP_CLI_CLASS_RE = re.compile(
     rb"(?:\b(?:public|private|protected)\s+)?\b(?:ref|value)\s+(?=(?:class|struct)\b)"
     rb"|(?:\b(?:public|private|protected)\s+)?\binterface\s+(?=class\b)"
 )
 # Handle (`String^ s`) and tracking-reference (`int% n`) suffixes.
 #
-# `^` and `%` are also XOR and modulo, and `String^ s` is lexically identical to
-# `a^ b` — attachment to the preceding token does not separate them, because
-# `a% b` and `hash^ mask` are attached too. Rewriting on attachment alone
-# corrupted those into `a  b` / `hash  mask`. So the rewrite is restricted to
-# the two positions where an operator reading is impossible or implausible.
-#
-# 1. Followed by a token that cannot begin an operand: `f(String^, int)`,
-#    `List<String^>`, `(String^)x`, `Object^;`. `a^,` is not valid C++, so
-#    there is no arithmetic to lose here. `*` and `&` are deliberately NOT in
-#    the set — `a^*p` and `a^&b` are valid XOR expressions, and `String^*` is
-#    rare enough not to be worth trading for them.
+# @doc extract.md#C0074
 _CPP_CLI_SUFFIX_UNAMBIGUOUS_RE = re.compile(rb"(?<=[A-Za-z0-9_>])[\^%](?=\s*[,)\]>;])")
-# 2. A type-shaped left side followed by a declarator: `System::String^ s`,
-#    `List<int>^ items`, `DataTable^ t`, `int% n`. Qualified names, a closing
-#    generic bracket, .NET's PascalCase convention and the primitive value
-#    types are all type positions; requiring one keeps lowercase operands like
-#    `count% 2` and `hash^ mask` as arithmetic. A capitalized name must also
-#    carry a lowercase letter, so SCREAMING_CASE constants stay arithmetic
-#    too (`MASK^ value`); a lone capital is exempt for generic parameters
-#    (`T^ x`). The type is captured and re-emitted so the substitution stays
-#    byte-length preserving.
+# @doc extract.md#C0075
 _CPP_CLI_SUFFIX_DECL_RE = re.compile(
     rb"(\b[A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)+"   # System::String
     rb"|\b[A-Z][A-Za-z0-9_]*[a-z][A-Za-z0-9_]*"                   # String, DataTable
@@ -2361,8 +2122,7 @@ def extract_php(path: Path) -> dict:
     return _extract_generic(path, _PHP_CONFIG)
 
 
-# One level of balanced parens (e.g. `Foo #(Bar #(int))`) — bounded so malformed
-# input cannot trigger pathological backtracking.
+# @doc extract.md#C0076
 
 
 def extract_lua(path: Path) -> dict:
@@ -2383,9 +2143,7 @@ def extract_swift(path: Path) -> dict:
 
 # ── Rust extractor (custom walk) ──────────────────────────────────────────────
 
-# Common Rust trait/stdlib method names that appear in virtually every codebase.
-# Resolving these cross-file produces spurious INFERRED edges across crate
-# boundaries (issue #908) — skip them from the unresolved-call queue entirely.
+# @doc extract.md#C0077
 
 
 # ── Zig ───────────────────────────────────────────────────────────────────────
@@ -2445,9 +2203,7 @@ def _canonicalize_csharp_namespace_nodes(all_nodes: list[dict], all_edges: list[
         all_nodes[:] = [node for node in all_nodes if id(node) not in drop_node_ids]
 
 
-# Languages whose identifiers are case-insensitive, so cross-file name resolution
-# may fold case. Everywhere else, case is semantic (`Path` the class vs `PATH` the
-# env var are distinct) and folding manufactures false edges / super-hubs (#1581).
+# @doc extract.md#C0078
 _CASE_INSENSITIVE_EXTS = frozenset({
     ".php", ".phtml", ".php3", ".php4", ".php5", ".php7", ".phps",  # PHP fns/classes
     ".sql",                                                          # SQL identifiers
@@ -2462,15 +2218,7 @@ def _lang_is_case_insensitive(source_file: object) -> bool:
     return Path(str(source_file)).suffix.lower() in _CASE_INSENSITIVE_EXTS
 
 
-# Language interop families for cross-file call resolution. A call in one language
-# can never bind by name to a definition in another family — a TSX component does
-# not invoke a Kotlin method, and a Python function does not invoke a Java one.
-# Families are grouped by REAL interop so legitimate cross-language resolution
-# keeps working: Kotlin/Java/Scala/Groovy share the JVM, C/C++/Objective-C/CUDA
-# share headers and symbols (Swift bridges to Objective-C), and JS/TS variants
-# (plus Vue/Svelte/Astro SFC script blocks) compile into one module graph.
-# Extensions absent from this map (docs, configs, unknown languages) resolve to
-# no family and are never filtered — same permissive default as before.
+# @doc extract.md#C0079
 _LANG_FAMILY_BY_EXT: dict[str, str] = {
     # JS/TS module graph (SFCs embed JS/TS)
     ".js": "jsts", ".jsx": "jsts", ".mjs": "jsts", ".cjs": "jsts",
@@ -2508,15 +2256,7 @@ def _lang_family(source_file: object) -> str | None:
     return _LANG_FAMILY_BY_EXT.get(Path(str(source_file)).suffix.lower())
 
 
-# A language's own built-in throwable hierarchy, keyed by the interop family of
-# the file that names it. `class FooApiException extends \Exception` in PHP means
-# PHP's global `Exception`, so a same-named class defined in a file of ANOTHER
-# family cannot be what it refers to (#2812). Scoped to built-in throwables on
-# purpose: they are the names every language ships and every corpus subclasses,
-# while a name a corpus commonly defines itself would suppress a real supertype
-# edge. `_LANGUAGE_BUILTIN_GLOBALS` covers the adjacent call-target case and is
-# deliberately separate — a flat set consulted at call sites, neither per-family
-# nor consulted by supertype resolution.
+# @doc extract.md#C0080
 _LANGUAGE_BUILTIN_BASE_CLASSES: dict[str, frozenset[str]] = {
     "php": frozenset({
         "Throwable", "Exception", "ErrorException", "Error", "TypeError",
@@ -2555,9 +2295,7 @@ _LANGUAGE_BUILTIN_BASE_CLASSES: dict[str, frozenset[str]] = {
     }),
 }
 
-# Folded companion, for referrers whose language resolves identifiers
-# case-insensitively (#1581) — PHP `extends \exception` names the same built-in
-# as `extends \Exception`. Mirrors the `real_by_label` / `real_by_label_ci` pair.
+# @doc extract.md#C0081
 _LANGUAGE_BUILTIN_BASE_CLASSES_CI: dict[str, frozenset[str]] = {
     family: frozenset(name.lower() for name in names)
     for family, names in _LANGUAGE_BUILTIN_BASE_CLASSES.items()
@@ -2599,9 +2337,7 @@ def _rewire_unique_stub_nodes(nodes: list[dict], edges: list[dict]) -> None:
             continue
         if node.get("source_file"):
             if _is_type_like_definition(node):
-                # Match stubs case-SENSITIVELY: a `Path` reference must not rewire to a
-                # `PATH` env var (#1581). Fold only for genuinely case-insensitive
-                # languages, where `foo` legitimately resolves to `Foo`.
+                # @doc extract.md#C0082
                 real_by_label.setdefault(key, []).append(node)
                 if _lang_is_case_insensitive(node.get("source_file")):
                     real_by_label_ci.setdefault(
@@ -2611,12 +2347,7 @@ def _rewire_unique_stub_nodes(nodes: list[dict], edges: list[dict]) -> None:
             continue
         stubs.append(node)
 
-    # Language families referencing each stub, for the function-merge guard (#1781):
-    # a cross-module `references` edge to a function used to dangle on a sourceless
-    # name-only stub because functions were excluded as rewire targets. We now allow
-    # a UNIQUE function definition to absorb it, but only when it shares a language
-    # family with the stub's referrers — so a Python `get_db` reference can't bind to
-    # a unique Go `get_db()` (mirrors the #1718/#1749 interop guard).
+    # @doc extract.md#C0083
     stub_ids = {str(s.get("id")) for s in stubs if s.get("id")}
     stub_families: dict[str, set] = {}
     supertype_stub_ids: set[str] = set()  # stubs used as a base type — never a function
@@ -2629,8 +2360,7 @@ def _rewire_unique_stub_nodes(nodes: list[dict], edges: list[dict]) -> None:
                 fam = _lang_family(edge.get("source_file"))
                 if fam is not None:
                     stub_families.setdefault(str(nid), set()).add(fam)
-                # A stub referenced as a supertype must resolve to a class/type,
-                # not a same-named function (you don't inherit from a function).
+                # @doc extract.md#C0084
                 if endpoint == "target" and rel in _SUPERTYPE_RELATIONS:
                     supertype_stub_ids.add(str(nid))
 
@@ -2641,14 +2371,10 @@ def _rewire_unique_stub_nodes(nodes: list[dict], edges: list[dict]) -> None:
             continue
         candidates = real_by_label.get(_node_label_key(stub), [])
         if len(candidates) != 1:
-            # No unique exact type match — fall back to a case-insensitive match, but
-            # only against case-insensitive-language definitions (so a case-sensitive
-            # `PATH` can never absorb a `Path` reference).
+            # @doc extract.md#C0085
             candidates = real_by_label_ci.get(_node_label_key(stub, fold=True), [])
         if len(candidates) != 1:
-            # #1781: no unique type — try a unique top-level FUNCTION definition,
-            # gated by (a) the stub not being used as a supertype and (b) a
-            # language-family match with the stub's referrers.
+            # @doc extract.md#C0086
             fcands = func_by_label.get(_node_label_key(stub), [])
             if len(fcands) == 1 and stub_id not in supertype_stub_ids:
                 fams = stub_families.get(stub_id, set())
@@ -2784,10 +2510,7 @@ def _merge_swift_extensions(
     if not extension_nids:
         return
 
-    # A genuine Swift type is the target of a `contains` edge from its file node;
-    # bare-reference shadow nodes (`let x: Foo`) carry a source_file but are NOT
-    # contained, so excluding them keeps a stub from making a real type look
-    # ambiguous — same predicate the Swift member-call resolver uses (#2538).
+    # @doc extract.md#C0087
     contained = {e.get("target") for e in all_edges if e.get("relation") == "contains"}
 
     label_to_canonical: dict[str, list[str]] = {}
@@ -2797,12 +2520,7 @@ def _merge_swift_extensions(
         label = n.get("label")
         if not label:
             continue
-        # The merge matches on label alone, so without a language gate
-        # `extension Data` / `extension Store` — idiomatic Swift — would absorb a
-        # same-named TypeScript or Python class in a polyglot repo and invent
-        # cross-language edges. Restrict candidates to Swift's own family, which
-        # keeps the intended Swift↔Objective-C folding, and skip builtin globals
-        # the way the member-call resolvers do (#1726, #2147).
+        # @doc extract.md#C0088
         if _lang_family(n.get("source_file")) != "native":
             continue
         if label in _LANGUAGE_BUILTIN_GLOBALS:
@@ -2825,11 +2543,7 @@ def _merge_swift_extensions(
 
     all_nodes[:] = [n for n in all_nodes if n.get("id") not in remap]
 
-    # Each extension file's `contains` edge ends up pointing at the canonical
-    # type — multiple files containing the same node is the intended shape:
-    # the type owns the methods, the files own their slice. Self-loops are
-    # dropped (e.g. an in-file extension method whose call already pointed at
-    # the canonical type).
+    # @doc extract.md#C0089
     def _key_of(e: dict, src: str, tgt: str) -> tuple:
         return (src, tgt, e.get("relation"), e.get("source_file"), e.get("source_location"))
 
@@ -2840,11 +2554,7 @@ def _merge_swift_extensions(
         src = remap.get(src0, src0)
         tgt = remap.get(tgt0, tgt0)
         if src == src0 and tgt == tgt0:
-            # Untouched by the merge — keep verbatim. The key below ignores
-            # confidence/weight/context, so deduping edges this pass never
-            # rewrote prunes legitimate parallel edges emitted elsewhere in the
-            # pipeline; one Swift extension in a polyglot repo was enough to
-            # silently drop unrelated edges from other languages (#2538).
+            # @doc extract.md#C0090
             seen_keys.add(_key_of(e, src0, tgt0))
             rewritten.append(e)
             continue
@@ -2911,9 +2621,7 @@ def _merge_csharp_partial_class_nodes(
     if not any(len(members) >= 2 for members in groups.values()):
         return
 
-    # Assembly probe (#2411). A node's `source_file` can be a bare filename at
-    # this point (ambiguous across project dirs), so map nid -> scanned path
-    # via per_file, which aligns 1:1 with `paths`.
+    # @doc extract.md#C0091
     nid_to_path: dict[str, Path] = {}
     for result, path in zip(per_file, paths):
         for pn in result.get("nodes") or []:
@@ -2998,10 +2706,7 @@ def _merge_csharp_partial_class_nodes(
 
     all_nodes[:] = [n for n in all_nodes if n.get("id") not in remap]
 
-    # Each half's file keeps a `contains` edge to the canonical type — multiple
-    # files containing one node is the intended shape (same as the Swift
-    # extension merge): the type owns the members, the files own their slice.
-    # Self-loops are dropped, exact duplicates dedup.
+    # @doc extract.md#C0092
     rewritten: list[dict] = []
     seen_keys: set[tuple] = set()
     for e in all_edges:
@@ -3018,9 +2723,7 @@ def _merge_csharp_partial_class_nodes(
         rewritten.append(e)
     all_edges[:] = rewritten
 
-    # raw_calls carry caller_nid, consumed by the member-call resolvers and the
-    # cross-file call pass after this merge — a top-level raw call whose caller
-    # is a merged-away class half must follow it onto the canonical node.
+    # @doc extract.md#C0093
     for result in per_file:
         for rc in result.get("raw_calls", []) or []:
             cn = rc.get("caller_nid")
@@ -3105,14 +2808,10 @@ def _resolve_swift_member_calls(
     def _key(label: str) -> str:
         return re.sub(r"[^a-zA-Z0-9]+", "", str(label)).lower()
 
-    # A genuine Swift type is the target of a `contains` edge from its file node.
-    # Bare type references create a same-label shadow node (via ensure_named_node)
-    # that carries a source_file but is NOT contained; excluding non-contained
-    # nodes keeps that shadow from making a real type name look ambiguous.
+    # @doc extract.md#C0094
     contained = {e.get("target") for e in all_edges if e.get("relation") == "contains"}
 
-    # Type name -> definition node ids (real, source-backed, type-like defs only).
-    # len != 1 is the god-node guard: an ambiguous type name bails.
+    # @doc extract.md#C0095
     type_def_nids: dict[str, list[str]] = {}
     node_by_id: dict[str, dict] = {}
     for n in all_nodes:
@@ -3130,13 +2829,7 @@ def _resolve_swift_member_calls(
         if tnode is not None:
             method_index[(src, _key(tnode.get("label", "")))] = tgt
 
-    # #2561: pending factory bindings (`let x = Factory.make()`) are label-only —
-    # resolve each against the factory method's marked plain return type
-    # (`swift_plain_return` on the return_type references edge) and fold the
-    # result into the declaring file's table so the raw-call loop below types
-    # `x.method()` through the existing INFERRED path. Every step is
-    # exactly-one guarded; any failure leaves the receiver untyped (no edge,
-    # never a wrong one). setdefault: an explicit annotation wins.
+    # @doc extract.md#C0096
     factory_by_file: dict[str, dict] = {}
     for result in per_file:
         tt = result.get("swift_type_table")
@@ -3152,8 +2845,7 @@ def _resolve_swift_member_calls(
                 return_targets_by_method.setdefault(
                     e.get("source"), set()).add(e.get("target"))
         for path, pending in factory_by_file.items():
-            # Copy before folding: the resolved label is corpus-dependent and
-            # must not leak back into the per-file result.
+            # @doc extract.md#C0097
             table = dict(type_table_by_file.get(path, {}))
             type_table_by_file[path] = table
             for receiver, bind in pending.items():
@@ -3193,9 +2885,7 @@ def _resolve_swift_member_calls(
         caller = rc.get("caller_nid")
         if not receiver or not callee or not caller:
             continue
-        # Determine the receiver's type. An upper-cased receiver is itself a type
-        # (Type.staticMethod(), Singleton.shared.x()); otherwise look it up in the
-        # declaring file's local type table.
+        # @doc extract.md#C0098
         if receiver[:1].isupper():
             type_name = receiver
             type_qualified = True
@@ -3204,19 +2894,12 @@ def _resolve_swift_member_calls(
             type_qualified = False
         if not type_name:
             continue
-        # A builtin receiver type (Data, NSLock, DispatchQueue, ...) must not
-        # resolve to a same-named user symbol — the cross-file CALL resolver and
-        # the TS/Python member-call resolvers already skip these globals (#1726);
-        # do the same for Swift (#2147).
+        # @doc extract.md#C0099
         if type_name in _LANGUAGE_BUILTIN_GLOBALS:
             continue
         type_defs = type_def_nids.get(_key(type_name), [])
         if not type_defs:
-            # Declared nowhere here — in a multi-repo setup that usually means "in
-            # a repo this build does not contain", so park it for the merge
-            # (#3152). This resolver shares `all_raw_calls` with every other
-            # language and Swift raw_calls carry no `lang` tag, so the parked
-            # entry's language comes from the declaring file's suffix.
+            # @doc extract.md#C0100
             if str(rc.get("source_file", "")).lower().endswith(".swift"):
                 _park_unresolved_member_call(
                     node_by_id.get(caller), callee, type_name, "swift", rc,
@@ -3231,10 +2914,7 @@ def _resolve_swift_member_calls(
         if target == caller or (caller, target) in existing_pairs:
             continue
         existing_pairs.add((caller, target))
-        # A type-qualified call (`Type.staticMethod()`) names the receiver type
-        # explicitly in source, so it is an exact reference — EXTRACTED, matching
-        # the Python qualified-class-method pass (#1533). An instance call whose
-        # receiver type came from local inference (`obj.method()`) stays INFERRED.
+        # @doc extract.md#C0101
         all_edges.append({
             "source": caller,
             "target": target,
@@ -3273,9 +2953,7 @@ def _resolve_python_member_calls(
 
     node_by_id: dict[str, dict] = {n.get("id"): n for n in all_nodes}
 
-    # A class owns methods: it is the source of one or more `method` edges. Index
-    # class label -> owning class node ids (len != 1 is the god-node guard), and
-    # (class_node_id, method_key) -> method_node_id.
+    # @doc extract.md#C0102
     class_def_nids: dict[str, list[str]] = {}
     method_index: dict[tuple[str, str], str] = {}
     for e in all_edges:
@@ -3288,9 +2966,7 @@ def _resolve_python_member_calls(
         tnode = node_by_id.get(tgt)
         if tnode is not None:
             method_index[(src, _key(tnode.get("label", "")))] = tgt
-    # A class with N methods produced N entries; collapse to a unique set. (No
-    # early return when there are no classes: the module arm below resolves
-    # `module.func()` where the callable is a plain function, not a method.)
+    # @doc extract.md#C0103
     for k in list(class_def_nids):
         class_def_nids[k] = sorted(set(class_def_nids[k]))
 
@@ -3298,11 +2974,7 @@ def _resolve_python_member_calls(
     for result in per_file:
         all_raw_calls.extend(result.get("raw_calls", []))
 
-    # Module-alias arm index (#1883): `module.func()` where `module` is imported.
-    # Key on stable node ids, not source_file strings (source_file is relativized
-    # by the CLI id-remap pass but raw_calls keep their original path, so a string
-    # join would miss under an explicit cache_root). The `imports` edge's source
-    # is the caller's own file node; `contains` maps a file node to its children.
+    # @doc extract.md#C0104
     contains_children: dict[str, dict[str, list[str]]] = {}
     file_of_node: dict[str, str] = {}
     for e in all_edges:
@@ -3314,10 +2986,7 @@ def _resolve_python_member_calls(
                     _key(tnode.get("label", "")), []).append(tgt)
                 file_of_node[tgt] = src
     imported_by_filenode: dict[str, set[str]] = {}
-    # Local alias bound by `as` on a specific import edge (#2082): `from pkg import
-    # mod as alias` / `import pkg.mod as alias` bind `alias`, not `mod`'s own stem,
-    # to the module in the importing file. Keyed by (importing file, target module)
-    # so two files aliasing the same module differently each match their own.
+    # @doc extract.md#C0105
     import_alias_by_filenode: dict[str, dict[str, str]] = {}
     for e in all_edges:
         if e.get("relation") in ("imports", "imports_from"):
@@ -3340,9 +3009,7 @@ def _resolve_python_member_calls(
         if not target_nid or target_nid == caller or (caller, target_nid) in existing_pairs:
             return
         existing_pairs.add((caller, target_nid))
-        # EXTRACTED: a qualified call (`ClassName.method()` or `module.func()`) is
-        # an explicit, unambiguous static reference resolved to exactly one
-        # definition (each arm applies a single-definition god-node guard).
+        # @doc extract.md#C0106
         all_edges.append({
             "source": caller,
             "target": target_nid,
@@ -3364,19 +3031,13 @@ def _resolve_python_member_calls(
         if not receiver or not callee or not caller:
             continue
         if receiver[:1].isupper():
-            # Class arm (#1446): a capitalized receiver is a class reference; an
-            # instance (`self`, `obj`) never collides with a same-spelled class.
+            # @doc extract.md#C0107
             class_nids = class_def_nids.get(_key(receiver), [])
             if len(class_nids) != 1:  # absent or ambiguous -> bail (god-node guard)
                 continue
             _emit_call(caller, method_index.get((class_nids[0], _key(callee))), rc)
         else:
-            # Module arm (#1883): a lowercase receiver may be an imported module.
-            # Resolve it against the modules imported into the caller's own file
-            # (so `self`/`obj`/local instances, which are not imported modules,
-            # never match), then to the single callable that module contains. A
-            # receiver also matches the local alias bound on that import edge
-            # (#2082), so an aliased import resolves the same as the bare name.
+            # @doc extract.md#C0108
             rkey = _key(receiver)
             caller_file = file_of_node.get(caller)
             file_aliases = import_alias_by_filenode.get(caller_file, {})
@@ -3444,12 +3105,7 @@ def _resolve_typescript_member_calls(
         if tnode is not None:
             method_index[(src, _key(tnode.get("label", "")))] = tgt
 
-    # Origin maps (#2553), built like the Python resolver's module arm: key on
-    # stable NODE ids, not source_file strings (raw_calls keep their original
-    # pre-relativization paths, so a string join would miss under an explicit
-    # cache_root). ``contains`` maps a node to its file node; a member call's
-    # caller is usually a METHOD node, which hangs off its class via a ``method``
-    # edge instead, so fold those through to the owning class's file.
+    # @doc extract.md#C0109
     file_of_node: dict[str, str] = {}
     for e in all_edges:
         if e.get("relation") == "contains":
@@ -3459,9 +3115,7 @@ def _resolve_typescript_member_calls(
             owner_file = file_of_node.get(e.get("source"))
             if owner_file is not None:
                 file_of_node.setdefault(e.get("target"), owner_file)
-    # ``imports`` targets are the imported symbol nodes; ``imports_from`` targets
-    # are module file nodes. A symbol id never collides with a file id, so one
-    # set serves both origin checks below.
+    # @doc extract.md#C0110
     imported_by_filenode: dict[str, set[str]] = {}
     for e in all_edges:
         if e.get("relation") in ("imports", "imports_from"):
@@ -3488,21 +3142,14 @@ def _resolve_typescript_member_calls(
             type_name = type_table_by_file.get(rc.get("source_file", ""), {}).get(receiver)
         if not type_name:
             continue
-        # A builtin global receiver type (Date, Promise, Map, ...) must not resolve
-        # to a user symbol. _key() casefolds, so `x: Date; x.getTime()` would bind
-        # the caller to a same-named user `class DATE` in another file, inventing
-        # phantom `references[call]` edges and a false god node (#1726). The
-        # cross-file CALL resolver already skips these globals; do the same here.
+        # @doc extract.md#C0111
         if type_name in _LANGUAGE_BUILTIN_GLOBALS:
             continue
         type_defs = type_def_nids.get(_key(type_name), [])
         if len(type_defs) != 1:
             continue
         type_nid = type_defs[0]
-        # Origin gate (#2553): the caller's file must actually see the matched
-        # type — same file, a named import of the type, or a module import of
-        # the type's file. Otherwise a third-party type name that happens to
-        # collide with a local class fabricates an edge; emit nothing.
+        # @doc extract.md#C0112
         caller_file = file_of_node.get(caller)
         type_file = file_of_node.get(type_nid)
         imported = imported_by_filenode.get(caller_file, set())
@@ -3514,16 +3161,12 @@ def _resolve_typescript_member_calls(
             continue
         method_nid = method_index.get((type_nid, _key(callee)))
         if not method_nid:
-            # Receiver typed, but the type has no such method. The old fallback
-            # (a `references` edge to the type node) was another fabrication
-            # vector; skip instead, matching the C# resolver.
+            # @doc extract.md#C0113
             continue
         if method_nid == caller or (caller, method_nid) in existing_pairs:
             continue
         existing_pairs.add((caller, method_nid))
-        # `Type.method()` names the receiver type explicitly in source —
-        # EXTRACTED; a receiver typed via the constructor-injection/local table
-        # is inference — INFERRED (the Swift/C#/Java ternary).
+        # @doc extract.md#C0114
         all_edges.append({
             "source": caller,
             "target": method_nid,
@@ -3573,9 +3216,7 @@ def _resolve_cpp_member_calls(
     def _key(label: str) -> str:
         return re.sub(r"[^a-zA-Z0-9]+", "", str(label)).lower()
 
-    # A genuine C++ type is the target of a `contains` edge from its file node;
-    # bare-reference shadow nodes (ensure_named_node stubs) are not contained, so
-    # excluding non-contained nodes keeps them from making a real type ambiguous.
+    # @doc extract.md#C0115
     contained = {e.get("target") for e in all_edges if e.get("relation") == "contains"}
 
     type_def_nids: dict[str, list[str]] = {}
@@ -3585,11 +3226,7 @@ def _resolve_cpp_member_calls(
         if n.get("source_file") and n.get("id") in contained and _is_type_like_definition(n):
             type_def_nids.setdefault(_key(n.get("label", "")), []).append(n["id"])
 
-    # (type_node_id, method_key) -> method_node_id, and caller -> enclosing type
-    # (the owning class) for `this->` calls. A C++ class owns its members via
-    # `method` edges (out-of-line definitions) AND `defines` edges (in-class
-    # declarations, which the extractor models as fields); index both so a header-
-    # declared `void bar();` resolves. `method` wins when a key has both.
+    # @doc extract.md#C0116
     method_index: dict[tuple[str, str], str] = {}
     enclosing_type: dict[str, str] = {}
     for rel in ("defines", "method"):
@@ -3617,9 +3254,7 @@ def _resolve_cpp_member_calls(
         if not receiver or not callee or not caller:
             continue
         src_file = rc.get("source_file", "")
-        # Only resolve C++ raw_calls (other languages share the raw_calls list;
-        # a `.h` may route to either extract_cpp or extract_objc by content, so the
-        # extractor-stamped `lang` tag — not the suffix — is the unambiguous gate).
+        # @doc extract.md#C0117
         if rc.get("lang") != "cpp":
             continue
         # Determine the receiver's type and the resulting confidence.
@@ -3633,11 +3268,7 @@ def _resolve_cpp_member_calls(
             # Foo::bar(): the type is named explicitly in source.
             type_defs = type_def_nids.get(_key(receiver), [])
             if not type_defs:
-                # Declared nowhere here, which in a multi-repo setup usually means
-                # "in a repo this build does not contain" (#3152). `Foo::bar()` is
-                # also the shape of a namespace-qualified free function, so the
-                # merge side's guards do the deciding: it acts only when exactly
-                # one other repo declares a `Foo` owning exactly one `bar`.
+                # @doc extract.md#C0118
                 _park_unresolved_member_call(
                     node_by_id.get(caller), callee, receiver, "cpp", rc,
                 )
@@ -3730,13 +3361,10 @@ def _resolve_csharp_member_calls(
         if n.get("source_file") and n.get("id") in contained and _is_type_like_definition(n):
             type_def_nids.setdefault(_key(n.get("label", "")), []).append(n["id"])
 
-    # Namespace/using/alias-aware simple-name resolution, shared with the C#
-    # type-reference pass (which has already arbitrated inherits/implements/
-    # references targets by the time the resolver registry runs).
+    # @doc extract.md#C0119
     resolver = CsharpNameResolver(all_nodes, all_edges)
 
-    # (type_node_id, method_key) -> method_node_id, and caller -> enclosing type.
-    # C# owns its methods via `method` edges.
+    # @doc extract.md#C0120
     method_index: dict[tuple[str, str], str] = {}
     enclosing_type: dict[str, str] = {}
     for e in all_edges:
@@ -3749,11 +3377,7 @@ def _resolve_csharp_member_calls(
         enclosing_type.setdefault(tgt, src)
         method_index[(src, _key(tnode.get("label", "")))] = tgt
 
-    # Base-class chain from `inherits` edges (C# files only). The type-reference
-    # pass has already re-pointed each resolvable base to its real definition and
-    # left unresolvable ones on dangling sourceless stubs — a stub target marks
-    # the derived type's base chain as UNRESOLVED (poison: an inherited-member
-    # lookup through it must bail, the member may be declared out of corpus).
+    # @doc extract.md#C0121
     bases_of: dict[str, list[str]] = {}
     unresolved_base: set[str] = set()
     for e in all_edges:
@@ -3864,8 +3488,7 @@ def _resolve_csharp_member_calls(
             type_qualified = True
         elif receiver[:1].isupper():
             # Type.M() — the type is named explicitly (also covers a Pascal-cased
-            # local whose name equals its type, resolved via the table below if the
-            # explicit-type lookup misses).
+            # @doc extract.md#C0122
             type_nid = _resolve_type_name_nid(receiver, caller_node, src_file)
             if not type_nid:
                 type_name = rc.get("receiver_type")
@@ -3935,8 +3558,7 @@ def _bind_member_field_tables(
                 if len(exact) == 1:
                     candidates = exact
                 else:
-                    # the node's source_file may have been relativized since
-                    # the entry was written; the basename still identifies it
+                    # @doc extract.md#C0123
                     base = os.path.basename(sf)
                     candidates = [
                         n for n in candidates
@@ -3994,11 +3616,7 @@ def _resolve_java_member_calls(
         method_index.setdefault((owner, key(method_node.get("label", ""))), set()).add(method)
 
     existing_pairs = {(edge.get("source"), edge.get("target")) for edge in all_edges}
-    # Inherited fields (#3151): a field declared on a superclass - possibly in
-    # another file - types a `this.<field>` receiver in the subclass. Safe
-    # because `this.` names a field by construction; no local can shadow it.
-    # The per-file tables ride the results keyed by class label + source_file
-    # (never node id, see #3150); bind each to its class node, ambiguity skips.
+    # @doc extract.md#C0124
     inherits_bases: dict[str, list[str]] = {}
     for edge in all_edges:
         if edge.get("relation") == "inherits":
@@ -4048,12 +3666,7 @@ def _resolve_java_member_calls(
                     continue
                 type_defs = type_def_nids.get(key(type_name), [])
                 if not type_defs:
-                    # The type is declared nowhere in this corpus, which in a
-                    # multi-repo setup usually means "in a repo this build does
-                    # not contain" rather than "does not exist" — park it for the
-                    # merge (#3152). An ambiguous name (>1 declaration) is a
-                    # local ambiguity that merging only widens, so it stays
-                    # dropped, exactly as the guard below already decided.
+                    # @doc extract.md#C0125
                     _park_unresolved_member_call(
                         node_by_id.get(caller), callee, type_name, "java", raw_call,
                     )
@@ -4121,8 +3734,7 @@ def _resolve_objc_member_calls(
         if tt and tt.get("path"):
             type_table_by_file[tt["path"]] = tt.get("table", {})
 
-    # #1556: cross-file `field -> ClassName` tables merged per class nid (the
-    # .h/.m pair share one id, preserved by _merge_decl_def_classes, so the header's
+    # @doc extract.md#C0126
     # @property entries and the impl's ivar entries land in one table). A cross-file
     # conflict on the same (class, field) drops the entry — no guess.
     field_types_by_class: dict[str, dict[str, str]] = {}
@@ -4175,8 +3787,7 @@ def _resolve_objc_member_calls(
         enclosing_type.setdefault(tgt, src)
         tnode = node_by_id.get(tgt)
         if tnode is not None:
-            # ObjC method labels carry a +/- sigil (`-doThing`); strip it so the
-            # selector `doThing` keys to the method.
+            # @doc extract.md#C0127
             method_index[(src, _key(tnode.get("label", "")))] = tgt
 
     all_raw_calls: list[dict] = []
@@ -4184,8 +3795,7 @@ def _resolve_objc_member_calls(
         all_raw_calls.extend(result.get("raw_calls", []))
 
     existing_pairs = {(e.get("source"), e.get("target")) for e in all_edges}
-    # A @property declared on a superclass types [self.<field> ...] in the
-    # subclass too (#3151): walk the inherits chain, nearest table first.
+    # @doc extract.md#C0128
     _objc_bases: dict[str, list[str]] = {}
     for e in all_edges:
         if e.get("relation") == "inherits":
@@ -4217,9 +3827,7 @@ def _resolve_objc_member_calls(
         if rc.get("lang") != "objc":
             continue
         if rc.get("receiver_kind") == "self_field":
-            # `[self.bar doIt]`: the extractor stamped the BARE field name; type it
-            # via the caller's own class's @property/ivar table. Checked before the
-            # capitalized arm so a capitalized field never reads as a class name.
+            # @doc extract.md#C0129
             cls = enclosing_type.get(caller)
             type_name = _field_type_up_chain(cls, receiver) if cls else None
             if not type_name:
@@ -4241,8 +3849,7 @@ def _resolve_objc_member_calls(
             type_nid = type_defs[0]
             type_qualified = True
         else:
-            # Locals shadow fields: the file's `Foo *f` local table first, then the
-            # enclosing class's @property/ivar table (covers `[_ivarBar doIt]`).
+            # @doc extract.md#C0130
             type_name = type_table_by_file.get(src_file, {}).get(receiver)
             if not type_name:
                 cls = enclosing_type.get(caller)
@@ -4313,9 +3920,7 @@ def _resolve_kotlin_import_targets(
     pkg_results = _kotlin_package_index(per_file)
     if not pkg_results:
         return
-    # package fqn -> {importable label -> [node ids]}. Member labels (leading
-    # dot) are not importable as `P.Name`, and sourceless reference stubs are
-    # not definitions; both are excluded so they can't shadow the real symbol.
+    # @doc extract.md#C0131
     pkg_symbols: dict[str, dict[str, list[str]]] = {}
     for pkg, results in pkg_results.items():
         by_label = pkg_symbols.setdefault(pkg, {})
@@ -4371,8 +3976,7 @@ def _resolve_csharp_qualified_calls(
     if not raw:
         return
 
-    # (namespace, type name) -> nids, over sourced type declarations only, so a
-    # sourceless stub minted for a dangling reference cannot win the match.
+    # @doc extract.md#C0132
     by_namespace: dict[tuple[str, str], list[str]] = {}
     for n in all_nodes:
         if not n.get("_callable_class") or not n.get("source_file"):
@@ -4384,9 +3988,7 @@ def _resolve_csharp_qualified_calls(
     if not by_namespace:
         return
 
-    # Scoped to `calls`: a method that both takes a type as a parameter and
-    # constructs it already has a `references` edge to it, and that edge says
-    # nothing about whether the construction was resolved.
+    # @doc extract.md#C0133
     existing_pairs = {
         (e.get("source"), e.get("target"))
         for e in all_edges
@@ -4459,8 +4061,7 @@ def _resolve_kotlin_qualified_calls(
         elif rel == "method":
             methods_by_type.setdefault(e.get("source"), []).append(e.get("target"))
 
-    # package fqn -> {name -> [top-level callable nids]} and
-    # package fqn -> {name -> [top-level type nids]} (classes/objects).
+    # @doc extract.md#C0134
     pkg_callables: dict[str, dict[str, list[str]]] = {}
     pkg_types: dict[str, dict[str, list[str]]] = {}
     for pkg, results in pkg_results.items():
@@ -4525,37 +4126,27 @@ def _resolve_kotlin_qualified_calls(
         })
 
 
-# Kotlin import-target resolution runs EARLY (directly in extract(), before the
-# shared call pass builds its import-evidence index) — registering it in the
-# tail registry would rewrite the targets after promotion already read them.
-# It still uses the registry's LanguageResolver/driver for the suffix gate and
-# failure isolation.
+# @doc extract.md#C0135
 _KOTLIN_IMPORT_TARGET_RESOLVER = LanguageResolver(
     "kotlin_import_targets", frozenset({".kt", ".kts"}), _resolve_kotlin_import_targets
 )
 
 
-# Register the cross-file, language-specific member-call resolvers into the shared
-# registry (framework lives in graphify.resolver_registry). A new language plugs in
-# by adding one register() call below — no edits to extract()'s body. Order
-# preserved from the prior inlined wiring: Swift (#1356) before Python (#1446).
+# @doc extract.md#C0136
 register_language_resolver(
     LanguageResolver("swift_member_calls", frozenset({".swift"}), _resolve_swift_member_calls)
 )
 register_language_resolver(
     LanguageResolver("python_member_calls", frozenset({".py"}), _resolve_python_member_calls)
 )
-# Ruby type-aware member-call resolution (Class.new + typed var.method). Lives in
-# graphify.ruby_resolution; registered here as a second consumer of the framework.
+# @doc extract.md#C0137
 register_language_resolver(
     LanguageResolver("ruby_member_calls", frozenset({".rb", ".rake"}), resolve_ruby_member_calls)
 )
 register_language_resolver(
     LanguageResolver("typescript_member_calls", frozenset({".ts", ".tsx", ".mts", ".cts", ".js", ".jsx"}), _resolve_typescript_member_calls)
 )
-# C++ (#1547) and ObjC (#1556) receiver-typed member-call resolution. `.h` is in
-# both suffix sets because it routes to extract_cpp or extract_objc by content; the
-# resolvers each claim only their own raw_calls via the extractor-stamped `lang`.
+# @doc extract.md#C0138
 register_language_resolver(
     LanguageResolver(
         "cpp_member_calls",
@@ -4570,20 +4161,14 @@ register_language_resolver(
         _resolve_objc_member_calls,
     )
 )
-# C# receiver-typed member-call resolution (#1609): `field/param/local.Method()`
-# bound to the receiver's declared type instead of a bare same-named match.
+# @doc extract.md#C0139
 register_language_resolver(
     LanguageResolver("csharp_member_calls", frozenset({".cs"}), _resolve_csharp_member_calls)
 )
 register_language_resolver(
     LanguageResolver("java_member_calls", frozenset({".java"}), _resolve_java_member_calls)
 )
-# Pascal/Delphi cross-file inherited-method-call resolution: a call from a
-# manual descendant class to a method it inherits from an ancestor declared
-# in a DIFFERENT file (the common generated-base/manual-descendant split,
-# e.g. Sistec's Th0Xxx/Th5Xxx) falls outside the per-file extractor's own
-# scope. Lives in graphify.pascal_resolution; registered here as a consumer
-# of the framework, same as the Ruby resolver above.
+# @doc extract.md#C0140
 register_language_resolver(
     LanguageResolver(
         "pascal_inherited_calls",
@@ -4591,27 +4176,19 @@ register_language_resolver(
         resolve_pascal_inherited_calls,
     )
 )
-# Kotlin fully-qualified call resolution (#2550): `com.pkg.Fn()` /
-# `com.pkg.Object.method()` raw_calls the shared pass skips (member calls with
-# no receiver). Runs in the tail registry like the other member-call resolvers;
-# its sibling import-target pass runs earlier (see _KOTLIN_IMPORT_TARGET_RESOLVER).
+# @doc extract.md#C0141
 register_language_resolver(
     LanguageResolver(
         "kotlin_qualified_calls", frozenset({".kt", ".kts"}), _resolve_kotlin_qualified_calls
     )
 )
-# C# qualified construction (#2997): `new A.B.Cache()` arrives as the bare name,
-# so a colliding `Cache` elsewhere makes it ambiguous. Runs in the tail registry
-# beside csharp_member_calls and matches the prefix against declared namespaces.
+# @doc extract.md#C0142
 register_language_resolver(
     LanguageResolver(
         "csharp_qualified_calls", frozenset({".cs"}), _resolve_csharp_qualified_calls
     )
 )
-# C# member-level interface dispatch (#3003): a call through an injected
-# dependency lands on the interface's method, so the implementation sits in the
-# graph unreachable from the call site. Lives in graphify.csharp_dispatch;
-# registered here as a consumer of the framework, like the Pascal resolver.
+# @doc extract.md#C0143
 register_language_resolver(
     LanguageResolver(
         "csharp_interface_dispatch", frozenset({".cs"}), resolve_csharp_interface_dispatch
@@ -4619,23 +4196,15 @@ register_language_resolver(
 )
 
 
-# Inline markdown link: [text](target "optional title"). The negative lookbehind
-# excludes images (![alt](src)). The target stops at whitespace/closing paren so
-# an optional "title" after the URL is dropped; an optional <...> wrapper is too.
-# Reference-style link definition line: [label]: target "optional title"
-# Obsidian-style wikilink: [[target]] / [[target|alias]] / [[target#anchor]].
+# @doc extract.md#C0144
 
-# Extensions graphify creates document file nodes for. A link to one of these
-# resolves to that file's node; links to code/assets are skipped (left to the
-# language extractors).
+# @doc extract.md#C0145
 
 
 # ── Pascal / Delphi extractor ─────────────────────────────────────────────────
 
 
-# Size cap for project XML files we parse with stdlib ElementTree.
-# Real .csproj/.fsproj/.vbproj/.lpk files are well under 2 MiB; anything
-# larger is either malformed or hostile.
+# @doc extract.md#C0146
 _PROJECT_XML_MAX_BYTES = 2 * 1024 * 1024
 
 
@@ -4650,9 +4219,7 @@ def _project_xml_is_safe(src: bytes) -> bool:
     Legitimate MSBuild and Lazarus package files never contain a DOCTYPE
     or ENTITY declaration, so this is a zero-false-positive screen.
     """
-    # Only the prolog can hold a DTD/internal subset, but be conservative
-    # and scan the full byte range -- these formats use ASCII tags so a
-    # case-insensitive substring match is sufficient.
+    # @doc extract.md#C0147
     lowered = src.lower()
     return b"<!doctype" not in lowered and b"<!entity" not in lowered
 
@@ -4975,25 +4542,18 @@ def _xml_local_name(name: str) -> str:
     return name.rsplit("}", 1)[-1] if name.startswith("{") else name
 
 
-# A .NET event handler has the signature `(object sender, <T>EventArgs e)`. Used
-# to tell a real event handler in the code-behind apart from an ordinary method
-# whose name a XAML attribute value happens to match. Tolerates `object?`, a
-# namespace-qualified args type, and a generic `EventArgs<T>`.
+# @doc extract.md#C0148
 _EVENT_HANDLER_SIGNATURE_RE = re.compile(
     r"\(\s*object\??\s+\w+\s*,\s*[\w.]*EventArgs(?:<[^>]*>)?\s+\w+\s*\)"
 )
 
-# XAML attribute names that carry free-form strings or identifiers and never name
-# an event handler. They are skipped when matching attribute values to code-behind
-# methods so e.g. Content="Save" or Tag="Refresh" can't fabricate an event edge.
+# @doc extract.md#C0149
 _XAML_NON_EVENT_ATTRS = frozenset({
     "Name", "Content", "Text", "Title", "Tag", "ToolTip", "Header",
     "Class", "Key", "Uid", "DataContext", "Style", "Source",
 })
 
-# A handler attribute value is a bare method name (e.g. Click="Save_Click"), not
-# markup, a path, or a sentence. Used to skip values like "{Binding ...}" or
-# free-form content before looking them up as code-behind methods.
+# @doc extract.md#C0150
 _XAML_IDENT_RE = re.compile(r"[A-Za-z_]\w*")
 _XAML_DESIGN_INSTANCE_TYPE_RE = re.compile(
     r"\bType\s*=\s*(?:\{x:Type\s+)?(?P<type>[\w.:+]+)"
@@ -5115,13 +4675,7 @@ def _xaml_codebehind_symbols(
                 class_method_edges.append(edge)
     method_ids = {edge.get("target") for edge in class_method_edges} if class_node else None
 
-    # Only methods with a .NET event-handler signature -- (object sender,
-    # <T>EventArgs e) -- are eligible to be wired to a XAML attribute as an
-    # event. Without this gate, any attribute whose value happens to match a
-    # method name (e.g. Content="Save" next to a business method Save()) would
-    # produce a spurious "event" edge. The C# extractor does not record the
-    # parameter list on method nodes, so we read it from the code-behind source
-    # at the method's recorded line.
+    # @doc extract.md#C0151
     try:
         cb_lines = codebehind.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError:
@@ -5245,14 +4799,7 @@ def _xaml_csharp_class_nodes(path: Path) -> dict[str, list[dict]]:
     classes: dict[str, list[dict]] = {}
     patterns = _load_graphifyignore(root)
     ignore_cache: dict[Path, bool] = {}
-    # Prune noise/hidden dirs DURING traversal (not after) so the scan never
-    # descends into node_modules/.venv/.git/build/..., and CAP the number of
-    # directories visited. rglob("*.cs") used to walk the entire tree first,
-    # which on a mis-resolved or huge root (e.g. a .xaml under a shared temp dir
-    # or a giant monorepo, where _xaml_project_root climbs to a broad ancestor)
-    # scanned millions of paths and effectively hung. A real .NET project sits
-    # well under the cap; a runaway root is bounded to a fast, partial scan
-    # instead of hanging.
+    # @doc extract.md#C0152
     import os as _os
     _DIR_CAP = 20000
     cs_files: list[Path] = []
@@ -5307,8 +4854,7 @@ def _xaml_communitytoolkit_members(vm_node: dict) -> tuple[dict[str, dict], list
     if not source_file or not vm_id:
         return {}, []
     try:
-        # errors="replace" so a non-UTF8 code-behind can't raise UnicodeDecodeError
-        # and abort the whole extract_xaml (matches every other reader here).
+        # @doc extract.md#C0153
         lines = Path(source_file).read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError:
         return {}, []
@@ -5535,12 +5081,7 @@ def extract_xaml(path: Path) -> dict:
 
         for key, value in elem.attrib.items():
             value = value or ""
-            # Event wiring: an attribute references a handler only when its local
-            # name isn't a known free-form/identity property, its value is a bare
-            # identifier (a method name, not markup or a sentence), and the matched
-            # code-behind method actually has an event-handler signature (the gate
-            # in _xaml_codebehind_symbols). This stops Content="Save" / Tag="..."
-            # from fabricating event edges against same-named ordinary methods.
+            # @doc extract.md#C0154
             attr_local = _xml_local_name(key)
             if attr_local not in _XAML_NON_EVENT_ATTRS and _XAML_IDENT_RE.fullmatch(value):
                 method = codebehind_methods.get(value)
@@ -5593,38 +5134,24 @@ def extract_xaml(path: Path) -> dict:
     return {"nodes": nodes, "edges": edges}
 
 
-# Config/manifest JSON filenames the structural extractor understands. Anything
-# else (eval fixtures, datasets, GeoJSON, API dumps) is *data* and must NOT be
-# AST-walked into per-key nodes — that floods the graph with orphan key-nodes
-# and near-duplicate communities (#1224). Data JSON is left to the LLM semantic
-# pass instead. Matched case-insensitively against the bare filename.
+# @doc extract.md#C0155
 
-# Top-level keys that prove a JSON object is a config/manifest the extractor can
-# draw *cross-file* edges from (deps, extends chains, schema refs).
+# @doc extract.md#C0156
 
 
-# ── DM (BYOND DreamMaker) extractor ──────────────────────────────────────────
-# DM identity is path-based (`/datum/object/proc/New()`), not block-based, so
-# the generic class-body walker doesn't fit well.
+# @doc extract.md#C0157
 
 
-# ── DMI (BYOND icon files) ────────────────────────────────────────────────────
-# .dmi is a PNG with a tEXt/zTXt "Description" chunk containing BYOND state
-# metadata. We want the icon state names (icon_state = "X" in DM code
-# references them).
+# @doc extract.md#C0158
 
 
-# ── DMM (BYOND map files) ─────────────────────────────────────────────────────
-# A .dmm starts with a tile dictionary — each "key" = (type, type{var=val}, ...)
-# names one or more types that compose a tile — then a grid. We only need the
-# dictionary section: every type path referenced is a `uses` edge.
+# @doc extract.md#C0159
 
 
 # ── DMF (BYOND interface forms) ───────────────────────────────────────────────
 
 
-# Head tokens in an HCL traversal that are meta/builtins, not references to a
-# block defined in the corpus (count.index, each.key, self.*, path.module, ...).
+# @doc extract.md#C0160
 
 
 _DISPATCH: dict[str, Any] = {
@@ -5731,12 +5258,15 @@ _DISPATCH: dict[str, Any] = {
     ".cls": extract_apex,
     ".trigger": extract_apex,
 }
+try:
+    import graphify.lang_registry
+    graphify.lang_registry.apply_registry()
+    graphify.lang_registry.apply_dispatch()
+except Exception:
+    pass
 
 
-# Extensions whose extractor depends on an optional-dependency extra
-# (pyproject [project.optional-dependencies]) and hard-fails without it,
-# rather than falling back like Pascal does. Used by the #1745 warning in
-# extract() to tell the user which extra restores the language.
+# @doc extract.md#C0161
 _EXTRA_FOR_EXTENSION = {
     ".sql": "sql",
     ".tf": "terraform",
@@ -5753,21 +5283,24 @@ _EXTRA_FOR_EXTENSION = {
     ".robot": "robot",
     ".resource": "robot",
 }
+try:
+    import graphify.lang_registry
+    graphify.lang_registry.apply_registry()
+    # Merge registry-provided extras (if any)
+    from graphify.lang_registry import get_registry_manifest
+    for suffix in graphify.lang_registry.get_registry_suffixes():
+        manifest = get_registry_manifest(suffix)
+        if manifest and manifest.extra:
+            _EXTRA_FOR_EXTENSION[suffix] = manifest.extra
+except Exception:
+    pass
 
-# Substrings an extractor's error carries to classify why a dependency-backed
-# file contributed nothing, used by the #1745 warning in extract(). A grammar
-# that is present but fails to load (#2602) must not be reported as missing —
-# the "install the extra" hint would be a no-op.
+# @doc extract.md#C0162
 _DEP_MISSING_MARKER = "not installed"
 _DEP_LOAD_FAILED_MARKER = "failed to load"
 
 
-# Extensionless executables (CLI entry points like `devctl` or `manage`) carry
-# their language in the shebang, not the suffix. detect.classify_file already
-# routes them to the CODE path via _shebang_interpreter; _get_extractor must
-# honor the same signal or these files are classified as code and then silently
-# dropped by extraction. Only interpreters with a real extractor are mapped —
-# detect's wider set (perl, fish, tcsh, Rscript) stays unmapped and skipped.
+# @doc extract.md#C0163
 _SHEBANG_DISPATCH: dict[str, Any] = {
     "python": extract_python,
     "python2": extract_python,
@@ -5786,18 +5319,10 @@ _SHEBANG_DISPATCH: dict[str, Any] = {
 }
 
 
-# ObjC-only directives. They are illegal in C and C++, so finding one in a `.h`
-# file is a near-zero-false-positive signal that the header is Objective-C (and so
-# belongs to extract_objc, not extract_c). `@property` is deliberately excluded: it
-# doubles as a Doxygen comment command and ObjC properties only ever live inside an
+# @doc extract.md#C0164
 # @interface/@protocol anyway, so the stronger directives already cover them.
 #
-# `#import` is included because an ObjC *bridging* header is often nothing but
-# `#import "X.h"` lines with no @interface (#1556). Routed to extract_c it parses
-# `#import` as a `preproc_call` (not `preproc_include`), so every import edge is
-# dropped and the header is isolated. `#import` is an ObjC-only directive (illegal
-# in C and C++), so this won't hijack genuine C/C++ headers, and extract_objc
-# resolves quoted imports via _resolve_c_include_path.
+# @doc extract.md#C0165
 _OBJC_HEADER_MARKERS = (b"@interface", b"@protocol", b"@implementation", b"@import", b"#import")
 
 
@@ -5816,14 +5341,7 @@ def _is_objc_header(path: Path) -> bool:
     return any(marker in head for marker in _OBJC_HEADER_MARKERS)
 
 
-# C++-only signals. None of these are valid in a plain C header, so finding one
-# in a `.h` is a high-confidence signal the header is C++ (#1547). The C grammar
-# has no class_specifier, so a `class Foo { ... };` header routed to extract_c
-# loses the class and its method prototypes (a junk `foo_foo` node + a sourceless
-# `class` stub); routing to extract_cpp recovers the real type. Kept CONSERVATIVE:
-# a plain C header with none of these stays on extract_c. ObjC sniffing keeps
-# priority (an ObjC header can legitimately contain `::`/`class` inside an inline
-# C++ block when compiled as Objective-C++).
+# @doc extract.md#C0166
 _CPP_HEADER_MARKERS = (
     b"class ", b"namespace ", b"template", b"::",
     b"public:", b"private:", b"protected:",
@@ -5863,40 +5381,26 @@ def _get_extractor(path: Path) -> Any | None:
     """Return the correct extractor function for a file, or None if unsupported."""
     if path.name.lower().endswith(".blade.php"):
         return extract_blade
-    # MCP config files (.mcp.json, claude_desktop_config.json, ...) are routed
-    # by filename before generic .json dispatch so they get MCP-aware nodes
-    # (servers, commands, packages, env vars) instead of opaque JSON keys.
+    # @doc extract.md#C0167
     if is_mcp_config_path(path):
         return extract_mcp_config
-    # Package manifests (apm.yml, pyproject.toml, go.mod, pom.xml) → a canonical
-    # package node + depends_on edges, by filename before generic suffix dispatch
-    # (#1377). apm.yml would otherwise be a .yml document handled by the LLM.
+    # @doc extract.md#C0168
     if is_package_manifest_path(path):
         return extract_package_manifest
-    # `.h` is C/C++/ObjC-ambiguous; route Objective-C headers to extract_objc
-    # (the suffix map sends `.h` to extract_c, which can't read @interface etc.).
-    # ObjC sniffing has priority over the C++ sniff: an Objective-C++ header can
-    # contain both `@interface` and inline C++ (`::`), and it must parse as ObjC.
+    # @doc extract.md#C0169
     suffix = path.suffix
     if suffix not in _DISPATCH and suffix.lower() in _DISPATCH:
         suffix = suffix.lower()
     if suffix == ".h":
         if _is_objc_header(path):
             return extract_objc
-        # A C++ class header routed to extract_c loses the class entirely (the C
-        # grammar has no class_specifier). Reroute to extract_cpp (#1547).
+        # @doc extract.md#C0170
         if _is_cpp_header(path):
             return extract_cpp
-    # `.m` is Objective-C OR MATLAB. extract_objc unconditionally would force-parse
-    # MATLAB through the ObjC grammar into garbage (#1702). Route to extract_objc
-    # only when the file actually looks like Objective-C; otherwise leave it without
-    # an extractor (surfaced by the no-AST-extractor warning, #1689) rather than
-    # mis-parsed. `.mm` is unambiguously Objective-C++ and stays on extract_objc.
+    # @doc extract.md#C0171
     if suffix == ".m" and not _is_objc_source(path):
         return None
-    # Extensionless files: resolve by shebang, mirroring detect.classify_file.
-    # Without this, detect labels e.g. `#!/usr/bin/env bash` CLIs as code but
-    # extraction returns no extractor and the file silently contributes nothing.
+    # @doc extract.md#C0172
     if not suffix:
         from graphify.detect import _shebang_interpreter
         interp = _shebang_interpreter(path)
@@ -5952,11 +5456,7 @@ def _extract_single_file(args: tuple) -> tuple[int, dict]:
         return idx, {"nodes": [], "edges": []}
 
     result = _safe_extract_with_xaml_root(extractor, path, root)
-    # Never cache a zero-node result for an extractable file. Every supported
-    # source produces at least a file node, so an empty node list is anomalous
-    # (e.g. a transient batch/parallel hiccup). Caching it makes the empty
-    # byte-stable across runs and silently blinds affected/explain to and
-    # through the file (#1666); skipping the write lets a rerun self-heal.
+    # @doc extract.md#C0173
     if not bypass_cache and "error" not in result and result.get("nodes"):
         save_cached(path, result, root, cache_root=cache_location)
     return idx, result
@@ -5980,11 +5480,7 @@ def _extract_parallel(
     import concurrent.futures
 
     if max_workers is None:
-        # Honour GRAPHIFY_MAX_WORKERS env override; otherwise scale to the
-        # full CPU. The historical `, 8)` cap was a safety bound for laptops
-        # in 2023 — on a 32-thread workstation it costs a 4x slowdown
-        # (issue #792). Capping at len(uncached_work) keeps small jobs
-        # from spawning useless idle workers.
+        # @doc extract.md#C0174
         env_raw = os.environ.get("GRAPHIFY_MAX_WORKERS", "").strip()
         env_cap = None
         if env_raw:
@@ -5997,25 +5493,16 @@ def _extract_parallel(
         cpu_cap = env_cap if env_cap is not None else (os.cpu_count() or 4)
         max_workers = min(cpu_cap, len(uncached_work))
 
-    # Windows ProcessPoolExecutor hard-caps at 61 workers (CPython limitation
-    # tied to WaitForMultipleObjects). Clamp here so every path — auto-compute,
-    # GRAPHIFY_MAX_WORKERS, and --max-workers — stays valid on >61-core boxes
-    # (issue #1298). Guard against 0 from an empty work list.
+    # @doc extract.md#C0175
     if sys.platform == "win32":
         max_workers = min(max_workers, 61)
     max_workers = max(max_workers, 1)
 
-    # A one-worker pool buys no parallelism: it still pays process spawn plus an
-    # IPC round trip per file, and it is the one residual case where the parent's
-    # rebuild watchdog (os._exit) can orphan a worker that is mid-task. The
-    # Windows post-commit hook exports GRAPHIFY_MAX_WORKERS=1, so this is the
-    # default there. Hand the work back so the caller extracts sequentially in
-    # this process instead (#2173).
+    # @doc extract.md#C0176
     if max_workers == 1:
         return False
 
-    # root anchors hash keys / node ids / XAML boundary; cache_location is where
-    # the cache dir is written (defaults to root when not decoupled) (#1774).
+    # @doc extract.md#C0177
     root_str = str(root)
     cache_loc_str = str(cache_location if cache_location is not None else root)
     work_items = [(idx, str(path), root_str, cache_loc_str) for idx, path in uncached_work]
@@ -6034,12 +5521,7 @@ def _extract_parallel(
                     idx, result = future.result()
                     per_file[idx] = result
                 except concurrent.futures.process.BrokenProcessPool:
-                    # #2444: a pool that dies while results are being consumed
-                    # raises BrokenProcessPool from every pending future. It
-                    # must reach the pool-level handler below (which returns
-                    # False so the caller falls back to sequential), not be
-                    # swallowed here per-future — that left the remaining
-                    # per_file slots empty and silently dropped the files.
+                    # @doc extract.md#C0178
                     raise
                 except Exception as exc:
                     pos = futures[future]
@@ -6059,11 +5541,7 @@ def _extract_parallel(
                         flush=True,
                     )
     except concurrent.futures.process.BrokenProcessPool:
-        # On Windows (spawn start method) the worker subprocesses re-import the
-        # caller's __main__. Inline invocations like `python -c "..."` have no
-        # __main__ guard, so worker bootstrap raises and the pool dies before
-        # any work completes. Fall back to in-process sequential extraction —
-        # slower but correct.
+        # @doc extract.md#C0179
         print(
             "  warning: parallel extraction failed (BrokenProcessPool); "
             "falling back to sequential. On Windows this usually means the "
@@ -6073,20 +5551,13 @@ def _extract_parallel(
         )
         return False
     if failed:
-        # #2445: retry per-future failures once, in-process, instead of leaving
-        # their per_file slots None (which the defensive fill downstream turned
-        # into well-formed empties — silent data loss). This is bounded, not a
-        # loop: _extract_sequential goes through _safe_extract, which converts
-        # a second failure into an error-carrying result.
+        # @doc extract.md#C0180
         _extract_sequential(
             [uncached_work[pos] for pos in failed],
             per_file, root, total_files, cache_location,
         )
     if total_files >= _PROGRESS_INTERVAL:
-        # Report the same denominator the intermediate lines used (uncached files
-        # actually processed this run), not total_files — switching to the full
-        # corpus made the count jump upward at the end (cached hits + files with no
-        # extractor never entered uncached_work), which read as inconsistent (#1693).
+        # @doc extract.md#C0181
         _done = len(uncached_work)
         print(
             f"  AST extraction: {_done}/{_done} uncached files (100%) [{max_workers} workers]",
@@ -6190,12 +5661,7 @@ def extract(
     _raise_recursion_limit()
     # Workspace package manifests/globs can change during watch or repeated extraction.
     _WORKSPACE_PACKAGE_CACHE.clear()
-    # tsconfig/jsconfig compilerOptions are the same kind of state: keyed by
-    # config path with no mtime component, so an edit to `paths` or `baseUrl`
-    # was never observed again for the life of the process. `graphify watch`
-    # and the MCP server both call extract() repeatedly in one process, so
-    # every rebuild after the edit kept resolving through the stale alias map.
-    # Clearing per run, not per file, leaves within-run caching intact.
+    # @doc extract.md#C0182
     _TSCONFIG_ALIAS_CACHE.clear()
     _TSCONFIG_BASEURL_CACHE.clear()
     _XAML_CSHARP_CLASS_CACHE.clear()
@@ -6218,22 +5684,14 @@ def extract(
             root = Path(*paths[0].parts[:common_len]) if common_len else Path(".")
     except Exception:
         root = Path(".")
-    # An explicit anchor wins. cache_root is only a fallback anchor: it happens to
-    # equal the scan root for the no---out CLI path and for watch, but with --out it
-    # is the OUTPUT dir, and letting it anchor made every scanned file "out-of-root"
-    # -> _portable_out_of_root_sf() -> bare basename for the whole corpus (#1941).
+    # @doc extract.md#C0183
     if anchor_root is not None:
         root = anchor_root
     elif cache_root is not None:
         root = cache_root
     root = root.resolve()
 
-    # #1774: the cache is an OUTPUT, so when no explicit cache_root is given it is
-    # written under the current working directory — never `root` (the inferred
-    # common parent of the inputs), which would drop graphify-out/ inside a
-    # read-only or foreign corpus. `root` still anchors the content-hash keys,
-    # node ids, symbol resolution, and the XAML project-scan boundary; only the
-    # cache directory's location diverges from it.
+    # @doc extract.md#C0184
     cache_location = (cache_root if cache_root is not None else Path(".")).resolve()
     total = len(paths)
 
@@ -6261,18 +5719,13 @@ def extract(
                 uncached_work, per_file, root, max_workers, total, cache_location
             )
         if not ran_parallel:
-            # #2444: only re-extract what the pool didn't finish. A pool that
-            # breaks mid-run has already filled some per_file slots; redoing
-            # the whole batch would throw that work away.
+            # @doc extract.md#C0185
             _extract_sequential(
                 [(i, p) for (i, p) in uncached_work if per_file[i] is None],
                 per_file, root, total, cache_location,
             )
 
-    # Fill any remaining None slots. With the #2444/#2445 handling above this
-    # is unreachable; the error marker keeps any regression loud (and out of
-    # the caches/#1666 paths) instead of letting a dropped file masquerade as
-    # a legitimately-empty one.
+    # @doc extract.md#C0186
     for i in range(total):
         if per_file[i] is None:
             per_file[i] = {
@@ -6280,9 +5733,7 @@ def extract(
                 "error": "internal: no extraction result produced",
             }
 
-    # #1666: surface any source file an extractor accepted but that produced zero
-    # nodes (not even a file node). Such a file is silently absent from the graph,
-    # so affected/explain are blind to and through it with no other signal.
+    # @doc extract.md#C0187
     _empty_sources: list[str] = []
     for i, _p in enumerate(paths):
         _res = per_file[i] or {}
@@ -6301,13 +5752,7 @@ def extract(
             file=sys.stderr, flush=True,
         )
 
-    # #2543: collect sources that must NOT be stamped as up-to-date in the
-    # incremental manifest. Two cases:
-    #   - extractor returned an error (missing optional extra, parse failure, …)
-    #   - extractor exists but produced zero nodes (#1666 empty-source set)
-    # The CLI drops these from the stamped file set and clears any prior
-    # hashes so the next run retries them after the user installs the extra
-    # (or the transient failure self-heals) without deleting graphify-out/.
+    # @doc extract.md#C0188
     _failed_sources: list[str] = []
     _failed_seen: set[str] = set()
     for i, _p in enumerate(paths):
@@ -6319,21 +5764,14 @@ def extract(
                 _failed_seen.add(_key)
             continue
         if _res.get("skipped"):
-            # The extractor declined this file by design (data JSON, #1224), so
-            # zero nodes is the intended outcome rather than a failure. Marking
-            # it failed keeps it out of the incremental manifest and re-queues
-            # it on every subsequent run, forever (#2879).
+            # @doc extract.md#C0189
             continue
         if (not _res.get("nodes")) and _get_extractor(_p) is not None:
             if _key not in _failed_seen:
                 _failed_sources.append(_key)
                 _failed_seen.add(_key)
 
-    # #1689: a file counted as code (extension in CODE_EXTENSIONS) but with no AST
-    # extractor wired up (e.g. .r/.R — there is no tree-sitter-r dispatch) silently
-    # contributes zero nodes. The #1666 warning above deliberately skips these (it
-    # only fires when an extractor exists), so surface them explicitly, grouped by
-    # extension, rather than reporting success as if the language were mapped.
+    # @doc extract.md#C0190
     from graphify.detect import CODE_EXTENSIONS as _CODE_EXTS
     _no_extractor: dict[str, int] = {}
     for _p in paths:
@@ -6352,13 +5790,7 @@ def extract(
             file=sys.stderr, flush=True,
         )
 
-    # #1745: an extractor IS wired up for these files but bailed out because its
-    # dependency is missing (e.g. .sql needs tree-sitter-sql from the [sql]
-    # extra). Neither warning above fires — #1666 skips results that carry an
-    # error, #1689 only covers files with no extractor — so the graph builds
-    # "successfully" while every such file silently contributes nothing.
-    # Surface them grouped by extension, naming the extra that provides the
-    # dependency when there is one.
+    # @doc extract.md#C0191
     _missing_dep_count: dict[str, int] = {}
     _missing_dep_error: dict[str, str] = {}
     for i, _p in enumerate(paths):
@@ -6376,8 +5808,7 @@ def extract(
             _hint = f' Install it with: pip install "graphifyy[{_extra}]"'
             _cause = "a dependency is missing"
         else:
-            # Either no known extra, or the grammar is present but failed to
-            # load (#2602): surface the real error and never suggest reinstall.
+            # @doc extract.md#C0192
             _reason = _err_text
             _hint = ""
             _cause = ("a dependency is missing" if _DEP_MISSING_MARKER in _err_text
@@ -6388,33 +5819,17 @@ def extract(
             file=sys.stderr, flush=True,
         )
 
-    # #2551: a file the parser ACCEPTED but only with ERROR recovery (e.g. the
-    # Kotlin grammar rejecting one-line `class C { val x }` bodies, or Luau
-    # syntax the Lua grammar can't parse, #2520) extracts partially — sometimes
-    # to nothing but the file node — with no other signal. Neither warning
-    # above fires (nodes exist, no error marker), so surface it explicitly,
-    # naming the first error line so the user can find the construct.
+    # @doc extract.md#C0193
     _syntax_error_files: list[tuple[str, int | None]] = []
     for i, _p in enumerate(paths):
         _res = per_file[i] or {}
         _pe = _res.get("parse_errors")
         if not _pe:
             continue
-        # #2610/#2599: gate the #2551 warning on plausible symbol loss.
-        # tree-sitter-typescript sets has_error on tiny fully-recovered errors
-        # (a `&` in a JSX string attr; a semicolon-less `in_*` interface
-        # member) that extract completely — stay silent. Warn only when
-        # nothing beyond the file node extracted, or an ERROR region
-        # dissolved multiple lines (the genuine #2551 Kotlin one-line-body /
-        # #2520 Luau case). `multiline_error` is absent from pre-fix cached
-        # results, so those fall back to the file-node-only arm.
+        # @doc extract.md#C0194
         if len(_res.get("nodes", [])) <= 1 or _pe.get("multiline_error"):
             _rel = os.path.relpath(str(_p), str(root)).replace("\\", "/")
-            # Symbols recovered from the file, excluding its own file node. This
-            # is what separates the two cases the warning otherwise blurs: a file
-            # that contributed nothing but its file node is a total loss, while
-            # one that yielded most of its symbols and lost an ERROR region is
-            # partial. "May be partially extracted" rendered both identically.
+            # @doc extract.md#C0195
             _kept = max(len(_res.get("nodes", [])) - 1, 0)
             _syntax_error_files.append((_rel, _pe.get("first_error_line"), _kept))
     if _syntax_error_files:
@@ -6430,13 +5845,7 @@ def extract(
             f" (+{len(_syntax_error_files) - 5} more)"
             if len(_syntax_error_files) > 5 else ""
         )
-        # No issue reference here. This message used to end in "(#2551)" for
-        # EVERY language, and #2551 is closed and Kotlin-specific ("bundled
-        # grammar rejects one-line type bodies"). It was the only lead the
-        # message offered, so a reader following it landed on a resolved problem
-        # in another language and concluded their own was already tracked
-        # (#2788). The file, the line and the symbol count are the actionable
-        # part; a single hardcoded number cannot be right for every grammar.
+        # @doc extract.md#C0196
         print(
             f"  warning: {len(_syntax_error_files)} file(s) had syntax errors and "
             f"may be partially extracted: {_shown}{_more}",
@@ -6450,36 +5859,17 @@ def extract(
         all_nodes.extend(result.get("nodes", []))
         all_edges.extend(result.get("edges", []))
         all_raw_calls.extend(result.get("raw_calls", []))
-    # Function / method / class def ids for the cross-file indirect_call callable
-    # guard. Built from the `_callable` node marker AFTER the id-remap / disambiguation
-    # passes below (which rewrite node ids), so it can never go stale — see the
-    # marker set in the per-file extractor. Populated just before the pass that uses it.
+    # @doc extract.md#C0197
     callable_nids: set[str] = set()
 
     _augment_symbol_resolution_edges(paths, all_nodes, all_edges, root)
 
-    # Merge a header-declared class (and its methods) with its sibling-impl
-    # definition into ONE node (C/C++/ObjC #1547/#1556). Runs BEFORE the id-remap
-    # below: a header symbol and its impl counterpart share an id only while both
-    # still carry the raw file-stem prefix; the per-file prefix remap then diverges
-    # them (foo_h vs foo_cpp), so the collapse must happen first. Collapsing here
-    # also means disambiguation sees one source_file per id and won't split them.
+    # @doc extract.md#C0198
     _merge_decl_def_classes(all_nodes, all_edges)
 
-    # Remap file node IDs from absolute-path-derived to the canonical
-    # {parent_dir}_{stem} spec form so (a) graph.json edge endpoints are stable
-    # across machines (#502) and (b) AST file nodes match the IDs semantic
-    # subagents generate (#1033). Resolve before relativizing so paths passed in
-    # relative form still anchor to the (resolved) root.
+    # @doc extract.md#C0199
     id_remap: dict[str, str] = {}
-    # A target OUTSIDE the scan root (an out-of-root ProjectReference/.sln/bash
-    # `source`/#include/relative import) can't be made relative to root; leaving
-    # it absolute leaked the scan path including the OS username into a
-    # committed graph.json (#1899). Fall back to a walk-up relative form, or the
-    # bare basename when that would still embed foreign path segments (a
-    # far-away or cross-drive target). Shared below by both the target_file
-    # remap loop (edges with no node of their own, #2243) and the node-level
-    # relativization pass further down (#1899/#2195).
+    # @doc extract.md#C0200
     def _portable_out_of_root_sf(p: Path) -> str:
         try:
             rel = os.path.relpath(str(p), str(root)).replace("\\", "/")
@@ -6491,39 +5881,14 @@ def extract(
                 updepth += 1
             else:
                 break
-        # More than a couple of walk-ups means the target lives well outside the
-        # corpus; its ancestor dirs would embed foreign (possibly user-named)
-        # segments, so collapse to the basename.
+        # @doc extract.md#C0201
         return p.name if updepth > 3 else rel
 
-    # Symbol node IDs embed the file stem as a prefix (_file_node_id of the path
-    # the extractor saw). For a root-level file that stem picks up the absolute
-    # parent directory name, so a symbol becomes <rootdir>_main_run while the
-    # file node is correctly relativized to main and the skill.md spec wants
-    # main_run -- splitting the symbol into AST/semantic ghosts (#1096). Relativize
-    # the symbol prefix the same way, gated by source_file so two files sharing a
-    # prefix can't cross-contaminate. Keyed by resolved path -> (old_pref, new_pref).
-    # Each file maps from up to TWO old prefixes — the input-form prefix
-    # _file_node_id(path) and the absolute-resolved-form prefix
-    # _file_node_id(path.resolve()). Alias/workspace imports resolve specifiers
-    # through .resolve(), so their edge targets are keyed off the ABSOLUTE form;
-    # when inputs are relative the two forms differ and absolute-derived targets
-    # would otherwise orphan (#1529). Stored as a list so the symbol-prefix remap
-    # below can try both (identical forms collapse to one — a no-op).
+    # @doc extract.md#C0202
     prefix_remap: dict[Path, list[tuple[str, str]]] = {}
-    # Canonical stem plus every prefix form a file's symbol ids may appear
-    # under, keyed by resolved path — consumed by the target_file-guided
-    # barrel repoint below (#1983). Unlike prefix_remap this records ALL
-    # in-root files, not just those whose prefix changed.
+    # @doc extract.md#C0203
     stem_forms: dict[Path, tuple[str, list[str]]] = {}
-    # Canonicalize edge-target files too, not just this batch's inputs (#2169).
-    # On an incremental run `paths` is only the CHANGED files, so a changed
-    # file's cross-file import/re-export edges keep absolute-path-derived
-    # target ids the remap below never learns — they match no node in the
-    # merged graph and silently dangle. The target_file stamp (set at edge
-    # emit time) names each resolved target, so registering id_remap /
-    # stem_forms for those in-root files as well lets the edge remap and the
-    # target_file-guided repoint pass fix them exactly as on a full scan.
+    # @doc extract.md#C0204
     remap_paths: list[Path] = list(paths)
     _remap_seen: set[Path] = set()
     for _p in paths:
@@ -6541,38 +5906,20 @@ def extract(
         except (OSError, RuntimeError):
             continue
         if _tp in _remap_seen:
-            # Already covered: either the target is in this batch (its input
-            # form is the same form the extractors minted ids from, and the
-            # per-path loop registers both that and the resolved form) or an
-            # earlier stamped edge registered it. Re-appending it here would
-            # re-run its per-path iteration AFTER later batch files and could
-            # flip the last-writer of a colliding old-id key.
+            # @doc extract.md#C0205
             continue
         _remap_seen.add(_tp)
         try:
             _tp.relative_to(root)
         except ValueError:
-            # Out-of-root target: `_file_node_id` (used below for in-root
-            # targets) needs a root-relative path, so it cannot help here.
-            # No node stands for this target either (target_file-stamped
-            # edges intentionally mint no stub node, #2195), so unlike an
-            # out-of-root node the belt-and-braces pass below never learns
-            # this id from anywhere — without registering it here the raw
-            # scan-path slug survives in the edge forever (#2243). Give it
-            # the same portable "ext_" id an out-of-root node would get; a
-            # target that does not actually exist on disk stays dangling,
-            # exactly as before.
+            # @doc extract.md#C0206
             try:
                 if _tp.is_file():
                     ext_new_id = _make_id("ext", _portable_out_of_root_sf(_tp))
                     id_remap[_make_id(str(_tp))] = ext_new_id
                     if _raw_tp != _tp:
                         id_remap[_make_id(str(_raw_tp))] = ext_new_id
-                    # Bash entrypoint endpoints suffix the file-level id with
-                    # "__entry" (script-invocation `calls` edges,
-                    # extractors/bash.py); register the suffixed forms too so
-                    # an out-of-root invoked script canonicalizes instead of
-                    # keeping the absolute scan-path slug (#2243).
+                    # @doc extract.md#C0207
                     id_remap.setdefault(
                         _make_id(str(_tp)) + "__entry", ext_new_id + "__entry")
                     if _raw_tp != _tp:
@@ -6584,21 +5931,12 @@ def extract(
             continue
         try:
             if not _tp.is_file():
-                # Speculatively-resolved target that doesn't exist (e.g. an
-                # import of a not-yet-created sibling): keep its raw id
-                # dangling, exactly as before, so no false canonical edge is
-                # fabricated toward a nonexistent file.
+                # @doc extract.md#C0208
                 continue
         except OSError:
             continue
         remap_paths.append(_tp)
-        # Also register the AS-STAMPED (unresolved) form. The edge target id
-        # was minted from the stamped path exactly as written (e.g.
-        # ``str(base / rel)`` for a Python relative import), which under a
-        # symlinked root (macOS /tmp -> /private/tmp) or relative inputs
-        # differs from the resolved form; the per-path loop below derives the
-        # old ids from whichever Path it is given, so a missing form would
-        # leave the edge target unmapped and dangling.
+        # @doc extract.md#C0209
         if _raw_tp != _tp:
             _remap_seen.add(_raw_tp)
             remap_paths.append(_raw_tp)
@@ -6614,9 +5952,7 @@ def extract(
         new_id = _file_node_id(rel)
         if old_id != new_id:
             id_remap[old_id] = new_id
-        # Also register the absolute-resolved form of the file-level id so
-        # alias/workspace import targets (resolved via .resolve()) remap to
-        # canonical instead of orphaning (#1529).
+        # @doc extract.md#C0210
         old_id_abs = _make_id(str(path.resolve()))
         if old_id_abs != new_id:
             id_remap[old_id_abs] = new_id
@@ -6627,14 +5963,7 @@ def extract(
         old_pref_abs = _file_node_id(path.resolve())
         if old_pref_abs != new_id and old_pref_abs != old_pref:
             old_prefs.append((old_pref_abs, new_id))
-        # Bash entrypoint node ids append "__entry" to the file-level id
-        # (extractors/bash.py), so a script-invocation edge endpoint minted
-        # from an out-of-batch target path keeps a suffixed absolute-derived
-        # id neither the plain id_remap key above nor the source_file-gated
-        # prefix pass below (nodes only) can reach on an incremental run
-        # (#2243). Register the suffixed forms, preserving the extension tail
-        # exactly as the prefix remap yields for in-batch entry nodes
-        # (`c.sh` -> `c_sh__entry`): new prefix + the tail of the minted id.
+        # @doc extract.md#C0211
         for _old, _pref in ((old_id, old_pref), (old_id_abs, old_pref_abs)):
             if not _old.startswith(_pref):
                 continue
@@ -6644,8 +5973,7 @@ def extract(
                 id_remap.setdefault(_entry_old, _entry_new)
         if old_prefs:
             prefix_remap[path.resolve()] = old_prefs
-        # Absolute form first: it is the longest, so prefix decomposition can
-        # try forms in order without a shorter form shadowing it.
+        # @doc extract.md#C0212
         stem_forms[path.resolve()] = (
             new_id, [old_pref_abs, old_pref, new_id]
         )
@@ -6658,31 +5986,18 @@ def extract(
                 e["source"] = id_remap[e["source"]]
             if e.get("target") in id_remap:
                 e["target"] = id_remap[e["target"]]
-        # raw_calls carry caller_nid, consumed by the cross-file call pass far
-        # below (after this remap). A module-TOP-LEVEL indirect_call/callback
-        # records the FILE-level id as its caller — the id minted from the
-        # absolute input path that this very remap just rewrote on the file
-        # node. Without rewriting the raw_calls too, the emitted
-        # indirect_call edge keeps the machine-specific absolute-derived
-        # source and matches no node in the graph (#2231). Mirrors the
-        # sym_remap raw_calls rewrite in the prefix pass below.
+        # @doc extract.md#C0213
         for rc in all_raw_calls:
             cn = rc.get("caller_nid")
             if cn in id_remap:
                 rc["caller_nid"] = id_remap[cn]
-        # swift_extensions[].nid is the same kind of id carrier as caller_nid
-        # above (cache.py remaps both), consumed by _merge_swift_extensions far
-        # below. Left stale it matches no node, so whether the extension merge
-        # runs at all depends on the FORM of the paths handed to extract() —
-        # relative input already yields the post-remap slug, absolute input does
-        # not (#2538). Remap it here so both agree.
+        # @doc extract.md#C0214
         for result in per_file:
             for ext in result.get("swift_extensions", []) or []:
                 en = ext.get("nid")
                 if en in id_remap:
                     ext["nid"] = id_remap[en]
-        # objc_field_types["tables"] is keyed BY class node id - the one bucket
-        # the #1529 rewrites missed (#3150).
+        # @doc extract.md#C0215
         _remap_objc_field_tables(per_file, id_remap)
     if prefix_remap:
         sym_remap: dict[str, str] = {}
@@ -6691,10 +6006,7 @@ def extract(
             sf = n.get("source_file")
             if not sf:
                 continue
-            # Package nodes carry a canonical name-keyed id (pkg_<name>) that must
-            # stay identical across every manifest that references the package, so
-            # they are exempt from the file-stem prefix remap (#1377), like the
-            # type=module anchors (#1327).
+            # @doc extract.md#C0216
             if n.get("type") == "package":
                 continue
             try:
@@ -6704,9 +6016,7 @@ def extract(
             if entry is None:
                 continue
             nid = n.get("id", "")
-            # Try both the input-form and absolute-form prefixes for this file
-            # (#1529). source_file gating above already prevents cross-file
-            # contamination, so the first matching prefix wins.
+            # @doc extract.md#C0217
             canonical_nid: str | None = None
             for old_pref, new_pref in entry:
                 if nid.startswith(old_pref + "_"):
@@ -6719,10 +6029,7 @@ def extract(
                     break
             if canonical_nid is None:
                 continue
-            # Named alias imports/re-exports can retain an absolute-prefixed target
-            # when the symbol node is already canonical. Record every old form
-            # so a redundant import edge or dangling re-export target can be fixed
-            # without globally reinterpreting an id that another real node may own.
+            # @doc extract.md#C0218
             for old_pref, new_pref in entry:
                 if not canonical_nid.startswith(new_pref + "_"):
                     continue
@@ -6738,9 +6045,7 @@ def extract(
                     e["source"] = sym_remap[e["source"]]
                 if e.get("target") in sym_remap:
                     e["target"] = sym_remap[e["target"]]
-            # raw_calls carry caller_nid (a symbol id) consumed by the cross-file
-            # call pass below, after this remap — rewrite it too or those edges
-            # would dangle on their (stale) source.
+            # @doc extract.md#C0219
             for rc in all_raw_calls:
                 cn = rc.get("caller_nid")
                 if cn in sym_remap:
@@ -6754,9 +6059,7 @@ def extract(
             _remap_objc_field_tables(per_file, sym_remap)
         if edge_alias_candidates:
             def _edge_key(edge: dict) -> str:
-                # target_file is a transient stamp (#1814/#1983); exclude it
-                # from twin identity or an alias edge (stamped) never matches
-                # the canonical twin the shared resolver emits (unstamped).
+                # @doc extract.md#C0220
                 return json.dumps(
                     {k: v for k, v in edge.items() if k != "target_file"},
                     sort_keys=True, separators=(",", ":"), default=str,
@@ -6779,9 +6082,7 @@ def extract(
                 if len(candidates) == 1:
                     candidate = next(iter(candidates))
                     twin_key = _edge_key({**edge, "target": candidate})
-                    # Drop only when the shared resolver emitted the exact
-                    # canonical twin. Otherwise the target may be a legitimate
-                    # owned node id.
+                    # @doc extract.md#C0221
                     if edge_key_counts[twin_key]:
                         if edge.get("target") in owned_node_ids:
                             edge_key_counts[twin_key] -= 1
@@ -6789,16 +6090,7 @@ def extract(
                 deduped_edges.append(edge)
             all_edges[:] = deduped_edges
 
-    # Repoint symbol-level alias edges that resolve THROUGH a barrel (#1983
-    # follow-up). The candidates rewrite above learns old→canonical forms only
-    # from symbols a file DEFINES; a barrel defines nothing, so a re-export or
-    # named import that resolves to one keeps an absolute-prefixed, dangling
-    # target no rewrite ever learns. Use the target_file stamp to decompose
-    # such a target into (canonical file stem, symbol), follow the barrel's own
-    # already-canonical re_exports edge to the defining symbol — iterating so
-    # multi-hop barrel chains resolve one hop per pass — and, when no chain
-    # leads to a real node, canonicalize the prefix anyway so a checkout path
-    # never survives in an edge target.
+    # @doc extract.md#C0222
     if stem_forms:
         owned_ids = {n.get("id") for n in all_nodes}
 
@@ -6815,14 +6107,7 @@ def extract(
                     return canonical, target[len(pref) + 1:]
             return None
 
-        # (canonical file id, symbol) → set of owned targets, learned from
-        # symbol-level re_exports edges that already point at a real node. A set
-        # (not last-write-wins): when a barrel re-exports the SAME local name
-        # from two different modules (`export {x} from './a'; export {x as y}
-        # from './b'` — both key on local name `x`), the key becomes ambiguous
-        # and must NOT be guessed, or we fabricate a wrong edge. Ambiguous keys
-        # resolve to None so the edge falls to the dangling-canonical fallback
-        # (dropped at build), while the shared resolver's correct edge survives.
+        # @doc extract.md#C0223
         chain: dict[tuple[str, str], set] = {}
 
         def _resolve1(key) -> "str | None":
@@ -6858,10 +6143,7 @@ def extract(
                     continue
                 e["target"] = resolved_target
                 if e.get("relation") == "re_exports":
-                    # This barrel's edge now feeds the next hop. Learn it
-                    # directly — decomposing the repointed target against this
-                    # edge's own target_file would fail, since the target now
-                    # carries the DEFINING file's stem, not the barrel's.
+                    # @doc extract.md#C0224
                     chain.setdefault((e.get("source"), dec[1]), set()).add(resolved_target)
                 progressed = True
             pending = still
@@ -6872,17 +6154,13 @@ def extract(
             if dec is not None:
                 e["target"] = f"{dec[0]}_{dec[1]}"
 
-    # Repoint Python absolute imports onto the real file nodes under a nested
-    # (src/) package root before the resolver/import-evidence passes run, so the
-    # graph is identical regardless of scan root (#2072).
+    # @doc extract.md#C0225
     _repoint_python_package_imports(paths, all_nodes, all_edges, root)
     _merge_swift_extensions(per_file, all_nodes, all_edges)
     _merge_csharp_partial_class_nodes(per_file, all_nodes, all_edges, paths, root)
     _disambiguate_colliding_node_ids(all_nodes, all_edges, all_raw_calls, root)
     _canonicalize_csharp_namespace_nodes(all_nodes, all_edges)
-    # PHP namespace/use disambiguation must run BEFORE the unique-stub rewire:
-    # the false merge (#1923) happens inside the rewire when a bare-name stub
-    # matches a unique internal class from a different namespace.
+    # @doc extract.md#C0226
     _php_exts = {".php", ".phtml", ".php3", ".php4", ".php5", ".php7", ".phps"}
     _php_sel = [
         (r, p) for r, p in zip(per_file, paths)
@@ -6896,12 +6174,7 @@ def extract(
         except Exception as exc:
             import logging
             logging.getLogger(__name__).warning("PHP type-reference resolution failed, skipping: %s", exc)
-    # Java package/import disambiguation must likewise run BEFORE the rewire
-    # (#2504): an EXTERNAL import (`org.springframework.stereotype.Component`)
-    # leaves a bare `Component` stub that the rewire would collapse onto the only
-    # internal class with that simple name, manufacturing a false hub. Parking
-    # such references on an FQN-labeled stub first prevents the merge, and
-    # import-exact resolution of internal references (#1318/#1744) still applies.
+    # @doc extract.md#C0227
     _java_sel = [(r, p) for r, p in zip(per_file, paths) if p.suffix == ".java"]
     if _java_sel:
         try:
@@ -6911,8 +6184,7 @@ def extract(
         except Exception as exc:
             import logging
             logging.getLogger(__name__).warning("Java type-reference resolution failed, skipping: %s", exc)
-    # Resolve internal Go pkg.Type references exactly and park external ones
-    # before the generic bare-label stub rewire can manufacture a collision.
+    # @doc extract.md#C0228
     _go_sel = [(r, p) for r, p in zip(per_file, paths) if p.suffix == ".go"]
     if _go_sel:
         try:
@@ -6948,9 +6220,7 @@ def extract(
             import logging
             logging.getLogger(__name__).warning("Java cross-file import resolution failed, skipping: %s", exc)
 
-    # Cross-file C# type-reference resolution: re-point dangling inherits/implements/
-    # references edges left on shadow stubs, disambiguating same-named types by the
-    # referencing file's `using` directives + enclosing namespace (mirrors Java #1318).
+    # @doc extract.md#C0229
     _DOTNET_TYPE_EXTS = {".cs", ".razor", ".cshtml"}
     cs_paths = [p for p in paths if p.suffix.lower() in _DOTNET_TYPE_EXTS]
     if cs_paths:
@@ -6966,21 +6236,7 @@ def extract(
             import logging
             logging.getLogger(__name__).warning("C# cross-file import resolution failed, skipping: %s", exc)
 
-    # Cross-file Bash source-backed call resolution: a call to a function defined
-    # in a file this one `source`s is left unresolved by the per-file extractor
-    # (it only links calls to same-file functions, #2141). Match each bash raw_call
-    # against functions in the sourced files and emit the calls edge — scoped to
-    # the source relationship, so a call to an external command never binds to a
-    # same-named function in an unsourced file. Runs after the id-remap passes
-    # above so caller_nids and function node ids are final; dedups the source
-    # edge the extractor already emitted via existing_edges.
-    # Selecting by filename suffix alone missed extensionless scripts:
-    # _SHEBANG_DISPATCH routes a `#!/usr/bin/env bash` file with no extension to
-    # extract_bash, so its functions get indexed, but a suffix-only filter left it
-    # out of this pass and calls into it never resolved (#2171). Select by shape
-    # too — the bash extractor tags every node it emits with
-    # metadata.language == "bash" — while keeping the suffix check so an empty
-    # .sh file (no nodes to inspect) still participates.
+    # @doc extract.md#C0230
     def _looks_like_bash(result: object) -> bool:
         if not isinstance(result, dict):
             return False
@@ -7010,31 +6266,10 @@ def extract(
             import logging
             logging.getLogger(__name__).warning("Bash cross-file call resolution failed, skipping: %s", exc)
 
-    # Cross-file call resolution for all languages
-    # Each extractor saved unresolved calls in raw_calls. Now that we have all
-    # nodes from all files, resolve any callee that exists in another file.
-    # Build name → ALL matching node IDs so we can skip ambiguous common names
-    # (e.g. "log", "execute", "find") that appear in multiple files — resolving
-    # those inflates god_nodes ranking with spurious cross-file edges.
-    # Build label -> node_id index for cross-file call resolution.
-    # Skip rationale nodes (their labels are docstring text, not callable
-    # identifiers, and they were polluting matches for short names — #563).
+    # @doc extract.md#C0231
     global_label_to_nids: dict[str, list[str]] = {}      # exact-case (all languages)
     global_label_to_nids_ci: dict[str, list[str]] = {}   # case-INSENSITIVE-language nodes
-    # #2406: on an incremental rebuild only the CHANGED files are parsed, so
-    # `all_nodes` alone cannot see a callee that lives in an unchanged file and
-    # every changed->unchanged DIRECT call silently vanished (while the file-level
-    # `imports` edge survived, because the JS/Python symbol-resolution pass
-    # reads the import TARGET off disk instead of off the node list). Extend the
-    # resolution indexes — and ONLY the indexes — with the caller-supplied
-    # unchanged-corpus nodes. Fresh nodes win on id collision, nothing is
-    # appended to `all_nodes`, and raw_calls still come solely from `paths`, so
-    # the emitted edges remain sourced by the re-extracted files.
-    #
-    # Scope: this list feeds the shared direct-call loop below, the
-    # indirect_call callable guard (#2438, via the persisted `_callable` /
-    # `_callable_class` markers), and — together with resolution_context_edges —
-    # the member-call resolvers run by run_language_resolvers (#2437).
+    # @doc extract.md#C0232
     resolution_nodes = all_nodes
     if resolution_context_nodes:
         _fresh_ids = {n["id"] for n in all_nodes}
@@ -7048,44 +6283,23 @@ def extract(
         raw = n.get("label", "")
         normalised = raw.strip("()").lstrip(".")
         if normalised:
-            # Case is semantic in most languages, so index (and match, below) by exact
-            # case — folding collapses `Path` (class) into `PATH` (env var) and makes a
-            # single shell variable the #1 god-node (#1581). Only case-insensitive
-            # languages (PHP/SQL/Nim) also get a folded key for legitimate fold-matching.
+            # @doc extract.md#C0233
             global_label_to_nids.setdefault(normalised, []).append(n["id"])
             if _lang_is_case_insensitive(n.get("source_file")):
                 global_label_to_nids_ci.setdefault(normalised.lower(), []).append(n["id"])
 
-    # Callable-def ids for the indirect_call callable guard, read from the `_callable`
-    # marker on the FINAL (post-remap) nodes — so a callback resolves only to a real
-    # function/method/class, never a same-named data symbol, and the guard never goes
-    # stale when node ids were relativized/disambiguated above (#1566). Read from
-    # `resolution_nodes`, not `all_nodes` (#2438): an unchanged callee's context node
-    # carries the marker persisted in graph.json, so an incremental rebuild keeps
-    # resolving callbacks into unchanged files while data symbols stay excluded.
+    # @doc extract.md#C0234
     callable_nids = {n["id"] for n in resolution_nodes if n.get("_callable")}
-    # Class defs are callable only via their constructor; they are frequently passed
-    # as descriptive values (`select(Model)`, exception tuples), not invoked. Exclude
-    # them from the indirect_call guard below to avoid false edges (#2137).
+    # @doc extract.md#C0235
     class_nids = {n["id"] for n in resolution_nodes if n.get("_callable_class")}
 
-    # Kotlin import targets (#2526): rewrite each `imports` edge from the bare
-    # last-segment id to the node its written FQN names, via the per-file
-    # package declarations. Runs HERE — after the id-remap/disambiguation passes
-    # (ids are final) but before the import-evidence index just below reads the
-    # edges — so genuine imported calls get promoted INFERRED -> EXTRACTED. The
-    # tail registry run (run_language_resolvers below) would be too late.
+    # @doc extract.md#C0236
     run_language_resolvers(
         paths, per_file, all_nodes, all_edges,
         resolvers=[_KOTLIN_IMPORT_TARGET_RESOLVER],
     )
 
-    # Build evidence index from import edges so cross-file calls backed by an
-    # explicit import statement can be promoted from INFERRED to EXTRACTED.
-    # Direct symbol imports (`import { foo }` / `const { foo } = require()`) are
-    # the strongest evidence — caller's file_id has an `imports` edge directly to
-    # the callee's symbol id. Module imports (`imports_from`) are weaker but still
-    # confirm the caller pulled in the callee's source file.
+    # @doc extract.md#C0237
     file_to_symbol_imports: dict[str, set[str]] = {}
     file_to_module_imports: dict[str, set[str]] = {}
     for e in all_edges:
@@ -7094,24 +6308,14 @@ def extract(
         elif e.get("relation") == "imports_from":
             file_to_module_imports.setdefault(e["source"], set()).add(e["target"])
 
-    # Map each node back to its containing file node id so we can ask
-    # "did the caller's file import the callee's file?"
-    # A node and its file node share the exact same ``source_file`` string, and a
-    # file node is the one whose label is the basename (``add_node(file_nid,
-    # path.name)``). Resolving file membership by that shared string is robust
-    # against the path-resolution/symlink mismatch that makes
-    # ``relative_to(root.resolve())`` throw and fall back to a non-matching
-    # absolute-derived id — which would spuriously fail import evidence and (with
-    # the #1659 JS/TS gate below) drop a legitimately-imported call.
+    # @doc extract.md#C0238
     sf_to_file_nid: dict[str, str] = {}
     for n in resolution_nodes:
         sf = n.get("source_file")
         if sf and n.get("label") == Path(str(sf)).name:
             sf_to_file_nid.setdefault(str(sf), n["id"])
     nid_to_file_nid: dict[str, str] = {}
-    # nid -> raw source_file string, for the ambiguous-name tie-breakers below
-    # (test/non-test classification + path proximity). Kept separate from the
-    # file-node-id map because tie-breaking compares the actual file paths.
+    # @doc extract.md#C0239
     nid_to_source_file: dict[str, str] = {}
     for n in resolution_nodes:
         sf = n.get("source_file")
@@ -7122,8 +6326,7 @@ def extract(
         if fnid is not None:
             nid_to_file_nid[n["id"]] = fnid
             continue
-        # Fallback (no file node found for this source_file): derive it the old
-        # way from the relativized path.
+        # @doc extract.md#C0240
         sf_path = Path(sf)
         try:
             sf_rel = sf_path.relative_to(root) if sf_path.is_absolute() else sf_path
@@ -7132,16 +6335,12 @@ def extract(
         nid_to_file_nid[n["id"]] = _file_node_id(sf_rel)
 
     existing_pairs = {(e["source"], e["target"]) for e in all_edges}
-    # Call-like pairs only, for the indirect_call dedup: an `imports` edge from a
-    # file to the symbol it imports is EXPECTED and must not suppress an
-    # indirect_call to that same symbol (JS/TS named imports create such an edge).
+    # @doc extract.md#C0241
     call_like_pairs = {
         (e["source"], e["target"]) for e in all_edges
         if e.get("relation") in ("calls", "indirect_call")
     }
-    # JS/TS/JSX modules have no implicit cross-module scope: a call into another
-    # file is real ONLY if the caller imported it. So a cross-file call from one
-    # of these files with no import evidence is gated below (#1659).
+    # @doc extract.md#C0242
     _JS_TS_CALL_SUFFIXES = (".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs")
     _go_module_cache: dict[Path, str | None] = {}
     for rc in all_raw_calls:
@@ -7150,48 +6349,25 @@ def extract(
             continue
         if callee in _LANGUAGE_BUILTIN_GLOBALS:
             continue
-        # Skip member-call callees: obj.log() → "log" has no import evidence
-        # and collides with any top-level function named "log" in the corpus.
+        # @doc extract.md#C0243
         if rc.get("is_member_call"):
             continue
-        # Skip Ruby include/extend/prepend mixin markers: they carry a module
-        # name as `callee` but are not calls — the Ruby resolver turns them into
-        # `mixes_in` edges. Letting the shared pass emit a `calls` edge here would
-        # both mislabel the relation and block the mixes_in emit as a dup (#1668).
+        # @doc extract.md#C0244
         if rc.get("is_mixin"):
             continue
-        # Bash calls are resolved only by resolve_bash_source_edges (run above),
-        # which scopes resolution to the files a script actually `source`s. The
-        # global name match here would bind a bash call to any same-named function
-        # in an unsourced file (an INFERRED phantom edge) and would resolve calls
-        # to external commands that merely share a name with a function elsewhere
-        # in the corpus — exactly what #2141 must not do.
+        # @doc extract.md#C0245
         if rc.get("language") == "bash":
             continue
-        # A Go predeclared function is never a cross-file call: the extractor
-        # already drops bare `append(s, x)` (extractors/go.py), so this is the
-        # backstop for Go raw_calls minted on any other path. Language-gated
-        # rather than folded into _LANGUAGE_BUILTIN_GLOBALS because `new`,
-        # `close` and `delete` are ordinary method names elsewhere (#2296).
+        # @doc extract.md#C0246
         if rc.get("language") == "go" and callee in _GO_PREDECLARED_FUNCS:
             continue
-        # Exact-case match first (case is semantic). Fold only when the CALLING
-        # file's language is case-insensitive, and only against the folded index of
-        # case-insensitive-language definitions — so a Python `Path()` call can never
-        # resolve to a shell `PATH` node (#1581).
+        # @doc extract.md#C0247
         candidates = global_label_to_nids.get(callee, [])
         if not candidates and _lang_is_case_insensitive(rc.get("source_file")):
             candidates = global_label_to_nids_ci.get(callee.lower(), [])
         if not candidates:
             continue
-        # Cross-language guard: never bind a call to a definition in a different
-        # language family. Name-only matching was resolving a TSX callback passed
-        # by name to a same-named Kotlin method in the Android half of the repo
-        # (and a Python call to a Kotlin fun) — phantom edges the extraction spec
-        # explicitly forbids. Candidates whose family is unknown (no source_file,
-        # non-code nodes) are kept, preserving the previous permissive behavior;
-        # real interop pairs (Kotlin↔Java, C↔C++↔ObjC, JS↔TS) share a family and
-        # still resolve.
+        # @doc extract.md#C0248
         caller_family = _lang_family(rc.get("source_file"))
         if caller_family is not None:
             candidates = [
@@ -7201,8 +6377,7 @@ def extract(
             ]
             if not candidates:
                 continue
-        # Imported Go selectors carry exact package evidence. External package
-        # calls yield no internal candidate instead of binding by bare name.
+        # @doc extract.md#C0249
         go_exact_import = False
         if rc.get("language") == "go" and rc.get("import_path"):
             import_path = str(rc["import_path"])
@@ -7216,11 +6391,7 @@ def extract(
                 continue
             go_exact_import = True
         caller = rc["caller_nid"]
-        # Resolve the caller's file via the raw_call's own source_file string,
-        # which is stable regardless of any caller_nid remap. An indirect
-        # callback's caller_nid is the file node, whose id may have been
-        # relativized after the raw_call was recorded, so a caller_nid lookup can
-        # miss and (with the #1659 gate) drop a legitimately-imported callback.
+        # @doc extract.md#C0250
         caller_file_nid = (
             sf_to_file_nid.get(str(rc.get("source_file", "")))
             or nid_to_file_nid.get(caller)
@@ -7229,10 +6400,7 @@ def extract(
         imported_modules = file_to_module_imports.get(caller_file_nid, set())
 
         def _has_import_evidence(candidate_id: str) -> bool:
-            # Direct symbol import (`import { foo }`) is the strongest evidence:
-            # the caller's file has an `imports` edge straight to this symbol.
-            # A module import (`import './helper.js'`) confirms the caller pulled
-            # in the file the candidate lives in.
+            # @doc extract.md#C0251
             candidate_file_nid = nid_to_file_nid.get(candidate_id)
             return (
                 candidate_id in imported_symbols
@@ -7243,13 +6411,7 @@ def extract(
             tgt = candidates[0]
             has_import_evidence = go_exact_import or _has_import_evidence(tgt)
         else:
-            # Ambiguous name (defined in 2+ files). Don't bail outright (#1219):
-            # if the caller has explicit import evidence pointing at exactly one
-            # of the candidates, that named import disambiguates unambiguously.
-            # Prefer direct symbol-import matches; fall back to module-import
-            # matches only when they too collapse to a single target. Without a
-            # unique evidence-backed pick we skip, preserving the #543 guard
-            # against over-connecting common short names (log, execute, find).
+            # @doc extract.md#C0252
             symbol_matches = [c for c in candidates if c in imported_symbols]
             if len(symbol_matches) == 1:
                 tgt = symbol_matches[0]
@@ -7263,12 +6425,7 @@ def extract(
                     tgt = module_matches[0]
                     has_import_evidence = True
                 else:
-                    # No unique import evidence. Instead of dropping the edge
-                    # outright (which let a single same-named test mock erase the
-                    # real call graph, #1553), apply the shared god-node
-                    # tie-breakers (non-test preference, then path proximity).
-                    # Resolve only if exactly one candidate survives; otherwise
-                    # the #543/#1219 guard still holds and we skip.
+                    # @doc extract.md#C0253
                     tgt = disambiguate_ambiguous_candidates(
                         candidates,
                         {c: nid_to_source_file.get(c, "") for c in candidates},
@@ -7278,15 +6435,7 @@ def extract(
                         continue
                     has_import_evidence = False
         if rc.get("indirect"):
-            # Cross-file indirect dispatch: a callback passed BY NAME
-            # (`from .h import fn; pool.submit(fn)`, or listed in a dispatch
-            # table). Resolved through the same single-definition / import-evidence
-            # candidate logic as a direct call, but emitted as a distinct INFERRED
-            # `indirect_call` and ONLY when the target is a real callable def —
-            # never a same-named data symbol. Stays INFERRED even with import
-            # evidence: the name is referenced as a value here, not invoked. Dedup
-            # is call-aware (an existing direct `calls` edge pre-empts it; a benign
-            # `imports` edge to the same symbol does NOT suppress it).
+            # @doc extract.md#C0254
             if tgt != caller and (caller, tgt) not in call_like_pairs and tgt in callable_nids and tgt not in class_nids:
                 call_like_pairs.add((caller, tgt))
                 all_edges.append({
@@ -7295,41 +6444,25 @@ def extract(
                     "relation": "indirect_call",
                     "context": rc.get("context", "argument"),
                     "confidence": "INFERRED",
-                    # 0.85, not 0.8: the rubric in references/extraction-spec.md
-                    # is a discrete set {0.55, 0.65, 0.75, 0.85, 0.95} and 0.8 is
-                    # not in it. Same tier, same meaning ("strong inference"),
-                    # now a value the documented scale actually contains (#2813).
+                    # @doc extract.md#C0255
                     "confidence_score": 0.85,
                     "source_file": rc.get("source_file", ""),
                     "source_location": rc.get("source_location"),
                     "weight": 1.0,
                 })
             continue
-        # #1659: a JS/TS DIRECT call with no import evidence is almost always an
-        # unrelated same-named export in a package that was never imported — a
-        # phantom cross-package edge (a 14-package monorepo had `platform` and
-        # `sidecar` shown as depending on `registry-protocol` purely because it
-        # exported generically-named symbols). JS/TS modules have no implicit
-        # cross-module scope, so leave it unresolved rather than binding by name
-        # alone. Other languages keep the #1553 single-candidate resolution:
-        # C/C++ headers, Ruby autoload, and same-package implicit scope
-        # legitimately call across files without an explicit import. Scoped to
-        # direct calls: the indirect_call path above is already conservative
-        # (INFERRED, callable-target-gated) and independent of import evidence.
+        # @doc extract.md#C0256
         if not has_import_evidence and str(rc.get("source_file", "")).endswith(_JS_TS_CALL_SUFFIXES):
             continue
         if tgt != caller and (caller, tgt) not in existing_pairs:
             existing_pairs.add((caller, tgt))
-            # Promote to EXTRACTED when there's a direct import edge from the
-            # caller's file pointing at either the callee symbol itself or the
-            # file the callee lives in.
+            # @doc extract.md#C0257
             if has_import_evidence:
                 confidence = "EXTRACTED"
                 confidence_score = 1.0
             else:
                 confidence = "INFERRED"
-                # 0.85 rather than 0.8 — the rubric's INFERRED set is discrete
-                # and does not contain 0.8 (#2813).
+                # @doc extract.md#C0258
                 confidence_score = 0.85
             all_edges.append({
                 "source": caller,
@@ -7343,20 +6476,7 @@ def extract(
                 "weight": 1.0,
             })
 
-    # Cross-file, language-specific member-call resolution. Runs after the shared
-    # call pass so node ids/caller_nids are final; each pass is additive (only the
-    # receiver-typed/qualified calls the shared pass skipped) with its own
-    # single-definition god-node guard. Registered in graphify.resolver_registry so
-    # a new language plugs in without editing this body (#1356 Swift, #1446 Python).
-    #
-    # #2437: on an incremental rebuild the resolvers must also see the unchanged
-    # corpus — its nodes (types/methods, from resolution_nodes above) and its
-    # persisted contains/method edges (resolution_context_edges) — or the
-    # single-definition guards bail on every changed->unchanged member call. Run
-    # them over SCRATCH lists that include the context, then keep only the fresh
-    # results: raw_calls come solely from `paths`, so nothing sourced by an
-    # unchanged file is ever emitted, and the ambiguity guards count the same
-    # candidates a full build would (the context is the whole unchanged corpus).
+    # @doc extract.md#C0259
     if resolution_context_nodes or resolution_context_edges:
         _rl_nodes = list(resolution_nodes)
         _rl_edges = all_edges + list(resolution_context_edges or [])
@@ -7367,28 +6487,11 @@ def extract(
     else:
         run_language_resolvers(paths, per_file, all_nodes, all_edges)
 
-    # Relativize source_file fields so paths are portable across machines (#555).
-    # When the node's id was itself minted from the absolute path, remap it to a
-    # portable id and rewrite the edge endpoints that reference it.
-    # ``_portable_out_of_root_sf`` is defined above, by ``id_remap`` (#2243).
+    # @doc extract.md#C0260
     ext_id_remap: dict[str, str] = {}
-    # General backstop closing the absolute-id leak CLASS (#2231/#2243): any
-    # producer that minted an id or edge endpoint as _make_id(<absolute path>)
-    # and was reached by no earlier remap (module-top-level raw_calls before
-    # #2231, unstamped edges, regex-rescue stubs #2195, ...) still leaks the
-    # machine/scan-path slug here. Instead of pattern-matching only the item's
-    # OWN id, LEARN the absolute-derived key forms (as-written and resolved)
-    # of every file that appears in the batch from the nodes' source_file, map
-    # them to the file's canonical id — _file_node_id(rel) in-root, the
-    # #1899/#2250 "ext" recipe out-of-root — and rewrite every node id and
-    # edge endpoint through that map. Only absolute-derived ids are renamed to
-    # their canonical form; a key already owned by a real (differently-minted)
-    # node is never remapped, so no edge is fabricated toward a node it did
-    # not already reference.
+    # @doc extract.md#C0261
     owned_ids = {n.get("id") for n in all_nodes}
-    # sf string -> (relativized source_file, canonical id, absolute-derived
-    # key forms). Cached so the path work (resolve() hits the filesystem)
-    # runs once per file, not once per node.
+    # @doc extract.md#C0262
     _sf_forms: dict[str, tuple[str, str, tuple[str, ...]]] = {}
 
     def _sf_entry(sf: str, sf_path: Path) -> tuple[str, str, tuple[str, ...]]:
@@ -7402,21 +6505,14 @@ def extract(
             canonical_id = _make_id("ext", portable)
             new_sf = portable
         else:
-            # In-root: the same canonical repo-relative form the real file
-            # node uses (_file_node_id), so the scan root can never leak into
-            # a persisted id. Real file nodes were already remapped by the
-            # #2169 pass, so only leftover absolute-derived ids match below
-            # (belt-and-braces for #2195 regex-rescue stubs and friends).
+            # @doc extract.md#C0263
             canonical_id = _file_node_id(rel)
             new_sf = rel.as_posix()
         try:
             sf_resolved = sf_path.resolve()
         except (OSError, RuntimeError):
             sf_resolved = sf_path
-        # Learn the STEM (extension-dropped) forms too: symbol producers mint
-        # compound ids as _make_id(_file_stem(path), name), so a node-less
-        # absolute-derived endpoint arrives as <stem-key>_<symbol> and only
-        # the stem prefix can identify the file it came from (#2262).
+        # @doc extract.md#C0264
         keys = tuple({
             _make_id(str(sf_path)),
             _make_id(str(sf_resolved)),
@@ -7438,10 +6534,7 @@ def extract(
                         if key == canonical_id or key in ext_id_remap:
                             continue
                         if key in owned_ids and item.get("id") != key:
-                            # The key is a real node's id minted some other way —
-                            # renaming it (or edges onto it) would corrupt the graph.
-                            # The node that owns it registers it itself when its own
-                            # id IS the absolute-derived form (#2195 stub).
+                            # @doc extract.md#C0265
                             continue
                         ext_id_remap[key] = canonical_id
                 item["source_file"] = new_sf
@@ -7453,9 +6546,7 @@ def extract(
                 item["definition_file"] = new_df
 
     if ext_id_remap:
-        # Bash entrypoint ids are the file-level id + "__entry"
-        # (extractors/bash.py); rewrite the suffixed form of any learned key
-        # the same way so a script-invocation endpoint can't keep the slug.
+        # @doc extract.md#C0266
         _ENTRY = "__entry"
 
         def _canon(nid: str) -> str:
@@ -7464,14 +6555,7 @@ def extract(
             if nid.endswith(_ENTRY) and nid[: -len(_ENTRY)] in ext_id_remap:
                 return ext_id_remap[nid[: -len(_ENTRY)]] + _ENTRY
             if nid not in owned_ids:
-                # Node-less suffixed-compound endpoint (#2262): an id minted
-                # as _make_id(<absolute stem>, <symbol>) by a producer that
-                # never materialized the node. No node ever registers it, so
-                # rewrite by longest learned prefix: the endpoint stays
-                # dangling (no node is fabricated) but becomes
-                # machine-portable. Ids owned by real nodes are never
-                # touched (guard above), and only absolute-path-derived
-                # prefixes are in ext_id_remap, so ordinary ids can't match.
+                # @doc extract.md#C0267
                 idx = nid.rfind("_")
                 while idx > 0:
                     canonical = ext_id_remap.get(nid[:idx])
@@ -7489,42 +6573,16 @@ def extract(
             if e.get("target"):
                 e["target"] = _canon(e["target"])
 
-    # origin_file is an internal disambiguation hint (#1462): the colliding-id pass
-    # above reads it to keep same-named cross-file stubs distinct, after which nothing
-    # consumes it. Drop it from the returned nodes so it never ships into graph.json as
-    # an absolute, machine-specific path — the same "no absolute paths in output"
-    # contract that relativizes source_file just above (#555, #932). The per-file AST
-    # cache keeps its own copy, which is what the colliding-id pass reads on a cache hit.
+    # @doc extract.md#C0268
     for n in all_nodes:
         n.pop("origin_file", None)
-    # `_callable` / `_callable_class` are deliberately NOT popped (#2438): they
-    # persist into graph.json — the same underscore-provenance precedent as
-    # `_origin` below — so an incremental rebuild can hand them back as
-    # resolution context and the indirect_call callable guard keeps working for
-    # targets in unchanged files. Callability is never inferred from a persisted
-    # label (that would reintroduce the #1566/#2137 data-symbol false positives);
-    # a graph written before the markers existed simply fails closed until its
-    # files are re-extracted.
+    # @doc extract.md#C0269
 
-    # local_alias is a transient import-resolution hint (#2082), same shape as
-    # target_file (#1814): it exists only so the module arm of
-    # _resolve_python_member_calls (run above via run_language_resolvers) can
-    # match an aliased receiver against the import edge it came from. Nothing
-    # reads it after that pass runs, so drop it here rather than let an internal
-    # local variable name ship into graph.json. Popped post-resolution, unlike
-    # target_file (which _disambiguate_colliding_node_ids pops earlier in the
-    # pipeline) — local_alias must survive until run_language_resolvers has run,
-    # so it cannot be popped at that earlier point without breaking the fix.
+    # @doc extract.md#C0270
     for e in all_edges:
         e.pop("local_alias", None)
 
-    # Tag AST provenance so the incremental watch rebuild can distinguish
-    # AST-extracted nodes from semantic/LLM nodes. On a full re-extraction
-    # the watcher drops any AST-marked node missing from the fresh output
-    # even when its source file still exists (#1116). Edges carry the same
-    # marker so edge eviction can be tier-scoped: re-extracting a source
-    # replaces its AST edges without evicting the semantic edges the AST
-    # pass cannot regenerate (#1865).
+    # @doc extract.md#C0271
     for n in all_nodes:
         n["_origin"] = "ast"
     for e in all_edges:
@@ -7532,24 +6590,7 @@ def extract(
 
     # Canonicalize source_file to POSIX on every node AND edge (#2625).
     #
-    # Extractors build source_file from the Path they were handed, so a run
-    # given RELATIVE inputs keeps the native separator on Windows. Only the
-    # relativizing branch of _sf_entry above ever calls as_posix(), so a single
-    # extraction could emit `src\lib\content.ts` and `src/pages/index.astro`
-    # side by side. source_file is compared as a STRING downstream
-    # (build._norm_source_file keying, _derive_prune_root, dedup, and
-    # analyze.find_import_cycles, which matches an edge's source_file against a
-    # node's by equality), so two spellings are two different files — the
-    # fragmentation of #683, and the reason the CLI path (which passes an
-    # explicit root) looked correct while the library entry point did not.
-    #
-    # Safe as a final pass: ids are minted through make_id, which collapses
-    # every non-word character — `\` and `/` alike — to `_`, so canonicalizing
-    # the separator here cannot desync an id from its source_file.
-    #
-    # PurePath is the NATIVE flavour on purpose: on POSIX a backslash is a legal
-    # filename character and must be left alone, so this only rewrites paths on
-    # the platform where `\` is actually a separator.
+    # @doc extract.md#C0272
     for _item in (*all_nodes, *all_edges):
         _sf = _item.get("source_file")
         if _sf and "\\" in str(_sf):
@@ -7563,9 +6604,7 @@ def extract(
         "edges": all_edges,
         "input_tokens": 0,
         "output_tokens": 0,
-        # Surfaces failed/empty AST sources to the CLI so the incremental
-        # manifest does not freeze them as processed (#2543). Callers that
-        # only read nodes/edges ignore this key.
+        # @doc extract.md#C0273
         "failed_sources": _failed_sources,
     }
 
@@ -7579,21 +6618,17 @@ def collect_files(target: Path, *, follow_symlinks: bool = False, root: Path | N
     from graphify.detect import _is_ignored, _is_noise_dir, _load_graphifyignore
     ignore_root = root if root is not None else target
     patterns = _load_graphifyignore(ignore_root)
-    # Shared across all _is_ignored calls in this scan so ancestor-directory
-    # results are memoised instead of re-evaluated per file.
+    # @doc extract.md#C0274
     ignore_cache: dict[Path, bool] = {}
 
     def _ignored(p: Path) -> bool:
         return bool(patterns and _is_ignored(p, ignore_root, patterns, _cache=ignore_cache))
 
     if not follow_symlinks:
-        # The old rglob filter rejected paths with a noise component anywhere,
-        # including components of target itself — preserve that.
+        # @doc extract.md#C0275
         if any(_is_noise_dir(part) for part in target.parts):
             return []
-        # When negation (!) patterns exist, skip directory-level ignore pruning
-        # so negated files inside ignored dirs can still be reached (same
-        # conservatism as detect's scan walk).
+        # @doc extract.md#C0276
         has_negation = any(pat.startswith("!") for _, pat in patterns)
         results: list[Path] = []
         for dirpath, dirnames, filenames in os.walk(target):

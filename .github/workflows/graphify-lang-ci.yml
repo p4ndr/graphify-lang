@@ -1,0 +1,60 @@
+name: graphify-lang CI
+
+on:
+  push:
+    branches: ["lang-registry", "v8"]
+  pull_request:
+    branches: ["lang-registry", "v8"]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # --frozen installs straight from the committed uv.lock without re-resolving
+      - name: Install dependencies
+        run: uv sync --all-extras --frozen
+
+      - name: Run tests
+        run: uv run --frozen pytest tests/ -q --tb=short -m 'not perf'
+
+      - name: Verify install works end-to-end
+        run: |
+          uv run --frozen graphify --help
+          uv run --frozen graphify install
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: bandit (static security analysis)
+        continue-on-error: true
+        run: uv run --frozen bandit -r graphify -ll
+
+      - name: pip-audit (dependency vulnerabilities)
+        continue-on-error: true
+        run: uv run --frozen pip-audit --strict

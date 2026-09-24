@@ -14,6 +14,7 @@ This document is a LIVE file containing a list of TASKS to be carried out.
 <!-- TEMPLATE-END -->
 
 ## 3. TASK LIST
+
 ### `[?]` T1 | S001 (prep) Toolchain, upstream baseline and corpus pin — plan §S001
 
 - `[x]` T1.1 | Install `uv` (measured absent on this host) and `git switch -c lang-registry v8`
@@ -97,3 +98,8 @@ This document is a LIVE file containing a list of TASKS to be carried out.
 - `[ ]` T10.3 | Cite issues #3180 and #1070, which both ask for exactly this
 - `[ ]` T10.4 | Include the `run_language_resolvers` casefold as a separate small fix
 - `[ ]` T10.5 | Expect to carry the registry indefinitely; plan accordingly
+
+### `[?]` T24 | Plan 02 step 6: extraction cache key check/fix for registry-dispatched files (D11)
+
+- `[x]` T24.1 | Inspect graphify/cache.py key
+- `[?]` T24.2 | Add plugin name+version to key for registry files only, or record in 50-PENDING if it needs a wider core edit

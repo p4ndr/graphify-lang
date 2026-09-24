@@ -1,0 +1,54 @@
+# graphify_lang.toml template - prose language
+#
+# This is a template for prose language manifests (e.g., Markdown with frontmatter).
+# Copy and customize for your language.
+#
+# See docs/research/01-manifest-schema.md for full field documentation.
+#
+# NOTE: section/reference/entity node kinds are not yet implemented (F20).
+# Use this template as a placeholder until those tiers are added.
+
+schema = "v1"
+
+[language]
+# Name of the language
+name = "prose-language"
+
+# File suffixes this language handles
+suffixes = [".md"]
+
+# Priority for precedence (higher wins)
+priority = 0
+
+# Case-insensitive file matching
+case_insensitive = true
+
+[grammar]
+# Tree-sitter grammar module
+module = "tree-sitter-markdown"
+
+# Language function name
+language_fn = "language"
+
+[extract]
+# Runtime module
+runtime = "graphify_lang.rules"
+
+# Optional: builtins file
+# builtins_file = "data/builtins.txt"
+
+# NOTE: section/reference/entity node kinds are not yet implemented (F20).
+# These are reserved for future prose-specific extraction tiers.
+
+[node_kind]
+# Basic prose node kinds
+# heading = "heading"
+# paragraph = "paragraph"
+# list = "list"
+# code_block = "code_block"
+# quote = "quote"
+
+[edge_kind]
+# Basic prose relations
+# contains = "contains"
+# references = "references"

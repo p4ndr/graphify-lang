@@ -3,42 +3,55 @@
 <!-- TEMPLATE-START -->
 # 40-DECISIONS.md
 
-This document is a LIVE register of the decisions made for this repo.
+This document is a LIVE file containing DECISIONS made during the project.
 
-- `§3` is the decision log, newest first.
+- `§3` is the DECISIONS in order of creation, most recent first.
 
 ## 1. INSTRUCTIONS
 
-- Change this document only with the repo-docs tools (`decision_add`, `pending_add`, `pending_settle`); hand edits by the owner are fine.
-- To create a decision: `decision_add`. To record an owner answer: `pending_settle`.
+- Change this document only through the repo-docs tools (`decision_add`); hand edits by the owner are fine. They number DECISIONS.
 <!-- TEMPLATE-END -->
 
-## 3. LOG
+## 3. DECISIONS
+### `D-003` | Carry plan for upstream registry | 2026-09-22
 
-### D-001 | 2026-09-21 | Rebase strategy
+If upstream accepts the registry proposal, the fork will rebase onto the accepted implementation and drop its own registry code. Until then, the registry remains in the fork. The AutoLISP plugin (`graphify_lang/autolisp`) is a separate concern and will remain in the fork as a reference implementation.
 
-**Decision:** Rebase, never merge. The fork's value is a small diff against upstream; merge commits hide it.
+**Source:** T10.5 (upstream proposal).
 
-**Source:** T1.1 setup.
+### `D-002` | Upstream proposal format: ISSUE, not PR | 2026-09-22
 
-**Rationale:** `git merge upstream/v8` would create a merge commit that obscures the fork's minimal diff. `git rebase upstream/v8` keeps a linear history and makes `git diff v8...HEAD -- graphify/` a clean artefact for upstream consumption.
+The fork plans to carry the registry indefinitely — upstreaming is a bonus, and a measured *issue* lands changes more often than a PR. The fork's `lang-registry` branch is the reference implementation, and `git diff v8...lang-registry -- graphify/` is the artefact an upstream maintainer can read and apply.
 
-### D-002 | 2026-09-21 | Upstream proposal route
+**Source:** T10.2 (issue #3764 on Graphify-Labs/graphify).
 
-**Decision:** Open an ISSUE on Graphify-Labs/graphify, not a pull request, for the registry proposal.
+### `D-001` | Fork CI and release safety | 2026-09-21
 
-**Source:** T10.2.
+- Add `.github/workflows/graphify-lang-ci.yml` (new file; ci.yml stays unedited).
+- Add `if: github.repository == 'Graphify-Labs/graphify'` to every job in publish.yml and release-graph.yml.
+- Add `addopts = "-m 'not perf'"` and register the `perf` marker.
+- Do not touch `pyproject.toml` `version`; fork releases are git tags only, `0.9.55+lang.<n>`.
 
-**Rationale:** The fork's intent is to propose a generic extension layer, not to ship AutoLISP. An issue lets upstream decide whether to accept the design before work begins; a PR implies a complete implementation.
+**Source:** T2.1-T2.4.
 
-### D-003 | 2026-09-21 | Commit grouping
+### `D-000` | Language extension layer: branch split | 2026-09-21
 
-**Decision:** Keep generic registry work in commits separate from AutoLISP-specific work.
+Three branches, per SRS §4.2 Workflow 5:
 
-**Source:** T10.5 note.
+| Branch | Off | Carries | Ends at |
+|:-------|:----|:--------|:--------|
+| `v8` | `upstream/v8` | nothing of the fork's; only ever fast-forwards | — |
+| `lang-registry` | `v8` | `graphify/lang_registry.py`, three core call sites, `tests/test_lang_registry.py`, the `ARCHITECTURE.md` row, and the fork's CI/release/pytest infrastructure | S004 |
+| `autolisp` | `lang-registry` | `graphify_lang/`, `tests/lang/`, packaging, corpus fixtures | S009 |
 
-**Rationale:** Upstream may accept the registry portion while rejecting the AutoLISP-specific details. Separating them allows upstream to cherry-pick the generic portion if desired.
+Nothing on `lang-registry` mentions AutoLISP.
 
-## 4. OPEN DECISIONS
+**Source:** `cc-IP000.001.md` §1.2.
 
-*None.*
+## D-001 — dcl_references also from dialog names passed to wrapper calls (INFERRED)
+
+Plan 02 §5 requires >=1 dcl_references into lithp_mgr, but autolithp reaches it only via `(dtk:dcl-exec dcl-file "lithp_mgr" ...)` (src/ui/manager.lsp:256), never a literal `(new_dialog "lithp_mgr")`. So: new_dialog literal -> EXTRACTED; an identifier-shaped string argument of any other call inside a defun -> INFERRED dcl_references, emitted only when it names exactly one dialog node in the corpus. Extends A6 (does not reopen it); pinned by tests/lang/test_autolisp_plan02.py::test_dcl_references.
+
+## D-002 — AutoLISP resolver: a name defined in several files resolves to the copy nearest the caller (INFERRED); ties are dropped
+
+autolithp defines err:trap twice (src/core/err.lsp and Import-Refactor/Archive/core/err_mod_main.lsp). Plan 02 §3's drop-ambiguous rule gave 0 inbound cross-file calls to err:trap (measured, tools/measure_autolisp.py), failing §5. Rule now: one candidate -> EXTRACTED; several -> the candidate sharing the longest leading directory path with the caller, confidence INFERRED; equal best prefix -> dropped (god-node guard kept). Measured after: 88 inbound cross-file calls to err:trap in autolithp. Complements A4 (.graphifyignore for archives), does not replace it. Pinned by test_duplicate_definition_resolves_to_nearest_copy.

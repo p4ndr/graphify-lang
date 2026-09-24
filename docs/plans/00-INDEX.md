@@ -38,4 +38,5 @@ When a CONDITION is TRUE, execute the tasks listed under that CONDITION.
 | File | Title | Purpose | Type / Status |
 |---|---|---|---|
 | `01-language-extension-layer-and-autolisp-plugin.md` | Language-extension layer and AutoLISP plugin | A registry that lets a language be registered from outside `graphify/extract.py`, plus an AutoLISP/DCL plugin built on it. | ACTIVE |
+| `02-autolisp-extractor-fixes-from-case-003.md` | AutoLISP extractor fixes from case 003 | Fix defects D1-D12 from `docs/testing/case_003_local-autolisp-repos.md` and add the edges agreed on 2026-09-24, so that an AutoLISP repo gi… | ACTIVE |
 <!-- MANIFEST-END -->

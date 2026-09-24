@@ -1,0 +1,46 @@
+# Corpus file list for AutoLISP plugin
+# SHA: d5a20743b007431521c4f9a0507560d5feb94b27
+# Generated: 2026-09-22
+# Total: 41 files (40 .lsp + 2 .dcl)
+
+src/core/cfg.lsp
+src/core/dtk.lsp
+src/core/err.lsp
+src/core/ldr.lsp
+src/core/log.lsp
+src/core/utl.lsp
+src/core/ver.lsp
+src/plugins/layerxl.lsp
+src/plugins/pltidy.lsp
+src/plugins/pltrn.lsp
+src/ui/manager.dcl
+src/ui/manager.lsp
+tests/core/test_cfg.lsp
+tests/core/test_dtk.lsp
+tests/core/test_err.lsp
+tests/core/test_ldr.lsp
+tests/core/test_log.lsp
+tests/core/test_utl.lsp
+tests/core/test_ver.lsp
+tests/modules/test_ann.lsp
+tests/modules/test_bat.lsp
+tests/modules/test_blk.lsp
+tests/modules/test_cln.lsp
+tests/modules/test_db.lsp
+tests/modules/test_dxf.lsp
+tests/modules/test_ent.lsp
+tests/modules/test_fs.lsp
+tests/modules/test_geo.lsp
+tests/modules/test_http.lsp
+tests/modules/test_io.lsp
+tests/modules/test_jsn.lsp
+tests/modules/test_lay.lsp
+tests/modules/test_lyr.lsp
+tests/modules/test_nod.lsp
+tests/modules/test_pub.lsp
+tests/modules/test_rgx.lsp
+tests/modules/test_rxn.lsp
+tests/modules/test_ss.lsp
+tests/modules/test_std.lsp
+tests/modules/test_ui.lsp
+tests/modules/test_xl.lsp

@@ -44,58 +44,76 @@ class LanguageManifest:
         except tomli.TOMLDecodeError as exc:
             return cls._invalid(f"TOML parse error: {exc}")
 
-        # Required fields
-        if "name" not in data:
-            errors.append("missing required field: name")
-        if "suffixes" not in data:
-            errors.append("missing required field: suffixes")
-        if "extract" not in data:
-            errors.append("missing required field: extract")
+        # Extract nested values - schema v1 uses sections
+        language = data.get("language", {})
+        grammar = data.get("grammar", {})
+        extract = data.get("extract", {})
 
+        # Required fields - check for presence first, then validate value
+        if "name" not in language:
+            errors.append("missing required field: language.name")
+            name = ""
+        else:
+            name = language.get("name")
+            if not name:
+                errors.append("name must be non-empty")
+        
+        if "suffixes" not in language:
+            errors.append("missing required field: language.suffixes")
+            suffixes = []
+        else:
+            suffixes = language.get("suffixes")
+            if not suffixes:
+                errors.append("suffixes must not be empty")
+        
         # Validate suffixes is a list/tuple of strings
-        if "suffixes" in data:
-            suffixes = data["suffixes"]
-            if not isinstance(suffixes, (list, tuple)):
-                errors.append("suffixes must be a list or tuple")
-                suffixes = []
-            elif not all(isinstance(s, str) for s in suffixes):
-                errors.append("suffixes must contain only strings")
-                suffixes = []
-
+        if suffixes and not isinstance(suffixes, (list, tuple)):
+            errors.append("suffixes must be a list or tuple")
+            suffixes = []
+        elif suffixes and not all(isinstance(s, str) for s in suffixes):
+            errors.append("suffixes must contain only strings")
+            suffixes = []
+        
         # Validate hook_suffixes if present
-        hook_suffixes = ()
-        if "hook_suffixes" in data:
-            hs = data["hook_suffixes"]
-            if not isinstance(hs, (list, tuple)):
-                errors.append("hook_suffixes must be a list or tuple")
-            elif not all(isinstance(s, str) for s in hs):
-                errors.append("hook_suffixes must contain only strings")
-            else:
-                hook_suffixes = tuple(hs)
-
+        hook_suffixes = language.get("hook_suffixes", ())
+        if not isinstance(hook_suffixes, (list, tuple)):
+            errors.append("hook_suffixes must be a list or tuple")
+            hook_suffixes = ()
+        elif not all(isinstance(s, str) for s in hook_suffixes):
+            errors.append("hook_suffixes must contain only strings")
+            hook_suffixes = ()
+        else:
+            hook_suffixes = tuple(hook_suffixes)
+        
         # Validate extra if present
-        extra = data.get("extra")
+        extra = grammar.get("extra")
         if extra is not None and not isinstance(extra, str):
             errors.append("extra must be a string")
-
-        # Validate grammar if present
-        grammar = data.get("grammar")
-        if grammar is not None and not isinstance(grammar, str):
-            errors.append("grammar must be a string")
+        
+        # Validate grammar module if present
+        grammar_module = grammar.get("module")
+        if grammar_module is not None and not isinstance(grammar_module, str):
+            errors.append("grammar.module must be a string")
+        
+        # Validate runtime is present
+        runtime = extract.get("runtime")
+        if not runtime:
+            errors.append("missing required field: extract.runtime")
 
         if errors:
             return cls._invalid("; ".join(errors))
 
-        # Build the manifest
+        # Build the manifest - extract is the runtime module name
+        # The registry will call runtime.build(path, data) to get the extract callable
         manifest = cls(
-            name=data["name"],
-            suffixes=frozenset(data["suffixes"]),
-            extract=data["extract"],
-            grammar=grammar,
+            name=name,
+            suffixes=frozenset(suffixes) if suffixes else frozenset(),
+            extract=lambda p: {},  # Placeholder, replaced by runtime.build()
+            grammar=grammar_module,
             extra=extra,
-            resolver=data.get("resolver"),
+            resolver=extract.get("resolver"),
             hook_suffixes=hook_suffixes,
-            fixture=Path(data["fixture"]) if "fixture" in data else None,
+            fixture=None,
         )
 
         # Additional validation

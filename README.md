@@ -294,13 +294,15 @@ never edited. The hand reader is the fallback for DCL either way.
 
 All against AutoLITHP, all mechanical, none of them satisfied at the fork point:
 
-| Check | Expected | Instrument |
-|:------|:---------|:-----------|
-| Function nodes from `src/core/err.lsp` | 27 | `len` of nodes with `file_type == "code"` and a `defun` origin, from `extract(...)` on that file |
-| `C:` commands appear | `C:LITHP`, `C:LITHP-MGR`, `C:LITHP-INIT` from `src/core/ldr.lsp:526-541` | node labels |
-| A prefixed name is one symbol | `err:trap` is one node, not `err` plus `trap` | node ids |
-| DCL edges | at least one `dcl_references` edge into `lithp_mgr` from `src/ui/manager.dcl:3` | edge list |
-| No upstream regression | `pytest tests/ -q` exit 0 with no test file edited | pytest |
+| Check | Expected | Instrument | Status (case 004, 2026-09-24) |
+|:------|:---------|:-----------|:------------------------------|
+| Function nodes from `src/core/err.lsp` | 27 | `len` of nodes with `file_type == "code"` and a `defun` origin, from `extract(...)` on that file | PASS — 27 distinct |
+| `C:` commands appear | `C:LITHP`, `C:LITHP-MGR`, `C:LITHP-INIT` from `src/core/ldr.lsp:526-541` | node labels | PASS |
+| A prefixed name is one symbol | `err:trap` is one node, not `err` plus `trap` | node ids | PASS |
+| DCL edges | at least one `dcl_references` edge into `lithp_mgr` from `src/ui/manager.dcl:3` | edge list | PASS — 1 (INFERRED, D-001) |
+| No upstream regression | `pytest tests/ -q` exit 0 with no test file edited | pytest | PASS — 5485 passed |
+
+Measurements: `docs/testing/case_004_plan02-autolisp-fixes.md` (`tools/measure_autolisp.py`).
 
 ## Roadmap
 

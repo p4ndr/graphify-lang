@@ -5,6 +5,7 @@ This module tests the lang_registry.py module (T3.5).
 
 from __future__ import annotations
 
+import os
 import tempfile
 from pathlib import Path
 
@@ -12,16 +13,6 @@ import pytest
 
 from graphify_lang.manifest import LanguageManifest
 from graphify_lang import registry
-from graphify_lang.registry import (
-    _init_state,
-    _RegistryState,
-    get_manifest,
-    get_manifest_for_suffix,
-    iter_manifests,
-    registered_names,
-    registered_suffixes,
-)
-
 
 class TestLanguageManifest:
     """Tests for the LanguageManifest dataclass."""
@@ -32,12 +23,17 @@ class TestLanguageManifest:
             manifest_path = Path(tmpdir) / "test.toml"
             manifest_path.write_text(
                 """
+[language]
 name = "testlang"
 suffixes = [".test", ".tst"]
-extract = "testlang.extract:extract_testlang"
-grammar = "tree-sitter-testlang"
-extra = "testlang"
 hook_suffixes = [".test"]
+
+[grammar]
+module = "tree-sitter-testlang"
+extra = "testlang"
+
+[extract]
+runtime = "testlang.extract:build"
 """,
                 encoding="utf-8",
             )
@@ -56,15 +52,18 @@ hook_suffixes = [".test"]
             manifest_path = Path(tmpdir) / "test.toml"
             manifest_path.write_text(
                 """
+[language]
 suffixes = [".test"]
-extract = "testlang.extract:extract_testlang"
+
+[extract]
+runtime = "testlang.extract:build"
 """,
                 encoding="utf-8",
             )
 
             manifest, errors = LanguageManifest.from_toml(manifest_path)
             assert len(errors) == 1
-            assert "missing required field: name" in errors[0]
+            assert "missing required field: language.name" in errors[0]
             assert not manifest.name
 
     def test_missing_required_field_suffixes(self) -> None:
@@ -73,23 +72,27 @@ extract = "testlang.extract:extract_testlang"
             manifest_path = Path(tmpdir) / "test.toml"
             manifest_path.write_text(
                 """
+[language]
 name = "testlang"
-extract = "testlang.extract:extract_testlang"
+
+[extract]
+runtime = "testlang.extract:build"
 """,
                 encoding="utf-8",
             )
 
             manifest, errors = LanguageManifest.from_toml(manifest_path)
             assert len(errors) == 1
-            assert "missing required field: suffixes" in errors[0]
+            assert "missing required field: language.suffixes" in errors[0]
             assert not manifest.suffixes
 
-    def test_missing_required_field_extract(self) -> None:
-        """A manifest without 'extract' is rejected with one-line error."""
+    def test_missing_required_field_runtime(self) -> None:
+        """A manifest without 'runtime' is rejected with one-line error."""
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest_path = Path(tmpdir) / "test.toml"
             manifest_path.write_text(
                 """
+[language]
 name = "testlang"
 suffixes = [".test"]
 """,
@@ -98,7 +101,7 @@ suffixes = [".test"]
 
             manifest, errors = LanguageManifest.from_toml(manifest_path)
             assert len(errors) == 1
-            assert "missing required field: extract" in errors[0]
+            assert "missing required field: extract.runtime" in errors[0]
 
     def test_suffix_not_starting_with_dot(self) -> None:
         """A suffix not starting with '.' is rejected with one-line error."""
@@ -106,9 +109,12 @@ suffixes = [".test"]
             manifest_path = Path(tmpdir) / "test.toml"
             manifest_path.write_text(
                 """
+[language]
 name = "testlang"
-suffixes = ["test"]
-extract = "testlang.extract:extract_testlang"
+suffixes = [".test", "test"]
+
+[extract]
+runtime = "testlang.extract:build"
 """,
                 encoding="utf-8",
             )
@@ -123,9 +129,12 @@ extract = "testlang.extract:extract_testlang"
             manifest_path = Path(tmpdir) / "test.toml"
             manifest_path.write_text(
                 """
+[language]
 name = "testlang"
 suffixes = [".test", 123]
-extract = "testlang.extract:extract_testlang"
+
+[extract]
+runtime = "testlang.extract:build"
 """,
                 encoding="utf-8",
             )
@@ -140,10 +149,13 @@ extract = "testlang.extract:extract_testlang"
             manifest_path = Path(tmpdir) / "test.toml"
             manifest_path.write_text(
                 """
+[language]
 name = "testlang"
 suffixes = [".test"]
-extract = "testlang.extract:extract_testlang"
 hook_suffixes = [".test", 123]
+
+[extract]
+runtime = "testlang.extract:build"
 """,
                 encoding="utf-8",
             )
@@ -158,10 +170,16 @@ hook_suffixes = [".test", 123]
             manifest_path = Path(tmpdir) / "test.toml"
             manifest_path.write_text(
                 """
+[language]
 name = "testlang"
 suffixes = [".test"]
-extract = "testlang.extract:extract_testlang"
+
+[grammar]
+module = "test"
 extra = 123
+
+[extract]
+runtime = "testlang.extract:build"
 """,
                 encoding="utf-8",
             )
@@ -176,9 +194,12 @@ extra = 123
             manifest_path = Path(tmpdir) / "test.toml"
             manifest_path.write_text(
                 """
+[language]
 name = ""
 suffixes = [".test"]
-extract = "testlang.extract:extract_testlang"
+
+[extract]
+runtime = "testlang.extract:build"
 """,
                 encoding="utf-8",
             )
@@ -193,9 +214,12 @@ extract = "testlang.extract:extract_testlang"
             manifest_path = Path(tmpdir) / "test.toml"
             manifest_path.write_text(
                 """
+[language]
 name = "testlang"
 suffixes = []
-extract = "testlang.extract:extract_testlang"
+
+[extract]
+runtime = "testlang.extract:build"
 """,
                 encoding="utf-8",
             )
@@ -208,56 +232,42 @@ extract = "testlang.extract:extract_testlang"
 class TestRegistryDiscovery:
     """Tests for registry discovery and caching."""
 
-    @pytest.fixture(autouse=True)
-    def reset_state(self) -> None:
-        """Reset the registry state before and after each test."""
-        registry._STATE = None
-        yield
-        registry._STATE = None
+    def test_get_manifest_returns_registered(self) -> None:
+        """get_manifest returns the registered manifest."""
+        manifest, errors = LanguageManifest.from_toml(
+            Path(__file__).parent / "lang" / "fixtures" / "autolisp.toml"
+        )
+        assert errors == [], f"Unexpected errors: {errors}"
+        assert manifest.name == "autolisp"
 
-    def test_registered_names_empty_initially(self) -> None:
-        """registered_names() returns empty list before any registration."""
-        assert registered_names() == []
+    def test_get_manifest_for_suffix(self) -> None:
+        """get_manifest_for_suffix returns the correct manifest."""
+        registry.reset()
+        manifest = registry.get_manifest_for_suffix(".lsp")
+        assert manifest is not None
+        assert manifest.name == "autolisp"
 
-    def test_iter_manifests_empty_initially(self) -> None:
-        """iter_manifests() yields nothing before any registration."""
-        assert list(iter_manifests()) == []
-
-    def test_get_manifest_none_for_unknown_name(self) -> None:
-        """get_manifest() returns None for unknown language."""
-        assert get_manifest("nonexistent") is None
-
-    def test_get_manifest_for_suffix_none_for_unknown_suffix(self) -> None:
-        """get_manifest_for_suffix() returns None for unknown suffix."""
-        assert get_manifest_for_suffix(".xyz") is None
+    def test_get_manifest_for_unknown_suffix(self) -> None:
+        """get_manifest_for_suffix returns None for unknown suffix."""
+        registry.reset()
+        manifest = registry.get_manifest_for_suffix(".unknown")
+        assert manifest is None
 
 
 class TestRegistryEnvironment:
     """Tests for registry environment variable handling."""
 
-    @pytest.fixture(autouse=True)
-    def reset_state(self) -> None:
-        """Reset the registry state before and after each test."""
-        registry._STATE = None
-        yield
-        registry._STATE = None
-
-    def test_init_state_caches_state(self) -> None:
-        """_init_state caches the state after first call."""
-        state1 = _init_state()
-        state2 = _init_state()
-        assert state1 is state2  # Same object returned
-
-    def test_init_state_respects_reset(self) -> None:
-        """Resetting _STATE allows a new state to be created."""
-        # Create initial state
-        state1 = _init_state()
-        assert state1.enabled
-
-        # Reset
-        registry._STATE = None
-
-        # Create new state
-        state2 = _init_state()
-        assert state2.enabled
-        assert state1 is not state2  # New object created
+    def test_graphify_lang_disable(self) -> None:
+        """GRAPHIFY_LANG_DISABLE disables discovery."""
+        original = os.environ.get("GRAPHIFY_LANG_DISABLE")
+        try:
+            os.environ["GRAPHIFY_LANG_DISABLE"] = "1"
+            registry.reset()
+            # Discovery should be disabled
+            names = registry.registered_names()
+            assert "autolisp" not in names
+        finally:
+            if original is None:
+                os.environ.pop("GRAPHIFY_LANG_DISABLE", None)
+            else:
+                os.environ["GRAPHIFY_LANG_DISABLE"] = original

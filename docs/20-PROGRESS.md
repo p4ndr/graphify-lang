@@ -15,6 +15,81 @@ This document is a LIVE running changelog for all work in the repo.
 
 ## 3. CURRENT SESSION
 
+### 2026-09-24 14:42 (UTC+10)
+
+- bash: timeout 1200 .venv/bin/python -m pytest tests/ -q -p no:cacheprovider 2>&1 | tail -1; TMPDIR=/tmp/claude-1000/-home-p4n…, cd ~/repos/autolisp-pvcase && rtk git log -1 --format='%h %ci'; git status --porcelain | head -5; git ls-files '*.lsp' …
+- T26.4 done: `.venv/bin/python -m pytest tests/ -q`: 5495 passed, 12 skipped (before this session 5485/12; +10 are new fork tests), no upstream test file edited. tools/measure_autolisp.py on the 4 repos: autolithp 4,212 nodes / 19,157 edges (calls 15,017, contains 4,128, dcl_references 4, module_depends 8), err:trap 88 inbound cross-file, lithp_mgr 1, 0 missed, 0 token, 0 dup; autolithp02 3,160/13,178; snap-rework 3,069/12,430 — all identical to case 005. pvcase is 1,301/5,634 over 32 files vs case 005's 1,176/4,972 over 29: the repo gained 3 files in commit bf69f47 at 14:23 today, which is not a regression. guard: graphify/ differs from v8 in cli, detect, extract (@doc, D-004), lang_registry and resolver_registry (the committed casefold fix, 0b2d2e4); no hand-added suffix; extract.py has 0 graphify_lang/autolisp strings.
+- T26 done (all steps): Settled items follow-up: fork version string (P9), restore detect.py (P10), `gr…
+- ag-build session (Phase 0 file ~/.claude/cache/phase0/graphify-lang/phase0-20260924-142911.md): T1, T24 and T26 done; T5-T8 steps closed where the code already meets them or needed a small fix; T5.2-T5.6 open under P16, T6.2/T6.4/T7.4/T8.2/T8.4 open under P17; P15 raised (fork and stock evict each other's AST cache dir)
+- Code changes: detect.py is v8 plus the registry lookup; version 0.9.55+lang.1 (uv.lock: that line only); `graphify lang list` (cli.py + lang_registry.format_languages); manifest.py uses stdlib tomllib; the walker no longer counts cond clause heads as calls; the licence file ships in package-data
+- Tests: SC2 subprocess snapshot test, lang list test, tests/lang/test_autolisp_corpus_fixtures.py (8 tests on the real err/ldr/manager fixtures plus authored .mnl/defun-q/cond/ERR.LSP). pytest 5495 passed / 12 skipped; measure_autolisp is identical to case 005 for autolithp, autolithp02 and snap-rework
+
+### 2026-09-24 14:41 (UTC+10)
+
+- T8.1 done: graphify_lang/autolisp/dcl.toml is a second manifest in the same package (autolisp-dcl, markup, .dcl, grammar regex, runtime extract_dcl); `graphify lang list` shows it.
+- T8.3 done: dcl_references come from new_dialog (EXTRACTED) and wrapper string args (INFERRED, D-005a); dcl_action comes from action_tile strings, re-parsed as AutoLISP. Pinned by test_autolisp_plan02.py::test_dcl_references and test_dcl_action.
+- T8.5 done: .mnl is claimed in graphify-lang.toml. New test_mnl_and_defun_q_authored: an authored acad.mnl dispatches to the walker without error and gives its functions and a call. SC6b: 1 dcl_references into lithp_mgr in autolithp (measure_autolisp, D-005a INFERRED); manager.dcl gives dialog lithp_mgr (test_manager_dcl_dialog).
+
+### 2026-09-24 14:40 (UTC+10)
+
+- bash: rtk read graphify_lang/rules.py; sed -n 1,60p graphify_lang/queries.py; sed -n 1,50p graphify_lang/regex_rules.py; sed …, sed -n 40,135p graphify_lang/manifest.py; rtk grep -n "def test" tests/lang/test_rules.py tests/lang/test_autolisp_node…, S=/tmp/claude-1000/-home-p4ndr-repos-graphify-lang/rt && mkdir -p $S && cat > $S/tags.scm <<'EOF'
+  (list_lit . (sym_lit)…, rtk read tests/lang/corpus_files.txt --max-lines 8; rtk grep -vc '^#' tests/lang/corpus_files.txt; git -C ~/repos/autol…, F=$(git -C ~/repos/autolithp ls-tree -r --name-only d5a20743b007431521c4f9a0507560d5feb94b27 -- src tests Import-Refact…, python3 - <<'EOF'
+  p='tests/lang/test_rules.py'
+  s=open(p).read()
+  old='    assert len(lines) > 0, "corpus_files.txt shoul… (+24 more)
+- edit: tests/lang/test_autolisp_corpus_fixtures.py, graphify_lang/autolisp/extract.py
+- T5.1 done: tests/lang/corpus_files.txt regenerated from `git ls-tree d5a2074 -- src tests Import-Refactor build` (the old file listed 42 of 84): 81 .lsp + 3 .dcl + 0 .mnl, with the regenerate command in its header; test_rules.py::test_corpus_file_list_count now pins 84.
+- T6.1 done: Already there: graphify_lang/autolisp/graphify-lang.toml (.lsp .mnl, overrides .lsp, case_insensitive, tree_sitter_commonlisp 0.4.1, extra commonlisp; runtime = the plan 02 walker) and pyproject.toml:97 `commonlisp = ["tree-sitter-commonlisp>=0.4.1,<0.5"]` (v8 has no specifier). Fixed: graphify_lang/manifest.py imported tomli unconditionally, which is only a dependency below 3.11; it now uses stdlib tomllib first. Measured with tomli blocked: registry still lists autolisp and autolisp-dcl.
+- T6.3 done: data/builtins.txt and data/LICENSE.AutoLispExt were already there, but package-data left the licence out of the wheel. Added "autolisp/data/LICENSE.*"; `uv build --wheel` now ships graphify_lang/autolisp/data/LICENSE.AutoLispExt. The stale ignored build/ still carries autolisp/queries/tags.scm into wheels; not deleted.
+- T6.5 done: tests/lang/fixtures/src/core/{err,ldr}.lsp and src/ui/manager.dcl are byte-identical to autolithp d5a2074 (cmp), but no test used them. New tests/lang/test_autolisp_corpus_fixtures.py extracts them with root=tests/lang/fixtures, so ids and source_file are src/core/err.lsp, the same as on the corpus.
+- T6.6 done: Checked in tests/lang/fixtures/collision_set.tsv, measured with extract_autolisp over corpus_files.txt: 11 groups, 5 pkg:name/pkg:_name and 6 repeated *error* (pltrn.lsp has 39, not the 24 in the plan). The tests derive SC4 instead of asserting it: 27 = the defun regex over the real err.lsp = distinct function ids, and the err.lsp collision group matches the TSV. SC5: C:LITHP, C:LITHP-MGR and C:LITHP-INIT are command nodes from ldr.lsp. Corpus: 0 missed defuns (measure_autolisp).
+- T7.1 done: Plan 02 §3 defines the contract as `autolisp_refs` (kind=call, source, name, line, source_file) on each extractor result. graphify_lang/autolisp/resolve.py binds them case-insensitively (D-005b nearest copy) and drops what is left unbound. Tested by test_autolisp_plan02.py::test_calls_exact and test_cross_file_call_is_extracted.
+- T7.2 done: The walker already skipped the defun/lambda headers (params), setq targets and quoted data. Added: cond clause heads are test values, not calls (extract.py walk_list). This changes nothing on the corpus (autolithp calls 15,017 before and after) and is pinned by test_cond_clause_head_is_not_a_call.
+- T7.3 done: Quoted 'fn, (quote fn) and (function fn) are call candidates in the walker (plan 02 A6), covered by test_autolisp_plan02 calls pins. The `:vlr-*` dotted-pair clause is not built: there are 0 quoted-literal instances in corpus code (7 grep hits, all in comments of src/modules/rxn/mod.lsp).
+- T7.5 done: resolve.py RESOLVER is a LanguageResolver for .lsp/.mnl/.dcl, registered once by the registry (test_resolver_registered_once). The resolver_registry casefold fix covers upper-case suffixes; new test_upper_case_suffix_resolves_cross_file: ERR.LSP gets its cross-file call.
+- T7.6 done: analyze.god_nodes(build_from_json(extract(corpus_files.txt, root=autolithp))) top 10 are all AutoLISP defuns, no COM or built-ins: pltrn:rget 714, pltrn:_fn 513, pltrn:_int 438, pltrn:_real 285, pltrn:_str 255, pltrn_nc pltrn:rget 174, pltrn:_fn2 152, pltrn_nc pltrn:_fn 148, pltrn:get 147, C:PLTRNTEST 145 (SC7). SC6a: err:trap has 88 inbound cross-file calls (measure_autolisp).
+
+### 2026-09-24 14:34 (UTC+10)
+
+- T26.2 done: graphify/detect.py rebuilt from `git show v8:graphify/detect.py` plus the 6-line try-wrapped registry lookup after CODE_EXTENSIONS: `git diff v8 -- graphify/detect.py` = +6 -0. classify_file gives CODE for .lisp .cl .asd .cls .trigger .robot .resource (and .lsp .dcl .mnl). SC2 snapshot identical under GRAPHIFY_LANG_DISABLE=1. extract.py @doc markers untouched (D-004).
+- bash: grep -n "def main\|cmd == \|argv\[1\]\|elif cmd\|if cmd" graphify/cli.py | head -60; rtk grep -n "^def \|^class " graph…, sed -n 3110,3172p graphify/cli.py; grep -n '"  global\|global list\|  benchmark' graphify/cli.py | head; grep -rln "glo…, grep -n 'global add <graph' graphify/cli.py | head; grep -n 'print("  global\|"  global' graphify/cli.py | head; sed -n…, cd /tmp && /home/p4ndr/repos/graphify-lang/.venv/bin/python -c "
+  from graphify_lang import registry as r
+  for m in r.ite…, cat >> graphify/lang_registry.py <<'EOF'
+  def format_languages() -> str:
+  """Table of registered plugin languages f…, ls graphify/__main__.py && cat >> tests/test_lang_registry.py <<'EOF'
+  def test_lang_list_subcommand() -> None:
+  ""…
+- T26.3 done: `graphify lang list`: 9-line try-wrapped branch in graphify/cli.py (before `extract`), table built by new graphify/lang_registry.format_languages() (generic, no language name). Measured: lists autolisp (.lsp .mnl, tree_sitter_commonlisp, resolver autolisp) and autolisp-dcl (.dcl); GRAPHIFY_LANG_DISABLE=1 -> "No plugin languages registered."; bare `graphify lang` -> usage, exit 1. Test: tests/test_lang_registry.py::test_lang_list_subcommand (subprocess). Side effect of the D-007 version: the fork CLI warns that ~/.claude/skills/graphify is from 0.9.55 (not acted on).
+
+### 2026-09-24 14:33 (UTC+10)
+
+- bash: sed -i '24s/^- `\[?\]` T1\.5 | \(.*\) (BLOCKED on P1: AutoLITHP corpus SHA decision)$/- `[x]` T1.5 | \1/' docs/30-TODO.…
+- T1 done: T1.5 (hand-marked: the tool's id match collides with T1.5b/T1.5c) — ~/repos/autolithp HEAD d5a20743b007 = SRS pin, clean; re-measured 81 .lsp, 4,027 defun/defun-q, 52 `defun C:` case-sensitive (SRS instrument said -Eio = 64 incl. 12 lowercase `c:`; SRS §1.3 row corrected), 3 .dcl, 8 dialogs, 3.04 MiB. T1.4 snapshot + SC2 test done.
+- bash: sed -i '7s/^version = "0.9.55"$/version = "0.9.55+lang.1"/' pyproject.toml && sed -n 6,8p pyproject.toml && uv sync --a…, uv sync --all-extras --quiet 2>&1 | tail -3; rtk git diff --stat uv.lock; git diff uv.lock | grep '^[-+]' | head; .venv…, cd /tmp && ~/.local/share/pipx/venvs/graphifyy/bin/python -c "import graphify.cache as c; print('stock', c._EXTRACTOR_V…, C=/tmp/claude-1000/-home-p4ndr-repos-graphify-lang/cachecheck; rm -rf $C; mkdir -p $C; cat > $C/run.py <<'EOF'
+  import s…
+- T26.1 done: pyproject.toml version = "0.9.55+lang.1" (D-007); `uv sync --all-extras` changed only the graphifyy version line in uv.lock; tree-sitter 0.25.2 / tree-sitter-commonlisp 0.4.1 kept (importlib.metadata). Fresh shared cache_root, alternating runs on ~/repos/autolithp src/core/err.lsp: fork writes cache/ast/v0.9.55+lang.1-s2 (33 nodes, 61 edges), stock writes v0.9.55-s2 (1 node) — neither reads the other's entries. Upstream's sibling-dir sweep makes them evict each other: P-item raised.
+- T24.2 done: Closed by D-007 / T26.1 instead of a per-file key: graphify/cache.py keys AST entries by package version (cache/ast/v{version}-s{schema}); the fork's version 0.9.55+lang.1 gives a distinct dir, measured fork v0.9.55+lang.1-s2 vs stock v0.9.55-s2 with no cross-reads. No cache.py edit.
+- T24 done (all steps): Plan 02 step 6: extraction cache key check/fix for registry-dispatched files (D…
+
+### 2026-09-24 14:32 (UTC+10)
+
+- bash: python3 - <<'EOF'
+  import re
+  p='docs/50-PENDING.md'; t=open(p).read()
+  a=t.index('### `[?]` P7 '); b=t.index('## 4. RESOL…, python3 - <<'EOF'
+  import re
+  d='docs/40-DECISIONS.md'; t=open(d).read()
+  t=t.replace("## D-003 — The fork's package versi…, awk '/^### .*T1 \|/,/^### .*T2 /' docs/30-TODO.md | head -30; awk '/^### .*T5 \|/,/^### .*T9 /' docs/30-TODO.md | rtk g…, grep -n "P1 \|P1:" -A6 docs/55-SETTLED.md docs/50-PENDING.md | head -20; rtk git -C ~/repos/autolithp log -1 --format='…, rtk read docs/10-READ-FIRST.md && rtk read docs/30-TODO.md, cat docs/40-DECISIONS.md | sed -n '1,400p'; echo ----; rtk read docs/50-PENDING.md; echo ---; rtk git status --short; r… (+20 more)
+- edit: scripts/snapshot_tables.py
+- T1.4 done: scripts/snapshot_tables.py rewritten to plan S001 spec (imports the modules, dumps _DISPATCH by __name__, _EXTRA_FOR_EXTENSION, CODE_EXTENSIONS, _WATCHED_EXTENSIONS, _HOOK_SOURCE_EXTS, registered_resolvers); tests/upstream_tables.json regenerated from `git archive v8` with GRAPHIFY_LANG_DISABLE=1 (old file held wrong hard-coded line ranges). New SC2 subprocess test tests/test_lang_registry.py::test_sc2_no_plugin_tables_match_upstream_snapshot passes, and fails on the pre-T26.2 detect.py.
+
+### 2026-09-24 14:27 (UTC+10)
+
+- bash: git status --short | head -40; rtk git diff HEAD --stat -- graphify/, cd /tmp/claude-1000/-home-p4ndr-repos-graphify-lang/6f526580-043c-4f87-897e-b7225701d683/scratchpad && rm -rf cache-* *…, cd /tmp/claude-1000/-home-p4ndr-repos-graphify-lang/6f526580-043c-4f87-897e-b7225701d683/scratchpad && rm -rf e2e e2s; …, cd /tmp/claude-1000/-home-p4ndr-repos-graphify-lang/6f526580-043c-4f87-897e-b7225701d683/scratchpad && python3 - <<'EOF…, sed -n '/^## /,$p' docs/50-PENDING.md | head -150; grep -n "D-001\|D-002" -A6 docs/40-DECISIONS.md | head -40 # graphif…
+- edit: docs/testing/case_005_rerun-fork-vs-stock.md
+- P9 settled: Option 1: give the fork a distinct package version (0.9.55+lang.1) so its AST cache dir differs from stock. Owner accep…; unblocked T24.2
+- P10 settled: Option 1, partial: restore graphify/detect.py to v8 plus only the registry lookup (brings back the 7 dropped suffixes).…
+
 ### 2026-09-24 10:33 (UTC+10)
 
 - bash: ls tools/ 2>/dev/null | head; rtk ls scripts; cat scripts/measure-corpus.sh | head -40; rtk ls ~/.local/share/pipx/venv…, time .venv/bin/python tools/measure_autolisp.py ~/repos/autolithp 2>&1 | tail -20, cd ~/repos/autolithp && rtk grep -rlni '(defun err:trap\b' --include=*.lsp .; grep -rn '(err:trap ' --include=*.lsp . |…, .venv/bin/python - <<'EOF' 2>&1 | grep -v Warn

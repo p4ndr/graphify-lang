@@ -104,7 +104,7 @@ this host 2026-09-21 at that commit, clean tree:
 |:---------|------:|:-----------|
 | `.lsp` files | 81 | `find src tests Import-Refactor build -name '*.lsp' \| wc -l` |
 | `(defun` / `(defun-q` forms | 4,027 | the same set through `grep -Eio '\(\s*defun(-q)?\s'` |
-| `(defun C:` forms | 52 | the same set through `grep -Eio '\(\s*defun\s+c:'` |
+| `(defun C:` forms | 52 | the same set through `grep -Eo '\(\s*defun\s+C:'` (uppercase as written; case-insensitive `grep -Eio '…c:'` gives 64 — 12 more written `c:`; re-measured 2026-09-24) |
 | `.dcl` files | 3 | `src/ui/manager.dcl`, `Import-Refactor/Archive/dialogs/{cbc,dtk}_app_dialogs.dcl` |
 | `name : dialog {` declarations | 8 | 1 + 2 + 5 across those three files |
 | total `.lsp` bytes | 3.1 MiB | `find … -printf '%s\n'`, summed |

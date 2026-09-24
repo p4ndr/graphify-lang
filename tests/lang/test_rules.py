@@ -24,7 +24,7 @@ def test_corpus_file_list_count():
     """T5.1: Verify corpus file list has expected file count."""
     content = CORPUS_FILES.read_text()
     lines = [l.strip() for l in content.splitlines() if l.strip() and not l.startswith("#")]
-    assert len(lines) > 0, "corpus_files.txt should have at least one file entry"
+    assert len(lines) == 84, "81 .lsp + 3 .dcl at autolithp d5a2074 (SRS §1.3)"
 
 
 def test_corpus_file_list_paths():

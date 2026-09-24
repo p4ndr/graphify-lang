@@ -4,7 +4,7 @@
 
 ## Quick Reference
 
-**Topics covered:** General (graphify-file-id-drops-extension, regex-rules-filter-kind, graphify-normalize-id-collapses-punctuation-merging-symbols) · Bug Fix (regex-rules-kind-filter) · Pattern (autolisp-package-lit-fix-is-a-query-not-a-walker)
+**Topics covered:** General (graphify-ast-cache-sweeps-sibling-versions, graphify-file-id-drops-extension, regex-rules-filter-kind, graphify-normalize-id-collapses-punctuation-merging-symbols) · Bug Fix (regex-rules-kind-filter) · Pattern (autolisp-package-lit-fix-is-a-query-not-a-walker)
 
 Scan entries by category below, or search by topic tag.
 <!-- TEMPLATE-END -->
@@ -21,6 +21,8 @@ Scan entries by category below, or search by topic tag.
 **2026-09-23 · regex-rules-filter-kind** — regex_rules.py fix: when from_manifest() loads rules, filter to only rules with kind="regex" to avoid processing query rules with empty patterns which match every position in text (source: ag-build)
 
 **2026-09-24 · graphify-file-id-drops-extension** — graphify file-node ids drop the extension (_file_node_id -> _make_id(_file_stem(rel))), so x.lsp and its x.md sidecar share one id; a file->sidecar edge becomes a self-loop. Markdown node ids are already root-relative when language resolvers run, while AST extractor ids are still absolute-stem ids (remapped after resolvers) — match cross-extractor targets by source_file, not by recomputed id. Also: extract() with no cache_root writes ./graphify-out/cache keyed only by content hash + graphifyy version, so fork tests pollute the repo's stock graph cache; always pass cache_root=tmp_path. (source: graphify-lang plan 02)
+
+**2026-09-24 · graphify-ast-cache-sweeps-sibling-versions** — graphify/cache.py namespaces AST cache as cache/ast/v{version}-s{schema}/ and _cleanup_stale_ast_entries deletes every sibling v*/ dir on first use per process. A distinct fork version (0.9.55+lang.1) stops cross-reads with stock 0.9.55, but alternating fork/stock runs on one repo wipe each other's cache (full re-extract each time). Also: tests/upstream_tables.json must be generated from `git archive v8 graphify` via PYTHONPATH + GRAPHIFY_LANG_DISABLE=1 (PYTHONPATH beats the editable finder), not from hard-coded line ranges. And repo-docs todo_set on id T1.5 errors when T1.5b/T1.5c exist (prefix collision): hand-edit the mark. (source: graphify-lang)
 
 ### Bug Fix
 

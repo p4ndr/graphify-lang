@@ -14,56 +14,24 @@ This document is a LIVE file containing pending ITEMS.
 <!-- TEMPLATE-END -->
 
 ## 3. ITEMS
-### `[?]` P7 | SRS §1.4, F18.4 — Should the fork add a `graphify lang list` subcommand?
 
-**Source:** `cc-RS000.001.md` §1.4 F26.
+### P15 | Accept that fork and stock graphify evict each other's AST cache when run on the same repo? | 2026-09-24
 
-### `[?]` P8 | SRS §1.4, F18.5 — Should the fork add a `graphify lang list` subcommand?
+- Source: T26.1
+- Context: After T26.1 (version 0.9.55+lang.1) fork and stock use separate dirs (cache/ast/v0.9.55+lang.1-s2 vs v0.9.55-s2) and never read each other's entries (measured on autolithp src/core/err.lsp: fork 33 nodes, stock 1, alternating runs). But upstream cache._cleanup_stale_ast_entries deletes every sibling v*/ dir on first use, so each side wipes the other's cache: alternating runs re-extract everything. Only a cost, never a wrong result.
+- Options: (1) Accept: do nothing — correctness holds, and the owner is unlikely to alternate stock and fork on one repo often (2) Point one side at a different graphify-out (GRAPHIFY_OUT env) when both are used on the same repo — no code change (3) Core edit to graphify/cache.py to skip sweeping +lang dirs — needs a new decision; adds a fifth core file
 
-**Source:** `cc-RS000.001.md` §1.4 F26.
+### P16 | Keep, repair or retire the generic TOML rules runtime (graphify_lang/rules.py, queries.py, regex_rules.py, builtins.py, templates/)? | 2026-09-24
 
-### `[?]` P9 | SRS §1.4, F18.6 — Should the fork add a `graphify lang list` subcommand?
+- Source: T5.2, T5.3, T5.4, T5.5, T5.6
+- Context: Plan 02 moved AutoLISP and DCL to purpose-built walkers, so nothing calls graphify_lang.rules now. Measured 2026-09-24 with a regex+tags.scm manifest on tests/lang/fixtures/src/core/err.lsp: 27 regex nodes, all with no label/source_file/file_type, 0 query nodes (the query tier fails silently), no file node, 0 edges. That is the case-003 failure mode. The tests/lang/test_rules.py checks for T5 loop over empty lists and prove nothing. The templates are not in package-data, so the wheel does not ship them.
+- Options: (1) Retire: delete rules/queries/regex_rules/builtins.py, templates/ and the vacuous tests, then mark T5.2-T5.6 superseded by plan 02. Nothing uses them, and a declarative tier can come back with a real second language to measure against (2) Repair to the S005 emission contract (file node, label/source_file/file_type, _file_stem ids, line suffix on collisions, @reference calls, builtins filter), ship the templates and test on a real regex language such as DCL. Large, and no consumer yet (3) Leave as is and document it as experimental
 
-**Source:** `cc-RS000.001.md` §1.4 F26.
+### P17 | Mark the plan 01 steps that plan 02 replaced as superseded: T6.2, T6.4, T7.4 (loads/@doc/target_file), T8.2, T8.4 (@include, load)? | 2026-09-24
 
-### `[?]` P10 | SRS §1.4, F18.7 — Should the fork add a `graphify lang list` subcommand?
-
-**Source:** `cc-RS000.001.md` §1.4 F26.
-
-### `[?]` P11 | SRS §1.4, F18.8 — Should the fork add a `graphify lang list` subcommand?
-
-**Source:** `cc-RS000.001.md` §1.4 F26.
-
-### `[?]` P12 | SRS §1.4, F18.9 — Should the fork add a `graphify lang list` subcommand?
-
-**Source:** `cc-RS000.001.md` §1.4 F26.
-
-### `[?]` P13 | SRS §1.4, F18.10 — Should the fork add a `graphify lang list` subcommand?
-
-**Source:** `cc-RS000.001.md` §1.4 F26.
-
-### `[?]` P14 | T15 scope: T14 only or include T13 files? | 2026-09-23
-
-- **Source:** T15
-- **Context:** T15 will reconcile duplicate test documentation in docs/testing/. T13 and T14 both cover the autolisp-pvcase test run. Need to know if T13-related files should be included.
-- **Options:** 
-  1. T14 only — focus on T14-*.md and T14-*.json files
-  2. Include T13 — also review T13-related files if they contain relevant duplicate content
-- **Resolution:** T14 only (user confirmed)
-
----
-
-### P9 | How should the fork stop sharing the AST cache with stock graphify 0.9.55 (D11)? | 2026-09-24
-
-- Source: T24.2
-- Context: graphify/cache.py:956 keys AST entries only by content hash under cache/ast/v{graphifyy version}-s{schema}; fork and stock both report 0.9.55, so they read each other's entries. load_cached runs before dispatch (extract.py:5461, 5719) and has no per-extractor hook, so a registry-only key is impossible; any fix edits cache.py. Measured side effect: the fork's own tests used to write into this repo's graphify-out/cache (now given cache_root=tmp_path).
-- Options: (1) Fork version string: give the fork a distinct package version (e.g. 0.9.55+lang.1) so _EXTRACTOR_VERSION differs; no code edit, but stock and fork then sweep each other's version dir (cleanup) when sharing one graphify-out (2) Core edit in cache.py: add an optional per-suffix salt (registry-provided plugin name+version) to the AST hash key; propose upstream with the registry issue (3) Accept: document never to share graphify-out between stock and fork
-
-### P10 | Restore upstream CODE_EXTENSIONS in graphify/detect.py (committed in 84d64c9 without 8 suffixes)? | 2026-09-24
-
-- Source: docs/plans/02-autolisp-extractor-fixes-from-case-003.md §3 (Resolver wiring)
-- Context: `git diff v8 -- graphify/detect.py`: the moved CODE_EXTENSIONS line drops .cls .trigger .lisp .cl .lsp .asd .robot .resource that v8 has; .lsp returns only via the registry, the other 7 are no longer detected. Also graphify/extract.py at HEAD differs from v8 by ~1,500 lines of comments replaced with `# @doc extract.md#C…` sidecar markers, so it cannot equal v8 except the registry lookup (plan 02 §3). Found during T22; not changed.
-- Options: (1) Restore both files to v8 plus only the registry try-blocks (keeps README goal 1 and the upstream-proposal diff small) (2) Keep as is and document the divergence
+- Source: T6.2, T6.4, T7.4, T8.2, T8.4
+- Context: These ask for artefacts that plan 02 or A6 rejected: tags.scm definition rules and a post_file package_lit join (the walker does both, tested: 27 defuns and err:trap as one node on the real err.lsp), loads/safe-load and @doc anchors (A6 out), DCL regex rules with tile nodes, pop and @include (plan 02 §3: controls are not nodes). module_depends and @sidecar are done. target_file has no reader: graphify/build.py:1217 drops it. defun-q and .mnl fixtures are now done.
+- Options: (1) Mark superseded (done), citing plan 02 and A6. Their outcomes are met or deliberately excluded (2) Reopen A6 for loads (15 safe-load sites with computed paths) and/or DCL tiles and @include, as a new plan (3) Keep them open as roadmap
 
 ## 4. RESOLVED ITEMS
 

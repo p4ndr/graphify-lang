@@ -15,6 +15,28 @@ This document is a LIVE file containing a list of TASKS that have been carried o
 
 ## 3. TASK LIST
 
+### `[x]` T26 | Settled items follow-up: fork version string (P9), restore detect.py (P10), `graphify lang list` subcommand (P7-P13)
+
+- `[x]` T26.1 | P9: set fork package version to 0.9.55+lang.1 so the AST cache dir differs from stock; verify stock and fork no longer read each other's entries; then close T24.2
+- `[x]` T26.2 | P10: restore graphify/detect.py to v8 plus only the registry lookup; verify .lisp .cl .asd .cls .trigger .robot .resource are detected again; keep extract.py @doc markers
+- `[x]` T26.3 | P7-P13: add `graphify lang list` subcommand (registered languages, suffixes, grammar, resolver), try-wrapped like the other core call sites; test it
+- `[x]` T26.4 | Run pytest tests/ -q and tools/measure_autolisp.py; record results
+
+### `[x]` T24 | Plan 02 step 6: extraction cache key check/fix for registry-dispatched files (D11)
+
+- `[x]` T24.1 | Inspect graphify/cache.py key
+- `[x]` T24.2 | Add plugin name+version to key for registry files only, or record in 50-PENDING if it needs a wider core edit
+
+### `[x]` T1 | S001 (prep) Toolchain, upstream baseline and corpus pin — plan §S001
+
+- `[x]` T1.1 | Install `uv` (measured absent on this host) and `git switch -c lang-registry v8`
+- `[x]` T1.2 | `uv venv && uv sync --all-extras` — never `pip install -e .`; the lock pins tree-sitter 0.25.2 and tree-sitter-commonlisp 0.4.1. Do not touch the pipx venv
+- `[x]` T1.3 | Run `uv run pytest tests/ -q` on unmodified `v8`; record counts and `uv pip freeze` to tests/lang_baseline.txt; investigate any pre-existing failure now
+- `[x]` T1.4 | Write scripts/snapshot_tables.py (~30 lines) and dump the six core tables to tests/upstream_tables.json — the SC2 comparison snapshot, regenerated at every rebase
+- `[x]` T1.5 | Pin the corpus: confirm `~/repos/autolithp` HEAD is `d5a2074` and clean; re-measure the six SRS §1.3 counts; if HEAD moved, stop and update SRS §1.3 first
+- `[x]` T1.5b | Create MCP install script for hook suffix registration (`scripts/install-mcp.sh` with `--dry-run`, `--check`, `--help` flags)
+- `[x]` T1.5c | Add entry-points stanza to pyproject.toml (`[project.entry-points."graphify_lang.plugins"]`)
+
 ### `[x]` T25 | Plan 02 step 7: corpus measurement script + case 004 report
 
 - `[x]` T25.1 | tools/measure_autolisp.py reproducing case 003 tables

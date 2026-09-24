@@ -30,7 +30,7 @@ The fork plans to carry the registry indefinitely — upstreaming is a bonus, an
 - Add `.github/workflows/graphify-lang-ci.yml` (new file; ci.yml stays unedited).
 - Add `if: github.repository == 'Graphify-Labs/graphify'` to every job in publish.yml and release-graph.yml.
 - Add `addopts = "-m 'not perf'"` and register the `perf` marker.
-- Do not touch `pyproject.toml` `version`; fork releases are git tags only, `0.9.55+lang.<n>`.
+- ~~Do not touch `pyproject.toml` `version`~~ — superseded by D-007 (version set to `0.9.55+lang.<n>` in pyproject.toml); fork releases are git tags `0.9.55+lang.<n>`.
 
 **Source:** T2.1-T2.4.
 
@@ -48,10 +48,26 @@ Nothing on `lang-registry` mentions AutoLISP.
 
 **Source:** `cc-IP000.001.md` §1.2.
 
-## D-001 — dcl_references also from dialog names passed to wrapper calls (INFERRED)
+## D-005a — dcl_references also from dialog names passed to wrapper calls (INFERRED)
 
 Plan 02 §5 requires >=1 dcl_references into lithp_mgr, but autolithp reaches it only via `(dtk:dcl-exec dcl-file "lithp_mgr" ...)` (src/ui/manager.lsp:256), never a literal `(new_dialog "lithp_mgr")`. So: new_dialog literal -> EXTRACTED; an identifier-shaped string argument of any other call inside a defun -> INFERRED dcl_references, emitted only when it names exactly one dialog node in the corpus. Extends A6 (does not reopen it); pinned by tests/lang/test_autolisp_plan02.py::test_dcl_references.
 
-## D-002 — AutoLISP resolver: a name defined in several files resolves to the copy nearest the caller (INFERRED); ties are dropped
+## D-005b — AutoLISP resolver: a name defined in several files resolves to the copy nearest the caller (INFERRED); ties are dropped
 
 autolithp defines err:trap twice (src/core/err.lsp and Import-Refactor/Archive/core/err_mod_main.lsp). Plan 02 §3's drop-ambiguous rule gave 0 inbound cross-file calls to err:trap (measured, tools/measure_autolisp.py), failing §5. Rule now: one candidate -> EXTRACTED; several -> the candidate sharing the longest leading directory path with the caller, confidence INFERRED; equal best prefix -> dropped (god-node guard kept). Measured after: 88 inbound cross-file calls to err:trap in autolithp. Complements A4 (.graphifyignore for archives), does not replace it. Pinned by test_duplicate_definition_resolves_to_nearest_copy.
+
+## D-007 — The fork's package version is 0.9.55+lang.<n> (set in pyproject.toml), so its extraction cache never mixes with stock graphify's cache.
+
+Option 1: give the fork a distinct package version (0.9.55+lang.1) so its AST cache dir differs from stock. Owner accepts that this replaces the old 'do not touch pyproject version' rule. (owner, 2026-09-24). Settles P9: How should the fork stop sharing the AST cache with stock graphify 0.9.55 (D11)?
+
+## D-004 — graphify/detect.py equals v8 except the registry lookup; the @doc comment-sidecar markers in graphify/extract.py are an accepted fork divergence.
+
+Option 1, partial: restore graphify/detect.py to v8 plus only the registry lookup (brings back the 7 dropped suffixes). Keep the @doc sidecar markers in graphify/extract.py. (owner, 2026-09-24). Settles P10: Restore upstream CODE_EXTENSIONS in graphify/detect.py (committed in 84d64c9 without 8 suffixes)?
+
+## D-005 — Owner approves ag-build's AutoLISP resolver rules: wrapper dialog refs and nearest-copy calls
+
+Approved 2026-09-24 after case 005 (docs/testing/case_005_rerun-fork-vs-stock.md). (1) A dialog name passed as a string to a wrapper call gives an INFERRED dcl_references edge when it names exactly one dialog node (autolithp reaches lithp_mgr only via dtk:dcl-exec, src/ui/manager.lsp:256). (2) A name defined in several files resolves to the copy with the longest shared directory path with the caller, INFERRED; ties dropped (88 inbound cross-file calls into err:trap in autolithp vs 0). These are the two entries ag-build wrote with numbers D-005a and D-005b (first written as colliding D-001 / D-002).
+
+## D-006 — Add a `graphify lang list` subcommand (reverses plan 01 out-of-scope note)
+
+Owner decision 2026-09-24, settling legacy P7-P13 (7 copies of SRS F26 / F18.4-F18.10). The subcommand lists registered languages, suffixes, grammar and resolver. It is a core edit in graphify/cli.py and must be try-wrapped like the other registry call sites. Tracked as T26.3.

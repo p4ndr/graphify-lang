@@ -94,5 +94,5 @@ Copies under `/tmp/claude-1000/-home-p4ndr-repos-graphify-lang/e2e/{fork,stock}`
 
 ## 5. Decisions taken during the build
 
-- D-001: `dcl_references` also from an identifier-shaped string passed to a wrapper call (INFERRED) — the only path to `lithp_mgr` in autolithp.
-- D-002: a name defined in several files resolves to the copy sharing the longest directory prefix with the caller (INFERRED); ties dropped — `err:trap` is defined in `src/core/err.lsp` and `Import-Refactor/Archive/core/err_mod_main.lsp`.
+- D-005a: `dcl_references` also from an identifier-shaped string passed to a wrapper call (INFERRED) — the only path to `lithp_mgr` in autolithp.
+- D-005b: a name defined in several files resolves to the copy sharing the longest directory prefix with the caller (INFERRED); ties dropped — `err:trap` is defined in `src/core/err.lsp` and `Import-Refactor/Archive/core/err_mod_main.lsp`.

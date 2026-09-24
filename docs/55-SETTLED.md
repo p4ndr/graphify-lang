@@ -15,6 +15,22 @@ This document is a LIVE file containing items that have been settled and are no 
 
 ## 3. ITEMS
 
+### P10 | Restore upstream CODE_EXTENSIONS in graphify/detect.py (committed in 84d64c9 without 8 suffixes)? | 2026-09-24
+
+- Source: docs/plans/02-autolisp-extractor-fixes-from-case-003.md §3 (Resolver wiring)
+- Context: `git diff v8 -- graphify/detect.py`: the moved CODE_EXTENSIONS line drops .cls .trigger .lisp .cl .lsp .asd .robot .resource that v8 has; .lsp returns only via the registry, the other 7 are no longer detected. Also graphify/extract.py at HEAD differs from v8 by ~1,500 lines of comments replaced with `# @doc extract.md#C…` sidecar markers, so it cannot equal v8 except the registry lookup (plan 02 §3). Found during T22; not changed.
+- Options: (1) Restore both files to v8 plus only the registry try-blocks (keeps README goal 1 and the upstream-proposal diff small) (2) Keep as is and document the divergence
+- Decision: Option 1, partial: restore graphify/detect.py to v8 plus only the registry lookup (brings back the 7 dropped suffixes). Keep the @doc sidecar markers in graphify/extract.py. | 2026-09-24
+- Applied to: T26.2, D-004
+
+### P9 | How should the fork stop sharing the AST cache with stock graphify 0.9.55 (D11)? | 2026-09-24
+
+- Source: T24.2
+- Context: graphify/cache.py:956 keys AST entries only by content hash under cache/ast/v{graphifyy version}-s{schema}; fork and stock both report 0.9.55, so they read each other's entries. load_cached runs before dispatch (extract.py:5461, 5719) and has no per-extractor hook, so a registry-only key is impossible; any fix edits cache.py. Measured side effect: the fork's own tests used to write into this repo's graphify-out/cache (now given cache_root=tmp_path).
+- Options: (1) Fork version string: give the fork a distinct package version (e.g. 0.9.55+lang.1) so _EXTRACTOR_VERSION differs; no code edit, but stock and fork then sweep each other's version dir (cleanup) when sharing one graphify-out (2) Core edit in cache.py: add an optional per-suffix salt (registry-provided plugin name+version) to the AST hash key; propose upstream with the registry issue (3) Accept: document never to share graphify-out between stock and fork
+- Decision: Option 1: give the fork a distinct package version (0.9.55+lang.1) so its AST cache dir differs from stock. Owner accepts that this replaces the old 'do not touch pyproject version' rule. | 2026-09-24
+- Applied to: T26.1, T24.2, D-007
+
 ### P1 | Should T13.1 proceed to T14 review, or are there concerns about the autolisp-pvcase repo or test plan? | 2026-09-23
 
 - Source: T13.1
@@ -113,3 +129,13 @@ This document is a LIVE file containing items that have been settled and are no 
 
 - Owner answer: No. The registry's own log line ships instead. The `graphify lang list` subcommand would be a fourth core edit; the registry's own log line is a Should Have, not a Must Have.
 - Item source: `cc-RS000.001.md` §1.4 F26.
+
+### P7-P13 | Should the fork add a `graphify lang list` subcommand? (7 duplicate legacy entries, SRS F26 / F18.4-F18.10) | 2026-09-24
+
+- Decision: Yes, add it (owner, 2026-09-24). Reverses plan 01 §2 out-of-scope note.
+- Applied to: T26.3; D-006
+
+### P14 | T15 scope: T14 only or include T13 files? | 2026-09-24
+
+- Decision: already resolved as "T14 only" (duplicate of resolved P8); removed from open items.
+- Applied to: T15

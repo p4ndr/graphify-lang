@@ -197,6 +197,11 @@ class _Walker:
             for value in args[1::2]:
                 self.walk(value, owner)
             return
+        if verb == "cond":  # a clause head is a test value, not a call (plan 01 S007 task 3)
+            for clause in args:
+                for child in _kids(clause) if clause.type == "list_lit" else [clause]:
+                    self.walk(child, owner)
+            return
         if verb in ("quote", "function"):
             if args and args[0].type in _SYMBOLS:
                 self.call(owner, args[0])

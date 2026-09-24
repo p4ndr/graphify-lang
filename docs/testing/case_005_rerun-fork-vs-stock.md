@@ -46,7 +46,7 @@ No extraction warnings, no `DEBUG` lines, 0 self-loops.
 
 | Item | State |
 |:-----|:------|
-| D11 cache shared between fork and stock (both `v0.9.55`) | open, `docs/50-PENDING.md` P9 |
+| D11 cache shared between fork and stock (both `v0.9.55`) | settled: D-007, fix in T26.1 |
 | `dcl_action` edges | 0: no `.dcl` in the repos for the dialogs behind literal `action_tile` calls |
 | `sidecar_doc` | 0 in extract, 1 after build: `x.lsp` and `x.md` share one file id |
-| D-001, D-002 (ag-build decisions) | need owner review, `docs/40-DECISIONS.md` |
+| D-005a, D-005b (ag-build decisions) | approved by owner, D-005 |

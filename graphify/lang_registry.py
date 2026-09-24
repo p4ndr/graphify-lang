@@ -82,3 +82,22 @@ def apply_dispatch() -> None:
 
 # Expose apply_registry for call sites
 apply_registry: Callable[[], None] = _apply_registry
+
+
+def format_languages() -> str:
+    """Table of registered plugin languages for ``graphify lang list``."""
+    try:
+        from graphify_lang import registry as lang_registry
+    except ImportError:
+        return "No plugin languages registered (graphify_lang not installed)."
+    manifests = list(lang_registry.iter_manifests())
+    if not manifests:
+        return "No plugin languages registered."
+    rows = [("language", "suffixes", "grammar", "resolver")]
+    for m in manifests:
+        resolver = getattr(m.resolver, "name", None) or "-"
+        rows.append((m.name, " ".join(sorted(m.suffixes)), m.grammar or "-", resolver))
+    widths = [max(len(r[i]) for r in rows) for i in range(3)]
+    return "\n".join(
+        "  ".join(c.ljust(w) for c, w in zip(r[:3], widths)) + "  " + r[3] for r in rows
+    )

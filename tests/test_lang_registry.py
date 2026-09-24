@@ -271,3 +271,45 @@ class TestRegistryEnvironment:
                 os.environ.pop("GRAPHIFY_LANG_DISABLE", None)
             else:
                 os.environ["GRAPHIFY_LANG_DISABLE"] = original
+
+
+def test_sc2_no_plugin_tables_match_upstream_snapshot() -> None:
+    """SC2: with discovery disabled, the six core tables equal the v8 snapshot.
+
+    Subprocess, because the registry merges are irreversible in-process.
+    Regenerate tests/upstream_tables.json per scripts/snapshot_tables.py.
+    """
+    import json
+    import subprocess
+    import sys
+
+    root = Path(__file__).resolve().parent.parent
+    env = {**os.environ, "GRAPHIFY_LANG_DISABLE": "1"}
+    env.pop("GRAPHIFY_LANG_PATH", None)
+    out = subprocess.run(
+        [sys.executable, str(root / "scripts" / "snapshot_tables.py")],
+        capture_output=True, text=True, env=env, check=True,
+    ).stdout
+    expected = json.loads((root / "tests" / "upstream_tables.json").read_text())
+    assert json.loads(out) == expected
+
+
+def test_lang_list_subcommand() -> None:
+    """`graphify lang list` shows each registered language; disabled -> none (D-006)."""
+    import subprocess
+    import sys
+
+    def run(disable: bool) -> str:
+        env = {**os.environ}
+        env.pop("GRAPHIFY_LANG_DISABLE", None)
+        if disable:
+            env["GRAPHIFY_LANG_DISABLE"] = "1"
+        return subprocess.run(
+            [sys.executable, "-m", "graphify", "lang", "list"],
+            capture_output=True, text=True, env=env, check=True,
+        ).stdout
+
+    rows = {line.split()[0]: line.split() for line in run(False).splitlines()[1:]}
+    assert rows["autolisp"] == ["autolisp", ".lsp", ".mnl", "tree_sitter_commonlisp", "autolisp"]
+    assert rows["autolisp-dcl"] == ["autolisp-dcl", ".dcl", "-", "autolisp"]
+    assert run(True).strip() == "No plugin languages registered."

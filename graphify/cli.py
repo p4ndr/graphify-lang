@@ -3169,6 +3169,15 @@ def dispatch_command(cmd: str) -> None:
         else:
             print("Usage: graphify global [add|remove|list|path]", file=sys.stderr); sys.exit(1)
 
+    elif cmd == "lang":
+        if (sys.argv[2] if len(sys.argv) > 2 else "") != "list":
+            print("Usage: graphify lang list", file=sys.stderr); sys.exit(1)
+        try:
+            import graphify.lang_registry
+            print(graphify.lang_registry.format_languages())
+        except Exception as exc:
+            print(f"error: language registry unavailable: {exc}", file=sys.stderr); sys.exit(1)
+
     elif cmd == "extract":
         # Headless full-pipeline extraction for CI / scripts (#698).
         # Runs detect -> AST extraction on code -> semantic LLM extraction on

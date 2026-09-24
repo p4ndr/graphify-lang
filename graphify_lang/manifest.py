@@ -6,7 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-import tomli
+try:
+    import tomllib as tomli  # Python 3.11+; tomli is only a dependency below 3.11
+except ImportError:  # pragma: no cover
+    import tomli
 
 
 @dataclass(frozen=True)

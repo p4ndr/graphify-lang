@@ -1,0 +1,17 @@
+schema = 1
+
+# Harness KB markdown (cc-*.md, plan 04 D5, D6). An augment on core
+# extract_markdown: it adds attributes to the page node and hands its
+# cross-doc and code references to the resolver. Base nodes are never
+# changed. No sniff: the file name carries the schema.
+[language]
+name = "cc-kb"
+kind = "augment"
+augments = [".md"]
+
+[match]
+globs = ["**/docs/cc-*.md"]
+
+# graphify_lang.cc_kb.augment:augment_cc_kb, resolver in resolve.py.
+[extract]
+runtime = "graphify_lang.cc_kb.augment"

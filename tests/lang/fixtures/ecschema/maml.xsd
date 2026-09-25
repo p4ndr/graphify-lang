@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="http://schemas.microsoft.com/maml/2004/10">
+  <xs:element name="ECSchema"/>
+</xs:schema>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ECSchema schemaName="Base" alias="bs" version="01.00.00" xmlns="http://www.bentley.com/schemas/Bentley.ECXML.3.1">
+    <ECSchemaReference name="CoreCustomAttributes" version="01.00.00" alias="CoreCA"/>
+    <ECEnumeration typeName="Status" backingTypeName="int" isStrict="true">
+        <ECEnumerator name="On" value="1"/>
+        <ECEnumerator name="Off" value="0"/>
+    </ECEnumeration>
+    <ECEntityClass typeName="Element" modifier="Abstract">
+        <ECCustomAttributes>
+            <ClassHasHandler xmlns="CoreCustomAttributes.01.00.00">
+                <ECEntityClass typeName="NotAClass"/>
+            </ClassHasHandler>
+        </ECCustomAttributes>
+        <ECProperty propertyName="Code" typeName="string"/>
+        <ECProperty propertyName="State" typeName="Status"/>
+        <ECStructProperty propertyName="Origin" typeName="Point"/>
+        <ECArrayProperty propertyName="Tags" typeName="string" minOccurs="0" maxOccurs="unbounded"/>
+        <ECStructArrayProperty propertyName="Corners" typeName="Point" minOccurs="0" maxOccurs="unbounded"/>
+        <ECNavigationProperty propertyName="Owner" relationshipName="ElementOwnsElements" direction="backward"/>
+    </ECEntityClass>
+    <ECEntityClass typeName="PhysicalElement">
+        <BaseClass>Element</BaseClass>
+    </ECEntityClass>
+    <ECStructClass typeName="Point">
+        <ECProperty propertyName="X" typeName="double"/>
+    </ECStructClass>
+    <ECCustomAttributeClass typeName="Note" appliesTo="Any"/>
+    <ECRelationshipClass typeName="ElementOwnsElements" strength="embedding" modifier="None">
+        <Source multiplicity="(0..1)" roleLabel="owns" polymorphic="true">
+            <Class class="Element"/>
+        </Source>
+        <Target multiplicity="(0..*)" roleLabel="is owned by" polymorphic="true">
+            <Class class="bs:Element"/>
+        </Target>
+    </ECRelationshipClass>
+</ECSchema>

@@ -1,0 +1,34 @@
+schema = 1
+
+# ast-grep project YAML: sgconfig.yml, rule files, global util files, rule
+# tests and their snapshots. .yml / .yaml are data suffixes (plan 04 D3): a
+# file is claimed only when a [match] glob AND the sniff pass; every other
+# .yml stays a document, exactly as upstream classifies it.
+[language]
+name = "astgrep"
+type = "data"
+suffixes = [".yml", ".yaml"]
+
+# Directory names are ast-grep's `sg new` defaults (ruleDirs = rules,
+# testDir = rule-tests, utilDirs = utils).
+[match]
+filenames = ["sgconfig.yml", "sgconfig.yaml"]
+globs = [
+    "rules/**/*.yml", "rules/**/*.yaml",
+    "rule-tests/**/*.yml", "rule-tests/**/*.yaml",
+    "utils/**/*.yml", "utils/**/*.yaml",
+]
+
+# A rule, util, test or snapshot: `id:` plus one of its body keys (2). An
+# sgconfig: `ruleDirs:` alone (2).
+[sniff]
+min_score = 2
+rules = [
+    { re = '^id:', weight = 1 },
+    { re = '^(rule|language|utils|valid|invalid|snapshots):', weight = 1 },
+    { re = '^ruleDirs:', weight = 2 },
+]
+
+# graphify_lang.astgrep.extract:extract_astgrep, resolver in resolve.py.
+[extract]
+runtime = "graphify_lang.astgrep.extract"

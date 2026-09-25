@@ -123,6 +123,7 @@ autolisp = "graphify_lang.autolisp:_get_manifest"
 vba = "graphify_lang.vba:_get_manifest"
 bmake = "graphify_lang.bmake:_get_manifest"
 cargo = "graphify_lang.cargo:_get_manifest"
+astgrep = "graphify_lang.astgrep:_get_manifest"
 [dependency-groups]
 dev = [
     "bandit>=1.9.4",
@@ -150,7 +151,7 @@ dev = [
 package = true
 
 [tool.setuptools]
-packages = ["graphify", "graphify.extractors", "graphify.exporters", "graphify_lang", "graphify_lang.autolisp", "graphify_lang.vba", "graphify_lang.bmake", "graphify_lang.cargo"]
+packages = ["graphify", "graphify.extractors", "graphify.exporters", "graphify_lang", "graphify_lang.autolisp", "graphify_lang.vba", "graphify_lang.bmake", "graphify_lang.cargo", "graphify_lang.astgrep"]
 include-package-data = false
 
 [tool.setuptools.package-data]
@@ -160,7 +161,7 @@ include-package-data = false
 # under graphify/always_on/. There is no graphify/skills/<host>/SKILL.md in the
 # repo, so no SKILL.md glob is needed here.
 graphify = ["skill.md", "skill-codex.md", "skill-opencode.md", "skill-kilo.md", "command-kilo.md", "skill-aider.md", "skill-amp.md", "skill-agents.md", "skill-copilot.md", "skill-claw.md", "skill-windows.md", "skill-droid.md", "skill-trae.md", "skill-kiro.md", "skill-vscode.md", "skill-pi.md", "skill-devin.md", "skills/*/references/*.md", "always_on/*.md"]
-graphify_lang = ["autolisp/graphify-lang.toml", "autolisp/dcl.toml", "autolisp/data/*.txt", "autolisp/data/*.md", "autolisp/data/LICENSE.*", "templates/*.toml", "vba/*.toml", "vba/data/*.txt", "bmake/*.toml", "cargo/*.toml"]
+graphify_lang = ["autolisp/graphify-lang.toml", "autolisp/dcl.toml", "autolisp/data/*.txt", "autolisp/data/*.md", "autolisp/data/LICENSE.*", "templates/*.toml", "vba/*.toml", "vba/data/*.txt", "bmake/*.toml", "cargo/*.toml", "astgrep/*.toml"]
 
 [tool.pytest.ini_options]
 addopts = "-m 'not perf'"

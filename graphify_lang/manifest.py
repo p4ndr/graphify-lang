@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -10,6 +11,72 @@ try:
     import tomllib as tomli  # Python 3.11+; tomli is only a dependency below 3.11
 except ImportError:  # pragma: no cover
     import tomli
+
+
+_FLAGS = {"i": re.IGNORECASE, "m": re.MULTILINE, "s": re.DOTALL, "x": re.VERBOSE}
+_KINDS = ("language", "augment")
+
+
+@dataclass(frozen=True)
+class Sniff:
+    """A ``[sniff]`` table: weighted regex rules read on the file head (plan 04 D1).
+
+    Every rule is compiled with ``re.MULTILINE`` so ``^`` anchors a line.
+    """
+
+    rules: tuple[tuple[re.Pattern[str], float], ...]
+    min_score: float = 1
+    head_bytes: int = 4096
+
+    def score(self, head: str) -> float:
+        return sum(weight for rx, weight in self.rules if rx.search(head))
+
+
+def _parse_sniff(table: Any) -> tuple[Sniff | None, list[str]]:
+    if not isinstance(table, dict):
+        return None, ["[sniff] must be a table"]
+    errors: list[str] = []
+    raw_rules = table.get("rules", [])
+    if "min_score" in table and not raw_rules:
+        errors.append("sniff.min_score set without sniff.rules")
+    if not isinstance(raw_rules, list) or not raw_rules:
+        return None, errors or ["sniff.rules must be a non-empty list"]
+    rules = []
+    for i, rule in enumerate(raw_rules):
+        if not isinstance(rule, dict) or not isinstance(rule.get("re"), str):
+            errors.append(f"sniff.rules[{i}] needs a string 're'")
+            continue
+        weight = rule.get("weight", 1)
+        flags = rule.get("flags", "")
+        if not isinstance(weight, (int, float)) or isinstance(weight, bool):
+            errors.append(f"sniff.rules[{i}].weight must be a number")
+            continue
+        if not isinstance(flags, str) or set(flags) - set(_FLAGS):
+            errors.append(f"sniff.rules[{i}].flags must use only {''.join(_FLAGS)}")
+            continue
+        bits = re.MULTILINE
+        for f in flags:
+            bits |= _FLAGS[f]
+        try:
+            rules.append((re.compile(rule["re"], bits), weight))
+        except re.error as exc:
+            errors.append(f"sniff.rules[{i}]: bad regex {rule['re']!r}: {exc}")
+    head_bytes = table.get("head_bytes", 4096)
+    if not isinstance(head_bytes, int) or isinstance(head_bytes, bool) or head_bytes <= 0:
+        errors.append("sniff.head_bytes must be a positive integer")
+    min_score = table.get("min_score", 1)
+    if not isinstance(min_score, (int, float)) or isinstance(min_score, bool):
+        errors.append("sniff.min_score must be a number")
+    if errors:
+        return None, errors
+    return Sniff(rules=tuple(rules), min_score=min_score, head_bytes=head_bytes), []
+
+
+def _str_list(value: Any, field: str, errors: list[str]) -> tuple[str, ...]:
+    if not isinstance(value, (list, tuple)) or not all(isinstance(v, str) for v in value):
+        errors.append(f"{field} must be a list of strings")
+        return ()
+    return tuple(value)
 
 
 @dataclass(frozen=True)
@@ -27,6 +94,19 @@ class LanguageManifest:
     resolver: Any | None = None
     hook_suffixes: tuple[str, ...] = ()
     fixture: Path | None = None
+    # Plan 04 §3: shared-suffix routing and the augment kind.
+    kind: str = "language"
+    augments: frozenset[str] = frozenset()
+    overrides: frozenset[str] = frozenset()
+    priority: int = 0
+    sniff: Sniff | None = None
+    match_globs: tuple[str, ...] = ()
+    match_filenames: tuple[str, ...] = ()
+    augment: Callable[[Path, dict], dict] | None = None
+
+    @property
+    def has_match(self) -> bool:
+        return bool(self.match_globs or self.match_filenames)
 
     @classmethod
     def from_toml(cls, path: Path) -> tuple[LanguageManifest, list[str]]:
@@ -52,6 +132,30 @@ class LanguageManifest:
         grammar = data.get("grammar", {})
         extract = data.get("extract", {})
 
+        kind = language.get("kind", "language")
+        if kind not in _KINDS:
+            errors.append(f"language.kind must be one of {', '.join(_KINDS)}")
+        augments = _str_list(language.get("augments", ()), "augments", errors)
+        overrides = _str_list(language.get("overrides", ()), "overrides", errors)
+        priority = language.get("priority", 0)
+        if not isinstance(priority, int) or isinstance(priority, bool):
+            errors.append("priority must be an integer")
+            priority = 0
+        sniff = None
+        if "sniff" in data:
+            sniff, sniff_errors = _parse_sniff(data["sniff"])
+            errors.extend(sniff_errors)
+        match = data.get("match", {})
+        if not isinstance(match, dict):
+            errors.append("[match] must be a table")
+            match = {}
+        match_globs = _str_list(match.get("globs", ()), "match.globs", errors)
+        match_filenames = _str_list(match.get("filenames", ()), "match.filenames", errors)
+        if kind == "augment":
+            if not augments:
+                errors.append("augment kind needs a non-empty language.augments")
+            language = {"suffixes": [], **language}  # an augment claims no suffix
+
         # Required fields - check for presence first, then validate value
         if "name" not in language:
             errors.append("missing required field: language.name")
@@ -66,7 +170,7 @@ class LanguageManifest:
             suffixes = []
         else:
             suffixes = language.get("suffixes")
-            if not suffixes:
+            if not suffixes and kind != "augment":
                 errors.append("suffixes must not be empty")
         
         # Validate suffixes is a list/tuple of strings
@@ -103,6 +207,11 @@ class LanguageManifest:
         if not runtime:
             errors.append("missing required field: extract.runtime")
 
+        if sniff is not None and isinstance(suffixes, (list, tuple)):
+            both = sorted(set(overrides) & set(suffixes))
+            if both:
+                errors.append(f"overrides and [sniff] on the same suffix: {', '.join(both)}")
+
         if errors:
             return cls._invalid("; ".join(errors))
 
@@ -117,16 +226,23 @@ class LanguageManifest:
             resolver=extract.get("resolver"),
             hook_suffixes=hook_suffixes,
             fixture=None,
+            kind=kind,
+            augments=frozenset(augments),
+            overrides=frozenset(overrides),
+            priority=priority,
+            sniff=sniff,
+            match_globs=match_globs,
+            match_filenames=match_filenames,
         )
 
         # Additional validation
         if not manifest.name:
             return cls._invalid("name must be non-empty")
 
-        if not manifest.suffixes:
+        if not manifest.suffixes and kind != "augment":
             return cls._invalid("suffixes must not be empty")
 
-        for s in manifest.suffixes:
+        for s in manifest.suffixes | manifest.augments:
             if not s.startswith("."):
                 return cls._invalid(f"suffix '{s}' must start with '.'")
 

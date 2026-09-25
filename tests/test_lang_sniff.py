@@ -156,3 +156,63 @@ def test_measured_start_point_vba_is_not_apex(clean_registry, tmp_path):
     if not path.is_file():
         pytest.skip("bim-chk corpus not on this host")
     assert _is_vba(_router(_manifest(tmp_path))(path))
+
+
+# --- manifest schema (plan 04 S2) -------------------------------------------
+
+def _parse(tmp_path: Path, body: str):
+    toml = tmp_path / "m.toml"
+    toml.write_text(body + '\n[extract]\nruntime = "x"\n', encoding="utf-8")
+    return LanguageManifest.from_toml(toml)
+
+
+def test_schema_sniff_and_match_parse(tmp_path):
+    m, errors = _parse(tmp_path, r"""
+[language]
+name = "astgrep"
+suffixes = [".yml"]
+priority = 3
+[sniff]
+head_bytes = 512
+min_score = 2
+rules = [{ re = '^id:', weight = 2 }, { re = '^RULE:', flags = "i" }]
+[match]
+globs = ["rules/**/*.yml"]
+filenames = ["sgconfig.yml"]
+""")
+    assert errors == []
+    assert (m.sniff.head_bytes, m.sniff.min_score, m.priority) == (512, 2, 3)
+    assert m.sniff.score("id: x\nrule: y\n") == 3
+    assert m.match_globs == ("rules/**/*.yml",) and m.match_filenames == ("sgconfig.yml",)
+
+
+def test_schema_augment_kind(tmp_path):
+    m, errors = _parse(tmp_path, """
+[language]
+name = "cc-kb"
+kind = "augment"
+augments = [".md"]
+[match]
+globs = ["docs/cc-*.md"]
+""")
+    assert errors == []
+    assert (m.kind, m.augments, m.suffixes) == ("augment", frozenset({".md"}), frozenset())
+
+
+@pytest.mark.parametrize("body, reason", [
+    ('[language]\nname = "a"\nsuffixes = [".a"]\n[sniff]\nrules = [{ re = "(" }]',
+     "bad regex"),
+    ('[language]\nname = "a"\nsuffixes = [".a"]\n[sniff]\nmin_score = 3',
+     "min_score set without sniff.rules"),
+    ('[language]\nname = "a"\nsuffixes = [".a", ".b"]\noverrides = [".a"]\n'
+     '[sniff]\nrules = [{ re = "x" }]',
+     "overrides and [sniff] on the same suffix: .a"),
+    ('[language]\nname = "a"\nsuffixes = [".a"]\n[sniff]\nrules = [{ re = "x", flags = "q" }]',
+     "flags must use only"),
+    ('[language]\nname = "a"\nkind = "augment"', "non-empty language.augments"),
+    ('[language]\nname = "a"\nkind = "plugin"\nsuffixes = [".a"]', "language.kind must be"),
+])
+def test_schema_rejects(tmp_path, body, reason):
+    m, errors = _parse(tmp_path, body)
+    assert len(errors) == 1 and reason in errors[0], errors
+    assert not m.name

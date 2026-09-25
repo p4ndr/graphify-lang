@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import codecs
+import functools
 import logging
 import os
-from collections.abc import Iterator
+import re
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -29,6 +32,7 @@ class _RegistryState:
     manifests: dict[str, LanguageManifest] = field(default_factory=dict)
     suffix_to_manifest: dict[str, LanguageManifest] = field(default_factory=dict)
     warned_builtins: set[str] = field(default_factory=set)
+    tie_warned: set[str] = field(default_factory=set)
 
 
 # Process-wide cache
@@ -131,21 +135,9 @@ def _register_manifest(manifest: LanguageManifest) -> None:
 
     state.manifests[manifest.name] = manifest
     for suffix in manifest.suffixes:
-        # Precedence: built-in suffix is taken only when listed in overrides
-        # For now, we just register the first manifest that claims each suffix
-        if suffix not in state.suffix_to_manifest:
-            state.suffix_to_manifest[suffix] = manifest
-        else:
-            # Already claimed - warn once per process
-            existing = state.suffix_to_manifest[suffix]
-            if manifest.name not in state.warned_builtins:
-                _LOG.warning(
-                    "suffix %s claimed by %s; already registered by %s",
-                    suffix,
-                    manifest.name,
-                    existing.name,
-                )
-                state.warned_builtins.add(manifest.name)
+        # First claimant is the suffix's manifest for metadata (extras). Who
+        # extracts a shared suffix is decided by dispatch_table (plan 04 §3.1).
+        state.suffix_to_manifest.setdefault(suffix, manifest)
 
     _register_resolver(manifest.resolver)
 
@@ -193,9 +185,166 @@ def registered_names() -> list[str]:
 
 
 def registered_suffixes() -> set[str]:
-    """Return all suffixes claimed by registered languages."""
+    """Suffixes a plugin claims whole (no ``[match]``): these are code by suffix."""
+    return {s for m in _languages() if not m.has_match for s in m.suffixes}
+
+
+def match_suffixes() -> set[str]:
+    """Suffixes claimed only per path (``[match]``): code only via ``claims_file``."""
+    return {s for m in _languages() if m.has_match for s in m.suffixes} - registered_suffixes()
+
+
+def claimants(suffix: str) -> list[LanguageManifest]:
+    """Plugins that list ``suffix``, in registration order."""
+    return [m for m in _languages() if suffix in m.suffixes]
+
+
+def _languages() -> list[LanguageManifest]:
+    return [m for m in _init_state().manifests.values() if m.kind == "language"]
+
+
+# --- content sniffing (plan 04 §3.1-3.2) ------------------------------------
+
+_EMPTY = {"nodes": [], "edges": []}
+
+
+@functools.lru_cache(maxsize=None)
+def _glob_re(glob: str) -> re.Pattern[str]:
+    """Glob on the repo-relative path. The path may be absolute, so the glob is
+    anchored at any ``/`` boundary: ``rules/*.yml`` matches ``/r/rules/a.yml``.
+    """
+    # ponytail: a parent dir outside the repo can satisfy the anchor; pass the
+    # scan root down if that ever mis-claims a file.
+    out, i = [], 0
+    while i < len(glob):
+        if glob.startswith("**/", i):
+            out.append("(?:[^/]*/)*")
+            i += 3
+        elif glob.startswith("**", i):
+            out.append(".*")
+            i += 2
+        else:
+            out.append({"*": "[^/]*", "?": "[^/]"}.get(glob[i]) or re.escape(glob[i]))
+            i += 1
+    return re.compile("(?:^|/)" + "".join(out) + "$")
+
+
+def _path_matches(m: LanguageManifest, path: Path) -> bool:
+    if not m.has_match:
+        return True
+    if path.name in m.match_filenames:
+        return True
+    posix = path.as_posix()
+    return any(_glob_re(g).search(posix) for g in m.match_globs)
+
+
+def _read_head(path: Path, n: int) -> bytes:
+    try:
+        with open(path, "rb") as fh:
+            return fh.read(n)
+    except OSError:
+        return b""
+
+
+def _sniff_score(m: LanguageManifest, path: Path, head: Callable[[int], bytes]) -> float | None:
+    """Score of ``m`` for ``path``, or None when ``m`` does not pass."""
+    if not _path_matches(m, path):
+        return None
+    if m.sniff is None:
+        return 0
+    raw = head(m.sniff.head_bytes)
+    if not raw or b"\x00" in raw:  # empty or binary: never code by content
+        return None
+    text = raw.removeprefix(codecs.BOM_UTF8).decode("utf-8", errors="replace")
+    score = m.sniff.score(text)
+    return score if score >= m.sniff.min_score else None
+
+
+def _head_reader(path: Path, size: int) -> Callable[[int], bytes]:
+    """Read the head of ``path`` at most once, sliced per plugin."""
+    cache: list[bytes] = []
+
+    def head(n: int) -> bytes:
+        if not cache:
+            cache.append(_read_head(path, size))
+        return cache[0][:n]
+    return head
+
+
+def _pick(suffix: str, candidates: list[LanguageManifest], path: Path) -> LanguageManifest | None:
+    """Best passing plugin: highest score, then priority, then registration order."""
+    size = max((m.sniff.head_bytes for m in candidates if m.sniff), default=0)
+    head = _head_reader(path, size)
+    best, best_key, tie = None, None, False
+    for m in candidates:
+        score = _sniff_score(m, path, head)
+        if score is None:
+            continue
+        key = (score, m.priority)
+        if best_key is None or key > best_key:
+            best, best_key, tie = m, key, False
+        elif key == best_key:
+            tie = True
     state = _init_state()
-    return set(state.suffix_to_manifest.keys())
+    if tie and suffix not in state.tie_warned:
+        state.tie_warned.add(suffix)
+        _LOG.warning("sniff tie on %s (%s): %s wins by registration order",
+                     suffix, path.name, best.name)
+    return best
+
+
+def _router(suffix: str, candidates: list[LanguageManifest],
+            fallback: Callable[[Path], dict] | None) -> Callable[[Path], dict]:
+    def route(path: Path) -> dict:
+        path = Path(path)
+        chosen = _pick(suffix, candidates, path)
+        if chosen is not None:
+            return chosen.extract(path)
+        return fallback(path) if fallback is not None else dict(_EMPTY)
+    route.__name__ = route.__qualname__ = f"sniff_router[{suffix}]"
+    return route
+
+
+def dispatch_table(builtins: Mapping[str, Callable[[Path], dict]]) -> dict[str, Callable[[Path], dict]]:
+    """Extractor per plugin-claimed suffix, given the core table before plugins.
+
+    Per suffix: an ``overrides`` plugin, else the built-in, else the first plugin
+    with no sniff/match is the fallback. Plugins with a sniff or a ``[match]``
+    compete through a router in front of that fallback (plan 04 §3.1, D2).
+    """
+    table: dict[str, Callable[[Path], dict]] = {}
+    for suffix in sorted({s for m in _languages() for s in m.suffixes}):
+        claim = claimants(suffix)
+        overriding = [m for m in claim if suffix in m.overrides]
+        conditional = [m for m in claim if m not in overriding and (m.sniff or m.has_match)]
+        plain = [m for m in claim if m not in overriding and m not in conditional]
+        builtin = builtins.get(suffix)
+        if overriding:
+            fallback = overriding[0].extract
+        elif builtin is not None:
+            fallback = builtin
+        else:
+            fallback = plain[0].extract if plain else None
+        ignored = overriding[1:] + (plain if overriding or builtin is not None else plain[1:])
+        for m in ignored:
+            _LOG.warning("suffix %s: %s has no [sniff] and does not win (%s kept)",
+                         suffix, m.name, getattr(fallback, "__name__", fallback))
+        if conditional:
+            table[suffix] = _router(suffix, conditional, fallback)
+        elif fallback is not None and fallback is not builtin:
+            table[suffix] = fallback
+    return table
+
+
+def claims_file(path: Path) -> bool:
+    """True when a ``[match]`` plugin's glob and sniff both pass for ``path`` (D3)."""
+    suffix = path.suffix.lower()
+    if suffix not in match_suffixes():
+        return False
+    candidates = [m for m in claimants(suffix) if m.has_match]
+    size = max((m.sniff.head_bytes for m in candidates if m.sniff), default=0)
+    head = _head_reader(path, size)
+    return any(_sniff_score(m, path, head) is not None for m in candidates)
 
 
 def iter_manifests() -> Iterator[LanguageManifest]:

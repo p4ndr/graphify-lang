@@ -216,3 +216,11 @@ def test_schema_rejects(tmp_path, body, reason):
     m, errors = _parse(tmp_path, body)
     assert len(errors) == 1 and reason in errors[0], errors
     assert not m.name
+
+
+def test_lsp_override_unchanged():
+    """`overrides` still means 'wins with no sniff': .lsp goes straight to AutoLISP."""
+    import graphify.extract as extract
+    from graphify_lang.autolisp import extract_autolisp
+    assert extract._DISPATCH[".lsp"] is extract_autolisp
+    assert extract._DISPATCH[".cls"] is extract_apex

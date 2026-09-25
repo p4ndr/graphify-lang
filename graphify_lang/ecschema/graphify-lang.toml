@@ -7,6 +7,7 @@ schema = 1
 name = "ecschema"
 type = "data"
 suffixes = [".xml"]
+hook_suffixes = [".xml"]
 
 # Any .xml, which covers the *.ecschema.xml naming; the sniff decides.
 [match]

@@ -98,6 +98,7 @@ def format_languages() -> str:
     """Table of registered plugin languages for ``graphify lang list``.
 
     ``*`` after a suffix: shared with a built-in or another plugin (sniff-routed).
+    ``+`` before a suffix: an augment that adds to that suffix's extractor.
     """
     try:
         from graphify_lang import registry as lang_registry
@@ -117,7 +118,8 @@ def format_languages() -> str:
     for m in manifests:
         resolver = getattr(m.resolver, "name", None) or "-"
         sniff = "+".join(k for k, on in (("sniff", m.sniff), ("match", m.has_match)) if on) or "-"
-        suffixes = " ".join(shared(s) for s in sorted(m.suffixes))
+        suffixes = (" ".join(shared(s) for s in sorted(m.suffixes))
+                    or " ".join("+" + s for s in sorted(m.augments)))
         rows.append((m.name, suffixes, m.grammar or "-", sniff, resolver))
     widths = [max(len(r[i]) for r in rows) for i in range(4)]
     return "\n".join(

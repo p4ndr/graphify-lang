@@ -296,3 +296,69 @@ def test_matched_data_file_extracts_through_router(data_plugins, tmp_path):
     other = _file(tmp_path, "ci.yml", "id: x\n")
     assert _is_stub(table[".yml"](rule), "astgrep")
     assert table[".yml"](other) == {"nodes": [], "edges": []}
+
+
+# --- augment kind (plan 04 S5, §3.3) ----------------------------------------
+
+AUGMENT_TOML = """
+[language]
+name = "stub-kb"
+kind = "augment"
+augments = ["{suffix}"]
+[match]
+globs = ["{glob}"]
+[extract]
+runtime = "tests.test_lang_sniff"
+"""
+
+
+def _stub_augment(path: Path, base: dict) -> dict:
+    first = base["nodes"][0]["id"]
+    return {
+        "nodes": [
+            {"id": f"stub_kb_{path.stem}", "label": "extra"},
+            {"id": first, "label": "renamed"},        # existing id: dropped
+            {"id": "no_prefix", "label": "x"},        # wrong prefix: dropped
+        ],
+        "edges": [{"source": first, "target": f"stub_kb_{path.stem}", "relation": "mentions"}],
+        "attrs": {first: {"cc_id": "cc-XX000.001", "label": "overwritten?"}},
+    }
+
+
+def _augment_plugin(tmp_path: Path, suffix: str, glob: str) -> None:
+    toml = tmp_path / "stub-kb.toml"
+    toml.write_text(AUGMENT_TOML.format(suffix=suffix, glob=glob), encoding="utf-8")
+    manifest, errors = LanguageManifest.from_toml(toml)
+    assert errors == []
+    registry._register_manifest(replace(manifest, augment=_stub_augment))
+
+
+def test_augment_adds_without_changing_base(clean_registry, tmp_path):
+    from graphify.extract import extract_markdown
+    _augment_plugin(tmp_path, ".md", "docs/cc-*.md")
+    wrapped = registry.dispatch_table({".md": extract_markdown})[".md"]
+    assert wrapped.__name__ == "augmented[.md]"
+    doc = _file(tmp_path, "docs/cc-XX000.001.md", "# Title\n\n## Section\n\nSee cc-XX000.000.\n")
+    base, got = extract_markdown(doc), wrapped(doc)
+    base_ids = [n["id"] for n in base["nodes"]]
+    assert [n["id"] for n in got["nodes"]] == base_ids + [f"stub_kb_{doc.stem}"]
+    assert [n["label"] for n in got["nodes"][:len(base_ids)]] == [n["label"] for n in base["nodes"]]
+    assert got["nodes"][0]["cc_id"] == "cc-XX000.001"
+    assert "cc_id" not in base["nodes"][0]                      # base not mutated
+    assert got["edges"] == base["edges"] + [
+        {"source": base_ids[0], "target": f"stub_kb_{doc.stem}", "relation": "mentions"}]
+    other = _file(tmp_path, "README.md", "# Readme\n")          # [match] miss
+    assert wrapped(other) == extract_markdown(other)
+    assert ".md" not in registry.registered_suffixes()
+
+
+def test_augment_composes_with_router(clean_registry, tmp_path):
+    registry._register_manifest(_manifest(tmp_path))
+    _augment_plugin(tmp_path, ".cls", "**/*.cls")
+    wrapped = registry.dispatch_table({".cls": extract_apex})[".cls"]
+    got = wrapped(FIXTURES / "vba_class.cls")
+    assert [n["label"] for n in got["nodes"]] == ["vba", "extra"]
+    apex = wrapped(FIXTURES / "apex_class.cls")
+    assert apex["nodes"][:-1] == [
+        {**n, **({"cc_id": "cc-XX000.001"} if i == 0 else {})}
+        for i, n in enumerate(extract_apex(FIXTURES / "apex_class.cls")["nodes"])]

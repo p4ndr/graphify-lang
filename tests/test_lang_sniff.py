@@ -71,7 +71,7 @@ def _router(*manifests: LanguageManifest):
     return registry.dispatch_table({".cls": extract_apex})[".cls"]
 
 
-def _is_vba(result: dict, tag: str = "vba") -> bool:
+def _is_stub(result: dict, tag: str = "vba") -> bool:
     return [n.get("label") for n in result["nodes"]] == [tag]
 
 
@@ -88,7 +88,7 @@ def test_routing_per_fixture(clean_registry, tmp_path, fixture, to_vba):
     path = FIXTURES / fixture
     result = route(path)
     if to_vba:
-        assert _is_vba(result)
+        assert _is_stub(result)
     else:
         assert result == extract_apex(path)
 
@@ -103,14 +103,14 @@ def test_head_bytes_truncation(clean_registry, tmp_path):
     path.write_bytes(body + b'Attribute VB_Name = "Late"\r\n')
     assert _router(_manifest(tmp_path, head_bytes=4096))(path) == extract_apex(path)
     registry.reset()
-    assert _is_vba(_router(_manifest(tmp_path, head_bytes=8192))(path))
+    assert _is_stub(_router(_manifest(tmp_path, head_bytes=8192))(path))
 
 
 def test_windows_1252_bytes(clean_registry, tmp_path):
     path = tmp_path / "cp1252.cls"
     path.write_bytes(b'Attribute VB_Name = "M\xf3dulo"\r\n'
                      b"Public Sub Caf\xe9()\r\nEnd Sub\r\n")
-    assert _is_vba(_router(_manifest(tmp_path))(path))
+    assert _is_stub(_router(_manifest(tmp_path))(path))
 
 
 def test_undecodable_head_falls_back(clean_registry, tmp_path):
@@ -122,14 +122,14 @@ def test_undecodable_head_falls_back(clean_registry, tmp_path):
 def test_tie_higher_priority_wins(clean_registry, tmp_path):
     route = _router(_manifest(tmp_path, "vba_a", priority=1),
                     _manifest(tmp_path, "vba_b", priority=5))
-    assert _is_vba(route(FIXTURES / "vba_class.cls"), "vba_b")
+    assert _is_stub(route(FIXTURES / "vba_class.cls"), "vba_b")
 
 
 def test_tie_equal_priority_first_wins_and_warns_once(clean_registry, tmp_path, caplog):
     route = _router(_manifest(tmp_path, "vba_a"), _manifest(tmp_path, "vba_b"))
     with caplog.at_level(logging.WARNING, logger="graphify_lang"):
-        assert _is_vba(route(FIXTURES / "vba_class.cls"), "vba_a")
-        assert _is_vba(route(FIXTURES / "vba_class_bom_crlf.cls"), "vba_a")
+        assert _is_stub(route(FIXTURES / "vba_class.cls"), "vba_a")
+        assert _is_stub(route(FIXTURES / "vba_class_bom_crlf.cls"), "vba_a")
     ties = [r for r in caplog.records if "tie" in r.getMessage()]
     assert len(ties) == 1
 
@@ -144,7 +144,7 @@ def test_get_extractor_uses_router(clean_registry, tmp_path, monkeypatch):
     core.apply_dispatch()
     vba = FIXTURES / "vba_class.cls"
     assert extract._get_extractor(vba).__name__ == "sniff_router[.cls]"
-    assert _is_vba(extract._get_extractor(vba)(vba))
+    assert _is_stub(extract._get_extractor(vba)(vba))
     apex = Path(__file__).parent / "fixtures" / "sample.cls"
     assert extract._get_extractor(apex)(apex) == extract_apex(apex)
 
@@ -155,7 +155,7 @@ def test_measured_start_point_vba_is_not_apex(clean_registry, tmp_path):
     path = home / "repos/bim-chk/src/document/ThisWorkbook.cls"
     if not path.is_file():
         pytest.skip("bim-chk corpus not on this host")
-    assert _is_vba(_router(_manifest(tmp_path))(path))
+    assert _is_stub(_router(_manifest(tmp_path))(path))
 
 
 # --- manifest schema (plan 04 S2) -------------------------------------------
@@ -224,3 +224,75 @@ def test_lsp_override_unchanged():
     from graphify_lang.autolisp import extract_autolisp
     assert extract._DISPATCH[".lsp"] is extract_autolisp
     assert extract._DISPATCH[".cls"] is extract_apex
+
+
+# --- detect hook for [match] data suffixes (plan 04 S4, §3.2) -----------------
+
+DATA_TOML = r"""
+[language]
+name = "{name}"
+suffixes = ["{suffix}"]
+[sniff]
+min_score = 1
+rules = [{{ re = '{rule}' }}]
+[match]
+{match}
+[extract]
+runtime = "tests.test_lang_sniff"
+"""
+
+
+def _data_plugin(tmp_path: Path, name: str, suffix: str, rule: str, match: str):
+    toml = tmp_path / f"{name}.toml"
+    toml.write_text(DATA_TOML.format(name=name, suffix=suffix, rule=rule, match=match),
+                    encoding="utf-8")
+    manifest, errors = LanguageManifest.from_toml(toml)
+    assert errors == []
+    registry._register_manifest(replace(manifest, extract=_stub(name)))
+
+
+@pytest.fixture
+def data_plugins(clean_registry, tmp_path):
+    _data_plugin(tmp_path, "cargo", ".toml", r"^\[(package|workspace)\]",
+                 'filenames = ["Cargo.toml"]')
+    _data_plugin(tmp_path, "astgrep", ".yml", r"^id:",
+                 'globs = ["rules/**/*.yml", "rule-tests/**/*.yml"]\nfilenames = ["sgconfig.yml"]')
+    _data_plugin(tmp_path, "ecschema", ".xml", r"<ECSchema", 'globs = ["**/*.xml"]')
+
+
+def _file(root: Path, rel: str, text: str) -> Path:
+    path = root / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+@pytest.mark.parametrize("rel, text, expected", [
+    ("Cargo.toml", "[package]\nname = 'x'\n", "code"),
+    ("pyproject.toml", "[project]\nname = 'x'\n", "code"),   # package manifest, as upstream
+    ("config/settings.toml", "[package]\n", None),          # no [match] hit: as upstream
+    ("rules/x.yml", "id: no-eval\nlanguage: python\n", "code"),
+    ("rules/deep/y.yml", "id: no-exec\n", "code"),
+    ("rules/notes.yml", "title: not a rule\n", "document"),  # glob hit, sniff miss
+    (".github/workflows/ci.yml", "id: build\non: push\n", "document"),
+    ("schema/Plant.ecschema.xml", '<?xml version="1.0"?>\n<ECSchema schemaName="P">', "code"),
+    ("docs/PSMaml.xml", '<?xml version="1.0"?>\n<helpItems>', None),
+    ("pom.xml", "<project/>", "code"),                       # package manifest, as upstream
+])
+def test_detect_hook(data_plugins, tmp_path, rel, text, expected):
+    from graphify.detect import classify_file
+    got = classify_file(_file(tmp_path, rel, text))
+    assert (got.value if got else None) == expected
+
+
+def test_data_suffixes_stay_out_of_code_extensions(data_plugins):
+    assert registry.registered_suffixes().isdisjoint({".yml", ".toml", ".xml"})
+    assert registry.match_suffixes() == {".yml", ".toml", ".xml"}
+
+
+def test_matched_data_file_extracts_through_router(data_plugins, tmp_path):
+    table = registry.dispatch_table({})
+    rule = _file(tmp_path, "rules/x.yml", "id: no-eval\n")
+    other = _file(tmp_path, "ci.yml", "id: x\n")
+    assert _is_stub(table[".yml"](rule), "astgrep")
+    assert table[".yml"](other) == {"nodes": [], "edges": []}

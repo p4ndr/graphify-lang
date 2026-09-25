@@ -90,6 +90,14 @@ def claims_file(path) -> bool:
     return lang_registry.claims_file(path)
 
 
+def augment_extractor(path, extractor):
+    """``extractor`` wrapped by any augment plugin whose ``[match]`` claims ``path``."""
+    if not _REGISTRY_AVAILABLE:
+        return extractor
+    from graphify_lang import registry as lang_registry
+    return lang_registry.augment_extractor(path, extractor)
+
+
 # Expose apply_registry for call sites
 apply_registry: Callable[[], None] = _apply_registry
 

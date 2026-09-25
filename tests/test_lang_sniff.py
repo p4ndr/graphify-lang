@@ -374,3 +374,19 @@ def test_augment_composes_with_router(clean_registry, tmp_path):
     assert apex["nodes"][:-1] == [
         {**n, **({"cc_id": "cc-XX000.001"} if i == 0 else {})}
         for i, n in enumerate(extract_apex(FIXTURES / "apex_class.cls")["nodes"])]
+
+
+def test_augment_on_package_manifest_path(clean_registry, tmp_path):
+    """A package manifest is picked by name before _DISPATCH; the augment still runs."""
+    from graphify.extract import _get_extractor
+    from graphify.manifest_ingest import extract_package_manifest
+    _augment_plugin(tmp_path, ".toml", "**/pyproject.toml")
+    assert ".toml" not in registry.dispatch_table({})             # per-path, not per-suffix
+    proj = _file(tmp_path, "pyproject.toml", "[project]\nname = 'demo'\n")
+    wrapped = _get_extractor(proj)
+    assert wrapped.__name__ == "augmented[.toml]"
+    base, got = extract_package_manifest(proj), wrapped(proj)
+    assert got["nodes"][:-1] == [{**base["nodes"][0], "cc_id": "cc-XX000.001"}]
+    assert got["nodes"][-1]["id"] == f"stub_kb_{proj.stem}"
+    other = _file(tmp_path, "sub/Cargo.toml", "[package]\nname = 'x'\n")  # [match] miss
+    assert _get_extractor(other) is extract_package_manifest

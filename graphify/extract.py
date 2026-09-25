@@ -6877,6 +6877,11 @@ def _get_extractor(path: Path) -> Any | None:
     # package node + depends_on edges, by filename before generic suffix dispatch
     # (#1377). apm.yml would otherwise be a .yml document handled by the LLM.
     if is_package_manifest_path(path):
+        try:
+            import graphify.lang_registry
+            return graphify.lang_registry.augment_extractor(path, extract_package_manifest)
+        except Exception:
+            pass
         return extract_package_manifest
     # `.h` is C/C++/ObjC-ambiguous; route Objective-C headers to extract_objc
     # (the suffix map sends `.h` to extract_c, which can't read @interface etc.).

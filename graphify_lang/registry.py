@@ -337,8 +337,13 @@ def dispatch_table(builtins: Mapping[str, Callable[[Path], dict]]) -> dict[str, 
     for suffix in sorted({s for m in augmenters for s in m.augments}):
         inner = table.get(suffix) or builtins.get(suffix)
         on_suffix = [m for m in augmenters if suffix in m.augments and m.augment]
-        if inner is None or not on_suffix:
-            _LOG.warning("augment on %s skipped: no extractor or no augment()", suffix)
+        if not on_suffix:
+            _LOG.warning("augment on %s skipped: no augment()", suffix)
+            continue
+        if inner is None:
+            # A file routed by name before _DISPATCH (a package manifest) is
+            # augmented through augment_extractor; nothing to wrap here.
+            _LOG.debug("augment on %s: no suffix extractor, per-path only", suffix)
             continue
         table[suffix] = _augmented(suffix, inner, on_suffix)
     return table
@@ -361,6 +366,21 @@ def _augmented(suffix: str, inner: Callable[[Path], dict],
         return result
     augmented.__name__ = augmented.__qualname__ = f"augmented[{suffix}]"
     return augmented
+
+
+def augment_extractor(path: Path, inner: Callable[[Path], dict]) -> Callable[[Path], dict]:
+    """``inner`` wrapped by the augments that claim ``path``, else ``inner`` itself.
+
+    For an extractor that core picks by file name before ``_DISPATCH`` (package
+    manifests), so the suffix wrapper in ``dispatch_table`` never sees the file.
+    """
+    suffix = path.suffix.lower()
+    on_suffix = [m for m in _init_state().manifests.values()
+                 if m.kind == "augment" and m.augment and suffix in m.augments]
+    size = max((m.sniff.head_bytes for m in on_suffix if m.sniff), default=0)
+    head = _head_reader(path, size)
+    claiming = [m for m in on_suffix if _sniff_score(m, path, head) is not None]
+    return _augmented(suffix, inner, claiming) if claiming else inner
 
 
 def _merge(m: LanguageManifest, base: dict, extra: dict) -> dict:

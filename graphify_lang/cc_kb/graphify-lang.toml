@@ -1,16 +1,21 @@
 schema = 1
 
-# Harness KB markdown (cc-*.md, plan 04 D5, D6). An augment on core
+# Harness KB markdown (cc-*.md, plan 04 D5, D6, D11). An augment on core
 # extract_markdown: it adds attributes to the page node and hands its
 # cross-doc and code references to the resolver. Base nodes are never
 # changed. No sniff: the file name carries the schema.
+#
+# The glob claims every .md (a glob here matches at any folder depth, so a
+# root-only `*.md` cannot be written). augment._scope narrows it: docs/cc-*.md,
+# plus root, agents/ and skills/ .md files of a folder whose docs/ holds a
+# cc-*.md. Any other .md comes back unchanged.
 [language]
 name = "cc-kb"
 kind = "augment"
 augments = [".md"]
 
 [match]
-globs = ["**/docs/cc-*.md"]
+globs = ["*.md"]
 
 # graphify_lang.cc_kb.augment:augment_cc_kb, resolver in resolve.py.
 [extract]

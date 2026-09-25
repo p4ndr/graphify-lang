@@ -1,6 +1,8 @@
-"""graphify_lang.cc_kb - harness KB markdown augment (plan 04 S13, D5, D6).
+"""graphify_lang.cc_kb - harness KB markdown augment (plan 04 S13, D5, D6, D11).
 
-- graphify-lang.toml: ``cc-kb``, kind ``augment`` on ``.md``, [match] ``**/docs/cc-*.md``
+- graphify-lang.toml: ``cc-kb``, kind ``augment`` on ``.md``, [match] ``*.md``,
+  narrowed in the augment to ``docs/cc-*.md`` and a harness root's root,
+  ``agents/`` and ``skills/`` ``.md`` files
 - augment.py: ``augment_cc_kb``, run on top of core ``extract_markdown``
 - resolve.py: the cross-file ``RESOLVER`` (registered by the registry)
 """

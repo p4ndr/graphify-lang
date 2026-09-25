@@ -1,0 +1,18 @@
+schema = 1
+
+# Bentley bmake makefiles. No built-in claims .mki or .mke, so no sniff: a
+# sniffed manifest drops every file that scores below min_score.
+[language]
+name = "bmake"
+type = "programming"
+suffixes = [".mki", ".mke"]
+hook_suffixes = [".mki", ".mke"]
+priority = 10
+
+[grammar]
+kind = "regex"
+language_fn = "bmake"
+
+# graphify_lang.bmake.extract:extract_bmake (a line scanner), resolver in resolve.py.
+[extract]
+runtime = "graphify_lang.bmake.extract"

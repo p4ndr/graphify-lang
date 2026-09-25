@@ -20,6 +20,10 @@ root, which is a folder whose ``docs/`` holds a ``cc-*.md`` file. Only
   the harness root, root-relative, first line only;
 - ``up``: the number of folders from the file up to the harness root.
   ``$CLAUDE_HOME/`` and ``~/.claude/`` prefixes are read as the repo root.
+- ``cc_heads`` / ``code_heads`` (D12): ``(ref, line, node)`` for the same
+  refs, ``node`` being the index of the heading node whose section holds the
+  mention (the nearest ``extract_markdown`` heading at or above the line).
+  A mention above the first heading has only the page item.
 
 ``GRAPHIFY_CC_KB_OFF`` (comma list of ``attrs``, ``cc``, ``hubs``, ``code``)
 switches an element off; the S14 value test measures each one.
@@ -28,6 +32,7 @@ from __future__ import annotations
 
 import os
 import re
+from bisect import bisect_right
 from pathlib import Path
 
 CC_ID = re.compile(r"cc-([A-Z]{2})(\d{3})\.(\d{3})(?:-S(\d{3}))?")
@@ -97,6 +102,10 @@ def _code_ref(span: str, root: Path) -> tuple[str, int | None] | None:
     return path.removeprefix("./"), int(line) if line else None
 
 
+def _heads(refs: dict[tuple[str, int], int]) -> list[tuple[str, int, int]]:
+    return sorted((ref, line, node) for (ref, node), line in refs.items())
+
+
 def augment_cc_kb(path: Path, base: dict) -> dict:
     path = Path(path)
     scope = _scope(path)
@@ -113,13 +122,21 @@ def augment_cc_kb(path: Path, base: dict) -> dict:
         return {}
     me = parse_cc_id(path.name) if kb_doc else None
     self_id = me["cc_id"] if me else None
+    heads = sorted((int(n["source_location"][1:]), i) for i, n in enumerate(base["nodes"])
+                   if n.get("node_kind") == "heading")
     cc: dict[str, int] = {}
     code: dict[str, int] = {}
+    cc_at: dict[tuple[str, int], int] = {}
+    code_at: dict[tuple[str, int], int] = {}
     fenced = False
     for no, line in enumerate(lines, 1):
+        at = bisect_right(heads, (no, len(base["nodes"])))
+        owner = heads[at - 1][1] if at else None
         for m in _MENTION.finditer(line):
             if m.group(0) != self_id:
                 cc.setdefault(m.group(0), no)
+                if owner is not None:
+                    cc_at.setdefault((m.group(0), owner), no)
         if _FENCE.match(line):
             fenced = not fenced
             continue
@@ -129,12 +146,16 @@ def augment_cc_kb(path: Path, base: dict) -> dict:
             ref = _code_ref(m.group(1), root)
             if ref and not path.samefile(root / ref[0]):
                 code.setdefault(ref[0], no)
+                if owner is not None:
+                    code_at.setdefault((ref[0], owner), no)
     out: dict = {}
     if me and not off("attrs"):
         out["attrs"] = {base["nodes"][page]["id"]: me}
     refs = {"node": page, "up": up, "cc": [] if off("cc") else sorted(cc.items()),
             "code": [] if off("code") else sorted(code.items()),
             "hubs": bool(me) and not off("hubs")}
+    refs["cc_heads"] = [] if off("cc") else _heads(cc_at)
+    refs["code_heads"] = [] if off("code") else _heads(code_at)
     if refs["cc"] or refs["code"] or refs["hubs"]:
         out["cc_kb_refs"] = refs
     return out

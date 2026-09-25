@@ -2,7 +2,8 @@
 
 Fixture tree: tests/lang/fixtures/cc_kb/ (hubs XX000 and YY100, spokes
 XX000.001 / .002, the -S001 spoke of XX000.001, scripts/tool.ps1, a root
-README.md, agents/ag-x.md, skills/s/SKILL.md and docs/notes.md) and
+README.md, agents/ag-x.md, skills/s/SKILL.md and docs/notes.md; .002 has a
+mention above its first heading and in two sections) and
 tests/lang/fixtures/cc_kb_plain/ (a repo whose docs/ holds no cc-*.md). Core ``extract_markdown`` runs first; the augment
 adds page-node attributes and the ``cc_kb_refs`` payload, and the resolver
 turns that into edges.
@@ -44,6 +45,21 @@ def test_payload():
     refs = _get_extractor(doc)(doc)["cc_kb_refs"]
     assert refs["cc"] == [("cc-YY100.000", 3), ("cc-ZZ999.000", 3)]   # no self, no .2 version
     assert refs["code"] == [("scripts/tool.ps1", 4)]                # :line, alias, fence, missing
+    assert refs["cc_heads"] == [("cc-YY100.000", 3, 1), ("cc-ZZ999.000", 3, 1)]
+    assert refs["code_heads"] == [("scripts/tool.ps1", 4, 1)]
+
+
+def test_heads_payload_per_section():
+    """D12: (ref, line, node) per section; nothing for text above the first heading."""
+    doc = DOCS / "cc-XX000.002.md"
+    got = _get_extractor(doc)(doc)
+    assert [n["label"] for n in got["nodes"]] == [
+        "cc-XX000.002.md", "XX spoke two", "Second section", "Third section"]
+    refs = got["cc_kb_refs"]
+    assert refs["cc"] == [("cc-YY100.000", 1), ("cc-ZZ999.000", 7)]
+    assert refs["cc_heads"] == [("cc-YY100.000", 7, 2), ("cc-YY100.000", 11, 3),
+                                ("cc-ZZ999.000", 7, 2)]
+    assert refs["code_heads"] == [("scripts/tool.ps1", 7, 2)]
 
 
 def test_root_agent_skill_payload_no_attrs():
@@ -71,7 +87,8 @@ def _graph(cache):
     paths = (sorted(DOCS.glob("*.md")) + [FIXTURE / "scripts" / "tool.ps1", FIXTURE / "README.md",
              FIXTURE / "agents" / "ag-x.md", FIXTURE / "skills" / "s" / "SKILL.md"])
     res = extract(paths, cache_root=cache)   # the AST cache key does not cover plugin code
-    label = {n["id"]: Path(n["source_file"]).name for n in res["nodes"] if n.get("source_file")}
+    label = {n["id"]: Path(n["source_file"]).name + ("#" + n["label"] if n.get("node_kind") == "heading"
+             else "") for n in res["nodes"] if n.get("source_file")}
     page = {Path(n["source_file"]).name: n for n in res["nodes"] if n.get("node_kind") == "page"}
     edges = sorted((label[e["source"]], label[e["target"]], e["relation"], e.get("context"))
                    for e in res["edges"] if e.get("context") in ("cc_ref", "hub_spoke", "code_ref"))
@@ -79,20 +96,39 @@ def _graph(cache):
 
 
 def test_resolved_edges_and_dangling(tmp_path):
+    """Page-level edges as before; D12 adds heading -> target on top (new pairs)."""
     edges, page = _graph(tmp_path)
     assert edges == [
         ("README.md", "cc-XX000.000.md", "cites", "cc_ref"),
         ("README.md", "tool.ps1", "cites", "code_ref"),
+        ("README.md#Root file", "cc-XX000.000.md", "cites", "cc_ref"),
+        ("README.md#Root file", "tool.ps1", "cites", "code_ref"),
         ("SKILL.md", "cc-XX000.002.md", "cites", "cc_ref"),
+        ("SKILL.md#Skill", "cc-XX000.002.md", "cites", "cc_ref"),
         ("ag-x.md", "cc-YY100.000.md", "cites", "cc_ref"),
         ("ag-x.md", "tool.ps1", "cites", "code_ref"),
+        ("ag-x.md#Agent", "cc-YY100.000.md", "cites", "cc_ref"),
+        ("ag-x.md#Agent", "tool.ps1", "cites", "code_ref"),
         ("cc-XX000.000.md", "cc-XX000.001.md", "contains", "hub_spoke"),
+        # hub -> .002 is a Markdown link already (core `references`): no page edge;
+        # the heading pairs are new
+        ("cc-XX000.000.md#XX hub", "cc-XX000.001.md", "cites", "cc_ref"),
+        ("cc-XX000.000.md#XX hub", "cc-XX000.002.md", "cites", "cc_ref"),
+        ("cc-XX000.001-S001.md#Spoke S001 of cc-XX000.001", "cc-XX000.001.md", "cites", "cc_ref"),
         ("cc-XX000.001.md", "cc-XX000.001-S001.md", "contains", "hub_spoke"),
         ("cc-XX000.001.md", "cc-YY100.000.md", "cites", "cc_ref"),
         ("cc-XX000.001.md", "tool.ps1", "cites", "code_ref"),
+        ("cc-XX000.001.md#XX spoke one", "cc-YY100.000.md", "cites", "cc_ref"),
+        ("cc-XX000.001.md#XX spoke one", "tool.ps1", "cites", "code_ref"),
         ("cc-XX000.001.squad-check.md", "cc-YY100.000.md", "cites", "cc_ref"),
-        # hub -> .002 is a Markdown link already (core `references`): no second edge
+        ("cc-XX000.001.squad-check.md#Review of XX000.001", "cc-YY100.000.md", "cites", "cc_ref"),
+        ("cc-XX000.002.md", "cc-YY100.000.md", "cites", "cc_ref"),
+        ("cc-XX000.002.md", "tool.ps1", "cites", "code_ref"),
+        ("cc-XX000.002.md#Second section", "cc-YY100.000.md", "cites", "cc_ref"),
+        ("cc-XX000.002.md#Second section", "tool.ps1", "cites", "code_ref"),
+        ("cc-XX000.002.md#Third section", "cc-YY100.000.md", "cites", "cc_ref"),
     ]
+    assert page["cc-XX000.002.md"]["dangling_cc_refs"] == ["cc-ZZ999.000"]
     assert page["cc-XX000.001.md"]["dangling_cc_refs"] == ["cc-ZZ999.000"]
     assert page["SKILL.md"]["dangling_cc_refs"] == ["cc-ZZ999.000"]
     assert "cc_id" not in page["README.md"]

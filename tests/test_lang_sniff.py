@@ -426,3 +426,18 @@ def test_augment_extra_keys_ride_along(clean_registry, tmp_path):
     base = {"nodes": [], "edges": [], "raw_calls": ["base"]}
     got = registry._merge(m, base, {"kb_refs": [1], "raw_calls": ["augment"]})
     assert got["kb_refs"] == [1] and got["raw_calls"] == ["base"]
+
+
+def test_augment_failure_keeps_base(clean_registry, tmp_path, caplog):
+    from graphify.extract import extract_markdown
+
+    def boom(path, base):
+        raise ValueError("bad augment")
+    _augment_plugin(tmp_path, ".md", "docs/cc-*.md")
+    m = registry.get_manifest("stub-kb")
+    registry._register_manifest(replace(m, augment=boom))
+    doc = _file(tmp_path, "docs/cc-XX000.001.md", "# Title\n")
+    with caplog.at_level(logging.WARNING):
+        got = registry.dispatch_table({".md": extract_markdown})[".md"](doc)
+    assert got == extract_markdown(doc)
+    assert "bad augment" in caplog.text

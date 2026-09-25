@@ -48,9 +48,10 @@ at `docs/UPSTREAM-README.md`.
 - Measure, do not assert. A claim about extractor output names the call
   that produced it (`extract_commonlisp(Path(...))`) and the corpus
   (`~/repos/autolithp`); a claim about a parse names the grammar version.
-- The user's `graphify` on `PATH` runs from the pipx venv
-  `~/.local/share/pipx/venvs/graphifyy` (`graphifyy 0.9.55`). Do not install
-  the fork into it; use a separate venv (`README.md`, 'Development setup').
+- The user's `graphify` on `PATH` (and both MCP servers) runs this fork from
+  the pipx venv `~/.local/share/pipx/venvs/graphifyy`, installed from a pinned
+  wheel of a release tag (`README.md`, 'Installing the fork'). Develop and test
+  in the repo `.venv`; never install an editable or untagged build into pipx.
 
 ## Harness
 

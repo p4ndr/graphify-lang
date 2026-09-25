@@ -341,19 +341,8 @@ def dispatch_table(builtins: Mapping[str, Callable[[Path], dict]]) -> dict[str, 
             table[suffix] = _router(suffix, conditional, fallback)
         elif fallback is not None and fallback is not builtin:
             table[suffix] = fallback
-    augmenters = [m for m in _init_state().manifests.values() if m.kind == "augment"]
-    for suffix in sorted({s for m in augmenters for s in m.augments}):
-        inner = table.get(suffix) or builtins.get(suffix)
-        on_suffix = [m for m in augmenters if suffix in m.augments and m.augment]
-        if not on_suffix:
-            _LOG.warning("augment on %s skipped: no augment()", suffix)
-            continue
-        if inner is None:
-            # A file routed by name before _DISPATCH (a package manifest) is
-            # augmented through augment_extractor; nothing to wrap here.
-            _LOG.debug("augment on %s: no suffix extractor, per-path only", suffix)
-            continue
-        table[suffix] = _augmented(suffix, inner, on_suffix)
+    # Augments are applied per path by augment_extractor (from _get_extractor),
+    # so _DISPATCH keeps the built-in itself (upstream pins _DISPATCH['.md']).
     return table
 
 
@@ -385,8 +374,9 @@ def _augmented(suffix: str, inner: Callable[[Path], dict],
 def augment_extractor(path: Path, inner: Callable[[Path], dict]) -> Callable[[Path], dict]:
     """``inner`` wrapped by the augments that claim ``path``, else ``inner`` itself.
 
-    For an extractor that core picks by file name before ``_DISPATCH`` (package
-    manifests), so the suffix wrapper in ``dispatch_table`` never sees the file.
+    Called by ``_get_extractor`` on the extractor it picked (by file name for a
+    package manifest, else from ``_DISPATCH``), so a file the augment's
+    ``[match]`` does not claim keeps the plain built-in.
     """
     suffix = path.suffix.lower()
     on_suffix = [m for m in _init_state().manifests.values()

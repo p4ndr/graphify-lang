@@ -1,0 +1,6 @@
+# ast-grep project configuration (fixture).
+ruleDirs:
+  - rules
+testConfigs:
+  - testDir: rule-tests
+utilDirs: [utils]

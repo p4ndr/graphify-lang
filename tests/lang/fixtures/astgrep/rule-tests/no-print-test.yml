@@ -1,0 +1,5 @@
+id: no-print
+valid:
+  - 'log(1)'
+invalid:
+  - 'print(1)'

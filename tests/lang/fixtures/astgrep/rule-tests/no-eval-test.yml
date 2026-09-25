@@ -1,0 +1,5 @@
+id: no-eval
+valid:
+  - 'print(1)'
+invalid:
+  - 'def f(): eval(x)'

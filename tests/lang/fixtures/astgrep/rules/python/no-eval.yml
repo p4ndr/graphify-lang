@@ -1,0 +1,17 @@
+id: no-eval
+language: python
+severity: error
+message: Do not call eval.
+note: |
+  The util below matches: nothing here; this line is prose.
+utils:
+  eval-call:
+    all:
+      - matches: is-call
+      - has: {kind: identifier, regex: '^eval$'}
+  in-function:
+    inside: {kind: function_definition, stopBy: end}
+rule:
+  all:
+    - matches: eval-call
+    - matches: in-function

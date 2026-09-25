@@ -1,0 +1,6 @@
+id: no-eval
+snapshots:
+  'def f(): eval(x)':
+    labels:
+    - source: eval(x)
+      style: primary

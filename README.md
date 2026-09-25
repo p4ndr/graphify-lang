@@ -192,6 +192,41 @@ the existing table each field feeds.
 | `resolver` | no | `LanguageResolver` | `register_language_resolver` (`extract.py:21`, `resolver_registry.py:48`) |
 | `hook_suffixes` | no | `tuple[str, ...]` | `_HOOK_SOURCE_EXTS` (`cli.py:71`), consumed at `cli.py:881` |
 | `fixture` | no | path | the package's own tests; the core's `tests/test_languages.py` is not edited |
+| `overrides` | no | suffixes | wins that suffix from the built-in with no sniff (`.lsp`) |
+| `priority` | no | `int` | breaks a sniff tie between plugins (higher wins) |
+| `[sniff]` | no | `head_bytes`, `rules = [{ re, weight, flags }]`, `min_score` | the sniff router, for a suffix with more than one claimant |
+| `[match]` | no | `globs`, `filenames` | the router, and the `classify_file` hook for data suffixes |
+| `kind`, `augments` | no | `"language"` or `"augment"`, suffixes | an augment adds to a suffix's extractor output |
+
+### Shared suffixes, data files and augments
+
+Plan 04 (`docs/plans/04-content-sniffing-augment-plugins-and-five-new-languages.md`)
+settles open question 3 below. The code is `graphify_lang/registry.py`
+(`dispatch_table`, `claims_file`) and `graphify/lang_registry.py`
+(`apply_dispatch`, `claims_file`).
+
+- **Claimants per suffix.** The built-in (`_DISPATCH` before plugins run,
+  kept as `lang_registry._BUILTIN_DISPATCH`) plus every plugin that lists
+  the suffix. The fallback is an `overrides` plugin, else the built-in, else
+  the first plugin with no `[sniff]` or `[match]`.
+- **Router.** When a plugin with `[sniff]` or `[match]` shares a suffix,
+  `_DISPATCH[suffix]` is `sniff_router[<suffix>]`. It reads the file head
+  once and calls the plugin with the highest score at or above its
+  `min_score`, then the higher `priority`, then the first registered (one
+  tie warning per suffix). Otherwise it calls the fallback, or returns an
+  empty result when there is none. A NUL byte in the head, or an empty file,
+  never passes a sniff. A UTF-8 BOM is stripped before `^` rules run.
+- **Data suffixes.** A suffix claimed only through `[match]` is not added to
+  `CODE_EXTENSIONS`. `classify_file` asks `lang_registry.claims_file(path)`
+  first; a file is CODE only when a glob or filename and the sniff pass.
+  Globs match the path at any `/` boundary, because `classify_file` does not
+  get the scan root.
+- **Augments.** `kind = "augment"` wraps the suffix's extractor (built-in or
+  router) as `augmented[<suffix>]`. The augment returns `nodes`, `edges`
+  and `attrs` keyed by base node id; new ids must start with the plugin
+  name prefix, and no base node or attribute is replaced.
+- `graphify lang list` shows a `sniff` column, `*` after a shared suffix and
+  `+` before an augmented one.
 
 Open questions the design has to settle before code, each with the options
 on the table:

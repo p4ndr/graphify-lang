@@ -1,0 +1,11 @@
+id: no-print
+language: python
+severity: warning
+rule:
+  pattern: print($$$ARGS)
+---
+id: no-exec
+language: python
+rule:
+  matches: is-call
+  regex: '^exec'

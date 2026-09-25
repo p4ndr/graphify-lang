@@ -34,8 +34,8 @@ case_insensitive = true
 
 [grammar]
 # Tree-sitter grammar module name
-# Must match the installed package name (e.g., tree-sitter-c, tree-sitter-python)
-module = "tree-sitter-language"
+# The importable module (e.g., tree_sitter_c); only loaded when [extract] queries is set
+module = "tree_sitter_language"
 
 # Language function name in the module (usually "language")
 language_fn = "language"
@@ -57,25 +57,33 @@ runtime = "graphify_lang.rules"
 # Optional: builtin prefixes for fuzzy matching
 # builtins_prefixes = ["vla-", "vlax-"]
 
-# Optional: Python hooks
-# post_file = "module:fn"  # Called after extraction: fn(path, tree, nodes, edges, manifest)
+# Optional: query tier - tags.scm file(s), relative to this manifest.
+# Captures: @definition.<node_kind> (span), @name (label),
+# @reference.<relation> (a use, labelled by @name). Needs [grammar] module.
+# A missing grammar or a query that does not compile is an error on every
+# file, never a silent empty result.
+# queries = ["tags.scm"]
+
+# Optional: one regex whose matches are blanked before the regex tier runs.
+# comments = '/\*.*?\*/|//[^\n]*'
+
+# Optional: Python hook, called after the rules run:
+# fn(path, tree, nodes, edges, manifest) -> None or {"nodes": ..., "edges": ...}
+# post_file = "module:fn"
+
+# Regex tier - one [[rule]] per pattern; see graphify_lang/regex_rules.py.
+# node = "<kind>" emits a definition; edge = "<relation>" emits a reference
+# resolved to a definition in the same file (builtins are dropped first).
+# scope: push | set | pop | ref (default); edges start at the current scope.
+[[rule]]
+pattern = "^\\s*def\\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)\\s*\\("
+node = "function"
+scope = "set"
 
 [[rule]]
-# Regex rule template
-# See regex_rules.py for full key set documentation
-pattern = "def\\s+(?P<name>[a-zA-Z_][a-zA-Z0-9_]*)\\s*\\("
-name_group = "name"
-type = "node"
-scope = "ref"
+pattern = "(?<!def\\s)\\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\\s*\\("
+edge = "calls"
 
-# Node kind mappings
-# Each entry maps a tree-sitter capture to a node kind
-[node_kind]
-# example: @definition.function -> "function"
-# definition.function = "function"
-
-# Edge kind mappings
-# Each entry defines a relation type
-[edge_kind]
-# example: @reference.calls -> "calls"
-# reference.calls = "calls"
+# Node kinds and relations are not declared in a table: the query tier takes
+# them from the capture names (@definition.<node_kind>, @reference.<relation>)
+# and the regex tier from each rule's `node = "<kind>"` / `edge = "<relation>"`.

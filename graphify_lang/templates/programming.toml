@@ -1,0 +1,81 @@
+# graphify_lang.toml template - programming language
+#
+# This is a template for programming language manifests (e.g., AutoLISP, C, Python).
+# Copy and customize for your language.
+#
+# See docs/research/01-manifest-schema.md for full field documentation.
+
+schema = "v1"
+
+[language]
+# Name of the language (used for logging and debugging)
+name = "language-name"
+
+# File suffixes this language handles (e.g., ".lsp", ".c", ".py")
+# Multiple suffixes can be declared
+suffixes = [".ext"]
+
+# Optional: override a built-in suffix (e.g., ".lsp" if upstream has a default)
+# built-in suffixes are taken only when listed in overrides
+# overrides = [".lsp"]
+
+# Optional: hook suffixes for watch mode (defaults to suffixes if omitted)
+# hook_suffixes = [".ext"]
+
+# Priority for precedence when multiple plugins claim the same suffix
+# Higher number wins; default is 0
+priority = 0
+
+# Case-insensitive file matching (for Windows compatibility)
+case_insensitive = true
+
+# Optional: hook source suffixes (for file watching)
+# hook_source_suffixes = [".ext"]
+
+[grammar]
+# Tree-sitter grammar module name
+# Must match the installed package name (e.g., tree-sitter-c, tree-sitter-python)
+module = "tree-sitter-language"
+
+# Language function name in the module (usually "language")
+language_fn = "language"
+
+# Optional: extra language identifier for ambiguous grammars
+# extra = "c"
+
+# Optional: version check - fails if installed grammar version doesn't match
+# version = "0.4.1"
+
+[extract]
+# Runtime module that implements build()
+# The module must have a build(manifest_path, manifest) -> (extract_fn, resolver_fn) function
+runtime = "graphify_lang.rules"
+
+# Optional: builtins file (one name per line, # comments)
+# builtins_file = "data/builtins.txt"
+
+# Optional: builtin prefixes for fuzzy matching
+# builtins_prefixes = ["vla-", "vlax-"]
+
+# Optional: Python hooks
+# post_file = "module:fn"  # Called after extraction: fn(path, tree, nodes, edges, manifest)
+
+[[rule]]
+# Regex rule template
+# See regex_rules.py for full key set documentation
+pattern = "def\\s+(?P<name>[a-zA-Z_][a-zA-Z0-9_]*)\\s*\\("
+name_group = "name"
+type = "node"
+scope = "ref"
+
+# Node kind mappings
+# Each entry maps a tree-sitter capture to a node kind
+[node_kind]
+# example: @definition.function -> "function"
+# definition.function = "function"
+
+# Edge kind mappings
+# Each entry defines a relation type
+[edge_kind]
+# example: @reference.calls -> "calls"
+# reference.calls = "calls"

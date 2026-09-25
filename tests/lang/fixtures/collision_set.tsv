@@ -1,0 +1,15 @@
+# In-file id collision groups (function/command nodes whose casefolded id repeats in one file).
+# Measured 2026-09-24 with graphify_lang.autolisp.extract.extract_autolisp over tests/lang/corpus_files.txt
+# (~/repos/autolithp at d5a2074): 11 groups = 5 pkg:name/pkg:_name + 6 repeated *error*.
+# Columns: file<TAB>node count<TAB>labels (space-separated)
+Import-Refactor/Archive/core/err_mod_main.lsp	2	err:_trap err:trap
+Import-Refactor/Archive/core/log_app_main.lsp	2	log:_failure-p log:failure-p
+Import-Refactor/Archive/core/log_app_main.lsp	2	log:_failure-message log:failure-message
+src/core/err.lsp	2	err:_trap err:trap
+src/plugins/layerxl.lsp	2	*error*
+src/plugins/pltidy.lsp	4	*error*
+src/plugins/pltrn.lsp	39	*error*
+src/plugins/pltrn.lsp	2	pltrn:_rec-fault pltrn:rec-fault
+src/plugins/plugin-archive/no-comments/layerxl_nc.lsp	2	*error*
+src/plugins/plugin-archive/no-comments/pltidy_nc.lsp	4	*error*
+src/plugins/plugin-archive/no-comments/pltrn_nc.lsp	7	*error*

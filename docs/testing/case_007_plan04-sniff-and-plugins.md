@@ -228,3 +228,65 @@ fixture only (`tests/lang/test_astgrep.py`).
   `astgrep_role`, so it gets no `loads` edge.
 - `.yml` is not in `hook_suffixes`: editing a rule does not trigger the git
   hook rebuild.
+
+## ecschema (S12, T29.5)
+
+**Date:** 2026-09-25
+**Branch:** `lang-ecschema` (off `lang-astgrep` `f6b6cc9`); engine `a6bdbb9`, plugin `2d07933`, tests `2632d4f`
+**Fork:** `/home/p4ndr/repos/graphify-lang/.venv` (editable fork; plugin `graphify_lang/ecschema`, suffix `.xml`, `[match]` `*.xml` + sniff on a root `<ECSchema`; stdlib expat)
+**Corpus HEAD:** BentleyHelp `95b9a95`, bentley-pyplace `fa8100d`, claude-config `0ad8780`
+**Instrument:** `classify_file(Path(...))` on each `git ls-files '*.xml' '*.xsd'` path of every git repo under `~/repos` plus `~/.claude`, with and without `GRAPHIFY_LANG_DISABLE=1`; `extract(files, cache_root=..., root=CORPUS)` on the claimed files.
+**Test suite:** `.venv/bin/python -m pytest tests/ -q` → 6126 passed, 14 skipped.
+
+### Engine change
+
+7 of the BentleyHelp schemas are UTF-16 LE with a BOM. The sniff read their
+NUL bytes as binary, so no plugin could claim them. `a6bdbb9` decodes a head
+that starts with a UTF-16 BOM; a head with NULs and no BOM stays binary
+(`tests/test_lang_sniff.py`).
+
+### Classification (D3, D8)
+
+| Scope | `.xml` | `.xsd` | upstream (None) | code (fork) | changed |
+|:--|--:|--:|--:|--:|--:|
+| BentleyHelp | 76 | 0 | 76 | 58 | 58 |
+| bentley-pyplace | 22 | 0 | 22 | 1 | 1 |
+| claude-config | 0 | 47 | 47 | 0 | 0 |
+| every git repo under `~/repos` + `~/.claude` | 127 | 165 | 292 | 63 | 63 |
+
+The 63 changed files are the 58 + 1 corpus schemas and 4 fixture schemas in
+this repo. The other 64 `.xml` and all 165 `.xsd` (47 PSMaml in claude-config)
+classify as upstream does. BentleyHelp has 57 `.xml` that parse with an
+`ECSchema` root plus `IllFormedXml.01.00.ecschema.xml`, which is claimed by its
+head and keeps a file node only. `MissingNodes.01.00.ecschema.xml` has no root
+element and is not claimed.
+
+### Corpus counts
+
+Truth grep, per claimed file (UTF-16 files through `iconv -f UTF-16 -t UTF-8`):
+`grep -oE '<([A-Za-z_][A-Za-z0-9_.-]*:)?(ECClass|ECEntityClass|ECStructClass|ECCustomAttributeClass|ECRelationshipClass)[[:space:]>/]' | wc -l`.
+The plan's `grep -c` counts lines and does not match an `ec:` prefix, so it
+gives 5109 on the raw BentleyHelp files and 5133 after the UTF-16 decode.
+
+| Repo | Claimed | Class tags (grep) | Class nodes | Difference |
+|:--|--:|--:|--:|:--|
+| BentleyHelp | 58 | 5134 | 5130 | 4: `IllFormedXml` (2, does not parse), `Unit_Attributes` (1, inside a comment), `MissingClassName` (1, no `typeName`) |
+| bentley-pyplace | 1 | 3 | 3 | 0 |
+
+BentleyHelp nodes: 58 file, 57 schema, 5130 class (4382 entity, 510
+relationship, 141 custom_attribute, 97 struct), 10007 property, 0 enumeration
+(all corpus schemas are EC 2.0). Edges: 15194 `contains`, 6254 `inherits`,
+457 `source_constraint`, 365 `target_constraint`, 177 `uses`, 42 `imports`;
+all EXTRACTED. `tests/lang/test_ecschema.py::test_corpus_class_count` pins the
+per-file class count against an ElementTree parse for both repos.
+
+### Known limits
+
+- EC 3.x, enumerations and navigation properties are covered by the fixture
+  only; the corpus has no EC 3.x schema.
+- The sniff reads 4096 bytes: a root after a longer comment block is not
+  claimed. A file with a DOCTYPE is not claimed, and the extractor refuses one.
+- Custom attribute instances, `KindOfQuantity`, `PropertyCategory` and units
+  items give no nodes.
+- `.xml` is not in `hook_suffixes`: editing a schema does not trigger the git
+  hook rebuild.

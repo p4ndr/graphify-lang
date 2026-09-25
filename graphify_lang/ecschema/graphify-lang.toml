@@ -1,0 +1,27 @@
+schema = 1
+
+# Bentley ECSchema XML (EC 2.0 and EC 3.x). .xml is a data suffix (plan 04
+# D3, D8): a file is claimed only when its root element is <ECSchema. Every
+# other .xml, and every .xsd, stays exactly as upstream classifies it.
+[language]
+name = "ecschema"
+type = "data"
+suffixes = [".xml"]
+
+# Any .xml, which covers the *.ecschema.xml naming; the sniff decides.
+[match]
+globs = ["*.xml"]
+
+# The root element (any namespace prefix), after an optional XML
+# declaration, comments and whitespace. The BOM is stripped (UTF-8) or
+# decoded (UTF-16) before the sniff runs. A DOCTYPE is not skipped: such a
+# file stays unclaimed.
+[sniff]
+min_score = 1
+rules = [
+    { re = '\A(?:\s|<\?xml[^>]*\?>|<!--.*?-->)*<(?:[\w.-]+:)?ECSchema[\s/>]', weight = 1, flags = "s" },
+]
+
+# graphify_lang.ecschema.extract:extract_ecschema, resolver in resolve.py.
+[extract]
+runtime = "graphify_lang.ecschema.extract"

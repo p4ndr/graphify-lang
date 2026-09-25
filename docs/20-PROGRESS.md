@@ -15,6 +15,25 @@ This document is a LIVE running changelog for all work in the repo.
 
 ## 3. CURRENT SESSION
 
+### 2026-09-25 18:08 (UTC+10)
+
+- T31 done (plan 04 S15-S17): 27c85f2 release 0.9.67+lang.3 (pyyaml runtime dep), autolisp fast-forwarded, local tag v0.9.67+lang.3 (nothing pushed), pipx venv on the lang.3 wheel with [mcp,commonlisp] extras; 12 graphs rebuilt with plugin nodes; learnings 1481-1484; CLAUDE.md graphify paragraph updated; plan 04 DONE.
+- Deviation: pipx install used the README form with [mcp,commonlisp] extras and the wheels dir copy, not a bare `pipx install --force dist/...whl`, which would drop the mcp extra that both MCP servers need.
+- Open: running Claude Code/OMP sessions keep the lang.1 MCP server process until restarted; upstream's zero-node warning for DOC yml (tmllm 00-POLICY.yml, fixtures/*.yml, repo-docs policy.yml) predates plan 04 (tmllm counts unchanged).
+
+### 2026-09-25 18:07 (UTC+10)
+
+- bash: S=/tmp/claude-1000/-home-p4ndr-repos-graphify-lang/d0e1fb12-471c-4d42-a019-0286ec26da55/scratchpad; for i in $(seq 1 55…, S=/tmp/claude-1000/-home-p4ndr-repos-graphify-lang/d0e1fb12-471c-4d42-a019-0286ec26da55/scratchpad; n0=$(grep -c ALLDON…, S=/tmp/claude-1000/-home-p4ndr-repos-graphify-lang/d0e1fb12-471c-4d42-a019-0286ec26da55/scratchpad; python3 - <<EOF
+  imp…, S=/tmp/claude-1000/-home-p4ndr-repos-graphify-lang/d0e1fb12-471c-4d42-a019-0286ec26da55/scratchpad; grep -nE "^== |zero…, PY=~/.local/share/pipx/venvs/graphifyy/bin/python; $PY - <<'EOF'  # graphify: skip classifying specific known files, no…, S=/tmp/claude-1000/-home-p4ndr-repos-graphify-lang/d0e1fb12-471c-4d42-a019-0286ec26da55/scratchpad; PY=~/.local/share/p… (+3 more)
+- T31.2 done: 12 graphs rebuilt (graph.pre-plan04.json backups, cache/ast cleared, graphify update, exit 0 each; semantic nodes kept). Nodes/edges before->after: bim-chk 421->818/381->1598; bentley-model-management 290->1406/300->4282; BentleyTools 33871->36395/34108->44499; BentleyHelp 6256->22230/12245->36945; bentley-pyplace 3770->3777/7396->7475; moxide 6045->6046/15030->15075; oa-graph 2433->2434/3970->3977; oag-dev 2586->2587/4091->4096; tmllm 4623/11629 unchanged; llm-linter-tool 1580->1662/2785->2882; claude-config 47567->47568/52295->64638 (12104 cites); ~/.claude 18256->18260/22925->33774 (10594 cites). Second no-change update identical on all 12; changed_paths incremental on scratch copies (bim-chk 6 VBA files, BentleyHelp 9 mki/mke/ecschema) kept every cross-file edge. graph_stats via MCP works on all 12. Rollback in plan 04 R5.
+- T31.3 done: Learnings ltm ids 1481-1482 (repo:graphify-lang: sniff router, augment kind), 1483-1484 (global: reconcile drops unbacked references edges, AST cache key excludes plugin code). $CLAUDE_HOME/CLAUDE.md graphify paragraph lists the 6 new plugins (matches graphify lang list). README layout table lists graphify_lang plugins. Plan 04 DONE.
+- T31 done (all steps): P04-E Release, rebuild graphs, docs — plan 04 S15-S17
+
+### 2026-09-25 18:05 (UTC+10)
+
+- bash: cd ~/repos/graphify-lang && git log --oneline 09c488a..lang-cc-kb | cat; git merge-base --is-ancestor autolisp lang-cc-…, cd ~/repos/graphify-lang && rtk git add .claude/docs/cc-LR000.002.md docs/20-PROGRESS.md docs/25-HISTORY.md docs/30-TOD…, git status --short | head; rtk git log --oneline -1; rtk ls docs/plans; rtk wc -l docs/plans/04-*.md docs/plans/03-*.md…, pwsh -NoProfile -File $HOME/.claude/scripts/phase0.ps1 -Repo /home/p4ndr/repos/graphify-lang -Task "T31 plan 04 S15-S17…, rtk read docs/plans/04-*.md; echo ======; rtk read docs/plans/03-*.md, grep -n "lang.2\|lang\.1\|version" pyproject.toml | head; grep -n "dependencies" -A25 pyproject.toml | head -50; rtk gi… (+25 more)
+- T31.1 done: 27c85f2 pyyaml>=6.0 runtime dep + 0.9.67+lang.3; pytest 6141 passed 14 skipped; extractors diff empty; autolisp ff to 27c85f2; local tag v0.9.67+lang.3 (not pushed); wheel graphifyy-0.9.67+lang.3 has 6 new plugin dirs + templates; pipx install with [mcp,commonlisp] extras (README form) - graphify 0.9.67+lang.3, lang list 9 languages, yaml 6.0.3 in venv, MCP server initialize reports 0.9.67+lang.3; skill refreshed via _copy_skill_file('claude')
+
 ### 2026-09-25 17:58 (UTC+10)
 
 - bash: cd ~/repos/graphify-lang && git log --oneline 8a07307..lang-cc-kb | cat; .venv/bin/python -m pytest tests/lang/test_cc_…, pwsh -NoProfile -File $HOME/.claude/scripts/phase0.ps1 -Repo /home/p4ndr/repos/graphify-lang -Task "cc-kb augment cites…, rtk read graphify_lang/cc_kb/augment.py graphify_lang/cc_kb/resolve.py graphify_lang/cc_kb/__init__.py; sed -n 1,80p /h…, grep -n "cc_kb_refs\|resolver_registry\|def _get_extractor\|augment" graphify/extract.py graphify/resolver_registry.py …, rtk ls tests/lang; grep -rln "cc_kb" tests/ | head; git show --stat 9aa125f 09c488a | cat, cat tests/lang/test_cc_kb.py; for f in $(find tests/lang/fixtures/cc_kb tests/lang/fixtures/cc_kb_plain -type f); do ec… (+35 more)
@@ -183,27 +202,5 @@ This document is a LIVE running changelog for all work in the repo.
 - T7.3 done: Quoted 'fn, (quote fn) and (function fn) are call candidates in the walker (plan 02 A6), covered by test_autolisp_plan02 calls pins. The `:vlr-*` dotted-pair clause is not built: there are 0 quoted-literal instances in corpus code (7 grep hits, all in comments of src/modules/rxn/mod.lsp).
 - T7.5 done: resolve.py RESOLVER is a LanguageResolver for .lsp/.mnl/.dcl, registered once by the registry (test_resolver_registered_once). The resolver_registry casefold fix covers upper-case suffixes; new test_upper_case_suffix_resolves_cross_file: ERR.LSP gets its cross-file call.
 - T7.6 done: analyze.god_nodes(build_from_json(extract(corpus_files.txt, root=autolithp))) top 10 are all AutoLISP defuns, no COM or built-ins: pltrn:rget 714, pltrn:_fn 513, pltrn:_int 438, pltrn:_real 285, pltrn:_str 255, pltrn_nc pltrn:rget 174, pltrn:_fn2 152, pltrn_nc pltrn:_fn 148, pltrn:get 147, C:PLTRNTEST 145 (SC7). SC6a: err:trap has 88 inbound cross-file calls (measure_autolisp).
-
-### 2026-09-24 14:34 (UTC+10)
-
-- T26.2 done: graphify/detect.py rebuilt from `git show v8:graphify/detect.py` plus the 6-line try-wrapped registry lookup after CODE_EXTENSIONS: `git diff v8 -- graphify/detect.py` = +6 -0. classify_file gives CODE for .lisp .cl .asd .cls .trigger .robot .resource (and .lsp .dcl .mnl). SC2 snapshot identical under GRAPHIFY_LANG_DISABLE=1. extract.py @doc markers untouched (D-004).
-- bash: grep -n "def main\|cmd == \|argv\[1\]\|elif cmd\|if cmd" graphify/cli.py | head -60; rtk grep -n "^def \|^class " graph…, sed -n 3110,3172p graphify/cli.py; grep -n '"  global\|global list\|  benchmark' graphify/cli.py | head; grep -rln "glo…, grep -n 'global add <graph' graphify/cli.py | head; grep -n 'print("  global\|"  global' graphify/cli.py | head; sed -n…, cd /tmp && /home/p4ndr/repos/graphify-lang/.venv/bin/python -c "
-  from graphify_lang import registry as r
-  for m in r.ite…, cat >> graphify/lang_registry.py <<'EOF'
-  def format_languages() -> str:
-  """Table of registered plugin languages f…, ls graphify/__main__.py && cat >> tests/test_lang_registry.py <<'EOF'
-  def test_lang_list_subcommand() -> None:
-  ""…
-- T26.3 done: `graphify lang list`: 9-line try-wrapped branch in graphify/cli.py (before `extract`), table built by new graphify/lang_registry.format_languages() (generic, no language name). Measured: lists autolisp (.lsp .mnl, tree_sitter_commonlisp, resolver autolisp) and autolisp-dcl (.dcl); GRAPHIFY_LANG_DISABLE=1 -> "No plugin languages registered."; bare `graphify lang` -> usage, exit 1. Test: tests/test_lang_registry.py::test_lang_list_subcommand (subprocess). Side effect of the D-007 version: the fork CLI warns that ~/.claude/skills/graphify is from 0.9.55 (not acted on).
-
-### 2026-09-24 14:33 (UTC+10)
-
-- bash: sed -i '24s/^- `\[?\]` T1\.5 | \(.*\) (BLOCKED on P1: AutoLITHP corpus SHA decision)$/- `[x]` T1.5 | \1/' docs/30-TODO.…
-- T1 done: T1.5 (hand-marked: the tool's id match collides with T1.5b/T1.5c) — ~/repos/autolithp HEAD d5a20743b007 = SRS pin, clean; re-measured 81 .lsp, 4,027 defun/defun-q, 52 `defun C:` case-sensitive (SRS instrument said -Eio = 64 incl. 12 lowercase `c:`; SRS §1.3 row corrected), 3 .dcl, 8 dialogs, 3.04 MiB. T1.4 snapshot + SC2 test done.
-- bash: sed -i '7s/^version = "0.9.55"$/version = "0.9.55+lang.1"/' pyproject.toml && sed -n 6,8p pyproject.toml && uv sync --a…, uv sync --all-extras --quiet 2>&1 | tail -3; rtk git diff --stat uv.lock; git diff uv.lock | grep '^[-+]' | head; .venv…, cd /tmp && ~/.local/share/pipx/venvs/graphifyy/bin/python -c "import graphify.cache as c; print('stock', c._EXTRACTOR_V…, C=/tmp/claude-1000/-home-p4ndr-repos-graphify-lang/cachecheck; rm -rf $C; mkdir -p $C; cat > $C/run.py <<'EOF'
-  import s…
-- T26.1 done: pyproject.toml version = "0.9.55+lang.1" (D-007); `uv sync --all-extras` changed only the graphifyy version line in uv.lock; tree-sitter 0.25.2 / tree-sitter-commonlisp 0.4.1 kept (importlib.metadata). Fresh shared cache_root, alternating runs on ~/repos/autolithp src/core/err.lsp: fork writes cache/ast/v0.9.55+lang.1-s2 (33 nodes, 61 edges), stock writes v0.9.55-s2 (1 node) — neither reads the other's entries. Upstream's sibling-dir sweep makes them evict each other: P-item raised.
-- T24.2 done: Closed by D-007 / T26.1 instead of a per-file key: graphify/cache.py keys AST entries by package version (cache/ast/v{version}-s{schema}); the fork's version 0.9.55+lang.1 gives a distinct dir, measured fork v0.9.55+lang.1-s2 vs stock v0.9.55-s2 with no cross-reads. No cache.py edit.
-- T24 done (all steps): Plan 02 step 6: extraction cache key check/fix for registry-dispatched files (D…
 
 ## 5. EARLIER SESSIONS

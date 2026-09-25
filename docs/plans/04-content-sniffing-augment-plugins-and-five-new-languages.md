@@ -2,7 +2,7 @@
 
 A content-sniff router for suffixes that two languages share, an `augment` manifest kind that adds to a built-in extractor's output, and plugins for VBA, bmake, Cargo TOML, ast-grep YAML, Bentley ECSchema XML, and the harness KB markdown.
 
-- Status: ACTIVE
+- Status: DONE
 - Created: 2026-09-25
 - Tasks: T27 (S1-S6), T28 (S7), T29 (S8-S12), T30 (S13-S14), T31 (S15-S17)
 
@@ -121,3 +121,4 @@ Target corpora:
 | R2 | The detect hook reads file heads for claimed data suffixes, which adds I/O to the detect step. | Read only for suffixes that some `[match]` claims, and only for glob hits. Measure the detect time on `~/.claude` before and after S4. |
 | R3 | Upstream adds its own `.cls` or `.bas` handling. | Rebase conflicts are limited to the registry lookup lines. The router still falls back to the built-in (D2). |
 | R4 | The augment adds noise to `~/.claude` query results. | S14 measures this; D6 lets an element be removed. |
+| R5 | (S16) A rebuilt graph or the release is bad. | Per repo: `cp graphify-out/graph.pre-plan04.json graphify-out/graph.json`. Global: `pipx install --force "graphifyy[mcp,commonlisp] @ file://$HOME/.local/share/graphify-lang/wheels/graphifyy-0.9.67+lang.1-py3-none-any.whl"` (no lang.2 wheel was built), then `rm -rf graphify-out/cache/ast` and `graphify update <path>` per repo. |

@@ -13,6 +13,28 @@ This document is an ARCHIVE of session progress cut-over from `20-PROGRESS.md`.
 
 ## 3. SESSION HISTORY
 
+### 2026-09-24 14:34 (UTC+10)
+
+- T26.2 done: graphify/detect.py rebuilt from `git show v8:graphify/detect.py` plus the 6-line try-wrapped registry lookup after CODE_EXTENSIONS: `git diff v8 -- graphify/detect.py` = +6 -0. classify_file gives CODE for .lisp .cl .asd .cls .trigger .robot .resource (and .lsp .dcl .mnl). SC2 snapshot identical under GRAPHIFY_LANG_DISABLE=1. extract.py @doc markers untouched (D-004).
+- bash: grep -n "def main\|cmd == \|argv\[1\]\|elif cmd\|if cmd" graphify/cli.py | head -60; rtk grep -n "^def \|^class " graph…, sed -n 3110,3172p graphify/cli.py; grep -n '"  global\|global list\|  benchmark' graphify/cli.py | head; grep -rln "glo…, grep -n 'global add <graph' graphify/cli.py | head; grep -n 'print("  global\|"  global' graphify/cli.py | head; sed -n…, cd /tmp && /home/p4ndr/repos/graphify-lang/.venv/bin/python -c "
+  from graphify_lang import registry as r
+  for m in r.ite…, cat >> graphify/lang_registry.py <<'EOF'
+  def format_languages() -> str:
+  """Table of registered plugin languages f…, ls graphify/__main__.py && cat >> tests/test_lang_registry.py <<'EOF'
+  def test_lang_list_subcommand() -> None:
+  ""…
+- T26.3 done: `graphify lang list`: 9-line try-wrapped branch in graphify/cli.py (before `extract`), table built by new graphify/lang_registry.format_languages() (generic, no language name). Measured: lists autolisp (.lsp .mnl, tree_sitter_commonlisp, resolver autolisp) and autolisp-dcl (.dcl); GRAPHIFY_LANG_DISABLE=1 -> "No plugin languages registered."; bare `graphify lang` -> usage, exit 1. Test: tests/test_lang_registry.py::test_lang_list_subcommand (subprocess). Side effect of the D-007 version: the fork CLI warns that ~/.claude/skills/graphify is from 0.9.55 (not acted on).
+
+### 2026-09-24 14:33 (UTC+10)
+
+- bash: sed -i '24s/^- `\[?\]` T1\.5 | \(.*\) (BLOCKED on P1: AutoLITHP corpus SHA decision)$/- `[x]` T1.5 | \1/' docs/30-TODO.…
+- T1 done: T1.5 (hand-marked: the tool's id match collides with T1.5b/T1.5c) — ~/repos/autolithp HEAD d5a20743b007 = SRS pin, clean; re-measured 81 .lsp, 4,027 defun/defun-q, 52 `defun C:` case-sensitive (SRS instrument said -Eio = 64 incl. 12 lowercase `c:`; SRS §1.3 row corrected), 3 .dcl, 8 dialogs, 3.04 MiB. T1.4 snapshot + SC2 test done.
+- bash: sed -i '7s/^version = "0.9.55"$/version = "0.9.55+lang.1"/' pyproject.toml && sed -n 6,8p pyproject.toml && uv sync --a…, uv sync --all-extras --quiet 2>&1 | tail -3; rtk git diff --stat uv.lock; git diff uv.lock | grep '^[-+]' | head; .venv…, cd /tmp && ~/.local/share/pipx/venvs/graphifyy/bin/python -c "import graphify.cache as c; print('stock', c._EXTRACTOR_V…, C=/tmp/claude-1000/-home-p4ndr-repos-graphify-lang/cachecheck; rm -rf $C; mkdir -p $C; cat > $C/run.py <<'EOF'
+  import s…
+- T26.1 done: pyproject.toml version = "0.9.55+lang.1" (D-007); `uv sync --all-extras` changed only the graphifyy version line in uv.lock; tree-sitter 0.25.2 / tree-sitter-commonlisp 0.4.1 kept (importlib.metadata). Fresh shared cache_root, alternating runs on ~/repos/autolithp src/core/err.lsp: fork writes cache/ast/v0.9.55+lang.1-s2 (33 nodes, 61 edges), stock writes v0.9.55-s2 (1 node) — neither reads the other's entries. Upstream's sibling-dir sweep makes them evict each other: P-item raised.
+- T24.2 done: Closed by D-007 / T26.1 instead of a per-file key: graphify/cache.py keys AST entries by package version (cache/ast/v{version}-s{schema}); the fork's version 0.9.55+lang.1 gives a distinct dir, measured fork v0.9.55+lang.1-s2 vs stock v0.9.55-s2 with no cross-reads. No cache.py edit.
+- T24 done (all steps): Plan 02 step 6: extraction cache key check/fix for registry-dispatched files (D…
+
 ### 2026-09-24 14:32 (UTC+10)
 
 - bash: python3 - <<'EOF'

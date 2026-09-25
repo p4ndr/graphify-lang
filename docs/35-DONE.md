@@ -15,6 +15,12 @@ This document is a LIVE file containing a list of TASKS that have been carried o
 
 ## 3. TASK LIST
 
+### `[x]` T31 | P04-E Release, rebuild graphs, docs — plan 04 S15-S17
+
+- `[x]` T31.1 | S15 Merge branches, tag v0.9.67+lang.3, build wheel, pipx install --force
+- `[x]` T31.2 | S16 Back up graph.json, clear cache/ast, graphify update for 12 corpus repos + ~/.claude
+- `[x]` T31.3 | S17 Learnings; update $CLAUDE_HOME/CLAUDE.md graphify paragraph
+
 ### `[x]` T30 | P04-D (lang-cc-kb) KB markdown augment and value test — plan 04 S13-S14
 
 - `[x]` T30.1 | S13 cc-* links, class/group attrs + hub->spoke, cc_id key, backtick code-path edges; run on ~/.claude/docs and claude-config

@@ -226,8 +226,9 @@ fixture only (`tests/lang/test_astgrep.py`).
   a line regex, so a local util's references are credited to its rule.
 - A file whose YAML does not parse keeps its file node with no
   `astgrep_role`, so it gets no `loads` edge.
-- `.yml` is not in `hook_suffixes`: editing a rule does not trigger the git
-  hook rebuild.
+- Fixed on `lang-cc-kb` (`271a06c`, `6503e04`): `.yml` and `.yaml` are in
+  `hook_suffixes`, so editing a rule triggers the git hook rebuild. Any other
+  `.yml` edit triggers it too (owner, 2026-09-25).
 
 ## ecschema (S12, T29.5)
 
@@ -288,5 +289,121 @@ per-file class count against an ElementTree parse for both repos.
   claimed. A file with a DOCTYPE is not claimed, and the extractor refuses one.
 - Custom attribute instances, `KindOfQuantity`, `PropertyCategory` and units
   items give no nodes.
-- `.xml` is not in `hook_suffixes`: editing a schema does not trigger the git
-  hook rebuild.
+- Fixed on `lang-cc-kb` (`271a06c`, `6503e04`): `.xml` is in
+  `hook_suffixes`, so editing a schema triggers the git hook rebuild. Any other
+  `.xml` edit triggers it too (owner, 2026-09-25).
+
+## cc-kb (S13-S14, T30)
+
+**Branch:** `lang-cc-kb` (off `lang-ecschema` `3e9e9fe`). Engine `271a06c`
+(`hook_suffixes` read), `635ea9c` (augment payload keys carried), `01c76a2`
+(a failing augment keeps the base result), `81b7fcc` (augments per path from
+`_get_extractor`); plugin `9b266d3`.
+
+### Step 0: hook set
+
+`graphify.cli._HOOK_SOURCE_EXTS` was the code suffixes only; `hook_suffixes`
+was parsed and never read. `get_registry_suffixes()` now returns the code
+suffixes plus every manifest's `hook_suffixes`, and `detect` takes the code set
+from `get_code_suffixes()`, so `CODE_EXTENSIONS` does not change. `cli.py` is
+not edited. Measured after: `.yml .yaml .xml .mke .mki .bas .cls .frm` are in
+the hook set; `.yml .yaml .xml` are not in `CODE_EXTENSIONS`
+(`tests/lang/test_astgrep.py::test_hook_set_has_data_and_plugin_suffixes`).
+
+### D10: docs that skip the AST pass
+
+Read from the existing graphs (`graphify.build._is_ast_tier` on each node whose
+`source_file` is `docs/cc-*.md`; the `watch.py` #1915 rule):
+
+| Corpus | `cc-*.md` | Semantic-backed (skip AST) | In graph via AST | Not in graph |
+|:--|--:|--:|--:|--:|
+| `~/.claude` | 644 | 0 | 515 | 129 (`cc-AR*`, `.graphifyignore`) |
+| claude-config | 633 | 0 | 633 | 0 |
+
+0 of 1277: not material, so no hook in the #1915 path. The link reconciliation
+(`watch._reconcile_markdown_links`) calls `extract_markdown` directly but only
+to rebuild authored-link edges; it does not skip the AST pass. It does prune:
+an AST `references` edge from a Markdown file with no authored link behind it
+is dropped. Measured on the scratch copy of `~/.claude`: with the augment's
+edges as `references`, the first `graphify update` kept all 2490 cross-doc and
+code-path edges and the second one (one doc edited) kept 0. The augment
+therefore uses the relation `cites`; with it, the second update keeps all of
+them.
+
+### What the augment adds
+
+On the page node of `extract_markdown`: `cc_id`, `doc_class`, `group`,
+`subgroup`, `is_hub`, and `spoke` (`S001`) for a spoke file. The resolver adds,
+matching docs by file name in the same `docs/` folder:
+
+- `contains` (context `hub_spoke`): `cc-XXGGG.000` to `cc-XXGGG.SSS`, and
+  `cc-XXGGG.SSS` to its `-SNNN` spokes. Runs first, so it takes a pair before a
+  mention does.
+- `cites` (context `cc_ref`): a `cc-XXGGG.SSS[-SNNN]` mention anywhere in the
+  text. A mention with no such doc goes to `dangling_cc_refs` on the page node.
+- `cites` (context `code_ref`): a backticked path, optionally `:line`, outside
+  a fence, that is a file under the repo root (the parent of `docs/`).
+  `$CLAUDE_HOME/` and `~/.claude/` read as the repo root.
+
+A pair that any edge already joins (a Markdown link) gets no second edge.
+
+### Corpus counts
+
+Scratch copies (the git-tracked files of each repo, `graphify update .`, AST
+only, no LLM); `~/.claude/graphify-out` and claude-config were not touched.
+
+| Corpus | Nodes | Edges base | Edges with augment | `hub_spoke` | `cc_ref` | `code_ref` | Docs with `cc_id` |
+|:--|--:|--:|--:|--:|--:|--:|--:|
+| `~/.claude` | 15972 | 19758 | 22538 | 241 | 1555 | 984 | 514 |
+| claude-config | 47225 | - | 55169 | 235 | 1831 | 1065 | 632 |
+
+The first build found an augment bug (an empty backtick span raised) that
+made graphify skip 6 docs whole; `01c76a2` makes the wrapper keep the base
+result when an augment raises.
+
+### Checks (plan S13)
+
+| Check | `~/.claude` | claude-config |
+|:--|:--|:--|
+| Each `cc-*` mention resolves or is dangling | 3286 mentions: 1663 by `cites`, 1189 by an existing edge, 434 dangling, 0 neither | 3941: 1949, 1777, 215, 0 |
+| Dangling by class | AR 250 (ignored), SN 101, LR 35, IP 16, DB 10, RS 10, other 12 | SN 101, LR 35, AR 31, other 48 |
+| Hub-to-spoke against the `cc-RF000.000` Quick Lookup | 417 expected pairs: 297 joined (241 `contains`, 56 Markdown link), 0 missing, 120 not graphed (AR); 0 `hub_spoke` edges outside the list | 408: 408 joined (235, 173), 0 missing; 6 `hub_spoke` edges for docs the index does not list |
+| Base nodes the same with and without the augment | yes: 15972 nodes, identical after removing the added keys and `community` | - |
+| Base edges kept | yes | - |
+| `graphify lang list` | `cc-kb  +.md  -  match  cc-kb` | |
+| Wheel | `graphify_lang/cc_kb/*` and the `cc-kb` entry point are in `graphifyy-0.9.67+lang.2-py3-none-any.whl` | |
+
+### S14 value test (D6)
+
+Five fixed questions, `graphify query "<q>" --graph <scratch>/graph.json`
+(default 2000-token budget), on the `~/.claude` scratch copy. One build per
+variant: `base` (every element off), `all`, and `all` minus one element
+(`GRAPHIFY_CC_KB_OFF`). A cell is the position of the first node from the
+relevant doc among the NODE lines, or `-` when none is in the output.
+
+| Question | Relevant doc | base | all | no attrs | no cc_ref | no hub_spoke | no code_ref |
+|:--|:--|--:|--:|--:|--:|--:|--:|
+| Q1 where is db.ps1 write ownership documented | `cc-SY050.001` | - | 7 | 7 | 9 | 7 | - |
+| Q2 which docs reference cc-SY050.000 | `cc-SY050.000` | 54 | 17 | 17 | 31 | 17 | 15 |
+| Q2 docs citing `cc-SY050.000` in the output (of 40) | | 5 | 17 | 17 | 11 | 16 | 14 |
+| Q3 what is the retrieval spec | `cc-SY060.000` | - | - | - | - | - | - |
+| Q4 which hub lists the style guides | `cc-SG000.000` | 2 | 2 | 2 | 2 | 2 | 2 |
+| Q5 what documents the graphify skip hook | `cc-SY010.007` | - | 8 | 8 | 12 | 8 | - |
+
+No element pushes a relevant node out of the budget, so all four are kept.
+`code_ref` gives the Q1 and Q5 hits; `cc_ref` moves Q1, Q2 and Q5 up;
+`hub_spoke` adds one Q2 citer; the attributes do not change query output
+(they are the `kb.db` join key). Every output is truncated at the budget
+except Q3, whose start nodes are the `Retrieval` heading of `PROMPT-BASE.md`
+and a graphify skill reference: `PROMPT-BASE.md` names `cc-SY060.000` but is
+not a `docs/cc-*.md` file, so the augment does not read it.
+
+### Known limits
+
+- Only `docs/cc-*.md` is read. Root files that cite the KB (`CLAUDE.md`,
+  `PROMPT-BASE.md`, agents, skills) add no `cc_ref` edge (the Q3 miss).
+- An incremental update resolves the changed docs against the whole graph,
+  but a new hub gets its `contains` edges only when each spoke is next
+  extracted (the edge is owned by the spoke's file).
+- A path that exists but is not graphed (for example a file under
+  `.graphifyignore`) adds nothing and is not listed.

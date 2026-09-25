@@ -333,7 +333,60 @@ def dispatch_table(builtins: Mapping[str, Callable[[Path], dict]]) -> dict[str, 
             table[suffix] = _router(suffix, conditional, fallback)
         elif fallback is not None and fallback is not builtin:
             table[suffix] = fallback
+    augmenters = [m for m in _init_state().manifests.values() if m.kind == "augment"]
+    for suffix in sorted({s for m in augmenters for s in m.augments}):
+        inner = table.get(suffix) or builtins.get(suffix)
+        on_suffix = [m for m in augmenters if suffix in m.augments and m.augment]
+        if inner is None or not on_suffix:
+            _LOG.warning("augment on %s skipped: no extractor or no augment()", suffix)
+            continue
+        table[suffix] = _augmented(suffix, inner, on_suffix)
     return table
+
+
+# --- augment kind (plan 04 §3.3, D5) ------------------------------------------
+
+def _augmented(suffix: str, inner: Callable[[Path], dict],
+               augmenters: list[LanguageManifest]) -> Callable[[Path], dict]:
+    """Run ``inner`` (built-in or router), then each augment whose match passes."""
+    size = max((m.sniff.head_bytes for m in augmenters if m.sniff), default=0)
+
+    def augmented(path: Path) -> dict:
+        path = Path(path)
+        result = inner(path)
+        head = _head_reader(path, size)
+        for m in augmenters:
+            if _sniff_score(m, path, head) is not None:
+                result = _merge(m, result, m.augment(path, result) or {})
+        return result
+    augmented.__name__ = augmented.__qualname__ = f"augmented[{suffix}]"
+    return augmented
+
+
+def _merge(m: LanguageManifest, base: dict, extra: dict) -> dict:
+    """Add an augment's nodes, edges and attrs; never delete, rename or overwrite."""
+    prefix = re.sub(r"\W+", "_", m.name).lower() + "_"
+    nodes = list(base.get("nodes", []))
+    ids = {n.get("id") for n in nodes}
+    for node in extra.get("nodes", []):
+        nid = node.get("id", "")
+        if nid in ids or not nid.startswith(prefix):
+            _LOG.info("augment %s: node %r dropped (existing id or no %s prefix)",
+                      m.name, nid, prefix)
+            continue
+        nodes.append(node)
+        ids.add(nid)
+    attrs = extra.get("attrs") or {}
+    for i, node in enumerate(nodes):
+        add = attrs.get(node.get("id"))
+        if not add:
+            continue
+        clash = sorted(k for k in add if k in node)
+        for key in clash:
+            _LOG.info("augment %s: attr %s on %s kept (not overwritten)", m.name, key, node["id"])
+        nodes[i] = {**node, **{k: v for k, v in add.items() if k not in node}}
+    edges = list(base.get("edges", [])) + list(extra.get("edges", []))
+    return {**base, "nodes": nodes, "edges": edges}
 
 
 def claims_file(path: Path) -> bool:

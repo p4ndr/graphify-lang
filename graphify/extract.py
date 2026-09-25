@@ -6712,6 +6712,12 @@ _DISPATCH: dict[str, Any] = {
     ".cls": extract_apex,
     ".trigger": extract_apex,
 }
+try:
+    import graphify.lang_registry
+    graphify.lang_registry.apply_registry()
+    graphify.lang_registry.apply_dispatch()
+except Exception:
+    pass
 
 
 # Extensions whose extractor depends on an optional-dependency extra
@@ -6740,6 +6746,17 @@ _EXTRA_FOR_EXTENSION = {
     ".robot": "robot",
     ".resource": "robot",
 }
+try:
+    import graphify.lang_registry
+    graphify.lang_registry.apply_registry()
+    # Merge registry-provided extras (if any)
+    from graphify.lang_registry import get_registry_manifest
+    for suffix in graphify.lang_registry.get_registry_suffixes():
+        manifest = get_registry_manifest(suffix)
+        if manifest and manifest.extra:
+            _EXTRA_FOR_EXTENSION[suffix] = manifest.extra
+except Exception:
+    pass
 
 # Substrings an extractor's error carries to classify why a dependency-backed
 # file contributed nothing, used by the #1745 warning in extract(). A grammar

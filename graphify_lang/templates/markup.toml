@@ -1,0 +1,52 @@
+# graphify_lang.toml template - markup language
+#
+# This is a template for markup language manifests (e.g., HTML, XML, Markdown).
+# Copy and customize for your language.
+#
+# See docs/research/01-manifest-schema.md for full field documentation.
+
+schema = "v1"
+
+[language]
+# Name of the language
+name = "markup-language"
+
+# File suffixes this language handles
+suffixes = [".html", ".xml"]
+
+# Priority for precedence (higher wins)
+priority = 0
+
+# Case-insensitive file matching
+case_insensitive = true
+
+[grammar]
+# Tree-sitter grammar module
+module = "tree-sitter-markup"
+
+# Language function name
+language_fn = "language"
+
+# Optional: extra identifier
+# extra = "html"
+
+[extract]
+# Runtime module
+runtime = "graphify_lang.rules"
+
+# Optional: builtins file
+# builtins_file = "data/builtins.txt"
+
+# Optional: Python hooks
+# post_file = "module:fn"
+
+[node_kind]
+# Define markup node kinds
+# element = "element"
+# attribute = "attribute"
+# text = "text"
+
+[edge_kind]
+# Define markup relations
+# contains = "contains"
+# references = "references"

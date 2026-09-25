@@ -1,0 +1,91 @@
+schema = 1
+
+[language]
+name = "autolisp"
+type = "programming"
+suffixes = [".lsp", ".mnl"]
+overrides = [".lsp"]
+hook_suffixes = [".lsp", ".mnl", ".dcl"]
+priority = 10
+case_insensitive = true
+
+[grammar]
+kind = "tree-sitter"
+module = "tree_sitter_commonlisp"
+language_fn = "language()"
+extra = "commonlisp"
+version = "0.4.1"
+
+[extract]
+runtime = "graphify_lang.rules"
+builtins_file = "data/builtins.txt"
+builtins_prefixes = ["vla-", "vlax-", "vlr-"]
+queries = ["queries/tags.scm"]
+
+[[rule]]
+kind = "query"
+name = "function_definition"
+query = """
+(defun_header function_name: [(sym_lit) (package_lit)] @name) @definition.function
+"""
+node_kind = "function"
+
+[[rule]]
+kind = "query"
+name = "defun_q"
+query = """
+(list_lit . (sym_lit) @kw (#eq? @kw "defun-q") . [(sym_lit) (package_lit)] @name) @definition.function
+"""
+node_kind = "function"
+
+[[rule]]
+kind = "query"
+name = "command"
+query = """
+[(sym_lit) (package_lit)] @name
+#match? @name "^[cC]:[a-zA-Z0-9_-]+$"
+"""
+node_kind = "command"
+
+[[rule]]
+kind = "query"
+name = "global"
+query = """
+(list_lit . (sym_lit) @kw (#eq? @kw "setq") . (sym_lit) @name) @definition.global
+"""
+node_kind = "global"
+
+[[rule]]
+kind = "regex"
+name = "module"
+pattern = "^;;;\\s*@module\\s+(.+)$"
+scope = "set"
+target = "module"
+
+[[rule]]
+kind = "regex"
+name = "prefix"
+pattern = "^;;;\\s*@prefix\\s+(.+)$"
+scope = "set"
+target = "prefix"
+
+[[rule]]
+kind = "regex"
+name = "depends"
+pattern = "^;;;\\s*@depends\\s+(.+)$"
+scope = "set"
+target = "depends"
+
+[[rule]]
+kind = "regex"
+name = "sidecar"
+pattern = "^;;;\\s*@sidecar\\s+(.+)$"
+scope = "set"
+target = "sidecar"
+
+[[rule]]
+kind = "regex"
+name = "doc"
+pattern = "^;;;\\s*@doc\\s+(.+)$"
+scope = "set"
+target = "doc"

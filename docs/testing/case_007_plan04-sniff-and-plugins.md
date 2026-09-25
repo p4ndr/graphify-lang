@@ -1,4 +1,4 @@
-# Case 005 — plan 04 sniff router and plugins, corpus counts
+# Case 007 — plan 04 sniff router and plugins, corpus counts
 
 Plan: `docs/plans/04-content-sniffing-augment-plugins-and-five-new-languages.md`.
 One section per plugin; S14 (KB augment value test) adds its own section.

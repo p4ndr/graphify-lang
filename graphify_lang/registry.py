@@ -189,6 +189,11 @@ def registered_suffixes() -> set[str]:
     return {s for m in _languages() if not m.has_match for s in m.suffixes}
 
 
+def hook_suffixes() -> set[str]:
+    """Every manifest's ``hook_suffixes``, augments included."""
+    return {s for m in _init_state().manifests.values() for s in m.hook_suffixes}
+
+
 def match_suffixes() -> set[str]:
     """Suffixes claimed only per path (``[match]``): code only via ``claims_file``."""
     return {s for m in _languages() if m.has_match for s in m.suffixes} - registered_suffixes()

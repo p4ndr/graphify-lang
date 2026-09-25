@@ -45,7 +45,7 @@ CODE_EXTENSIONS = {'.py', '.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', 
 try:
     import graphify.lang_registry
     graphify.lang_registry.apply_registry()
-    CODE_EXTENSIONS.update(graphify.lang_registry.get_registry_suffixes())
+    CODE_EXTENSIONS.update(graphify.lang_registry.get_code_suffixes())
 except Exception:
     pass
 DOC_EXTENSIONS = {'.md', '.mdx', '.qmd', '.skill', '.txt', '.rst', '.html', '.yaml', '.yml'}

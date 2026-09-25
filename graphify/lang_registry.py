@@ -9,6 +9,10 @@ _LOG = logging.getLogger(__name__)
 # Global state
 _REGISTRY_AVAILABLE = False
 _REGISTRY_SUFFIXES: set[str] = set()
+# Suffixes whose edit triggers a graph rebuild: the code suffixes above plus
+# every manifest's ``hook_suffixes`` (a ``[match]`` data plugin claims .yml or
+# .xml per path, so its suffix is never a code suffix).
+_HOOK_SUFFIXES: set[str] = set()
 
 
 def _apply_registry() -> None:
@@ -16,7 +20,7 @@ def _apply_registry() -> None:
     
     Each call site wraps this in try/except so one failure doesn't break graphify.
     """
-    global _REGISTRY_AVAILABLE, _REGISTRY_SUFFIXES
+    global _REGISTRY_AVAILABLE, _REGISTRY_SUFFIXES, _HOOK_SUFFIXES
     
     try:
         from graphify_lang import registry as lang_registry
@@ -34,7 +38,10 @@ def _apply_registry() -> None:
             _REGISTRY_SUFFIXES.add(suffix)
             # Also register uppercase variant for case-insensitive filesystems
             _REGISTRY_SUFFIXES.add(suffix.upper())
-        
+        for suffix in lang_registry.hook_suffixes():
+            _HOOK_SUFFIXES.update((suffix, suffix.upper()))
+        _HOOK_SUFFIXES |= _REGISTRY_SUFFIXES
+
         _REGISTRY_AVAILABLE = True
         _LOG.debug("registry integration active, suffixes: %s", sorted(_REGISTRY_SUFFIXES))
     except Exception as exc:
@@ -43,7 +50,16 @@ def _apply_registry() -> None:
 
 
 def get_registry_suffixes() -> set[str]:
-    """Return all registry suffixes (including case variants)."""
+    """Suffixes whose edit should rebuild the graph (including case variants).
+
+    The code suffixes plus every manifest's ``hook_suffixes``. ``graphify.cli``
+    merges this into ``_HOOK_SOURCE_EXTS``; ``detect`` uses ``get_code_suffixes``.
+    """
+    return _HOOK_SUFFIXES.copy()
+
+
+def get_code_suffixes() -> set[str]:
+    """Suffixes a plugin claims whole: code by suffix (including case variants)."""
     return _REGISTRY_SUFFIXES.copy()
 
 

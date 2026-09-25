@@ -405,3 +405,15 @@ def test_utf16_without_bom_stays_binary(clean_registry, tmp_path):
     path = tmp_path / "nobom.cls"
     path.write_bytes('Attribute VB_Name = "Wide"\r\n'.encode("utf-16-le"))
     assert _router(_manifest(tmp_path))(path) == extract_apex(path)
+
+
+def test_hook_suffixes_union_all_manifests(clean_registry, tmp_path):
+    """Every manifest's hook_suffixes, a [match] data plugin and an augment included."""
+    _data_plugin(tmp_path, "astgrep", ".yml", r"^id:", 'globs = ["rules/**/*.yml"]')
+    data = registry.get_manifest("astgrep")
+    registry._register_manifest(replace(data, hook_suffixes=(".yml", ".yaml")))
+    registry._register_manifest(LanguageManifest(
+        name="aug", suffixes=frozenset(), extract=_stub("aug"), kind="augment",
+        augments=frozenset({".md"}), hook_suffixes=(".md",)))
+    assert registry.hook_suffixes() == {".yml", ".yaml", ".md"}
+    assert ".yml" not in registry.registered_suffixes()

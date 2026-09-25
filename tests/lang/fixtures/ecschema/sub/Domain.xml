@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A domain schema: no .ecschema.xml suffix, a comment before the root. -->
+<ECSchema schemaName="Domain" alias="dm" version="01.02.00" xmlns="http://www.bentley.com/schemas/Bentley.ECXML.3.2">
+    <ECSchemaReference name="Base" version="01.00.00" alias="bs"/>
+    <ECSchemaReference name="Missing" version="01.00.00" alias="ms"/>
+    <ECEntityClass typeName="Pump">
+        <BaseClass>bs:PhysicalElement</BaseClass>
+        <BaseClass>ms:Ghost</BaseClass>
+        <ECProperty propertyName="State" typeName="bs:Status"/>
+        <ECStructProperty propertyName="Inlet" typeName="bs:Point"/>
+    </ECEntityClass>
+    <ECRelationshipClass typeName="PumpFeedsElement" strength="referencing" modifier="Sealed">
+        <BaseClass>bs:ElementOwnsElements</BaseClass>
+        <Source multiplicity="(0..*)" roleLabel="feeds" polymorphic="false">
+            <Class class="Pump"/>
+        </Source>
+        <Target multiplicity="(0..*)" roleLabel="is fed by" polymorphic="true">
+            <Class class="bs:Element"/>
+        </Target>
+    </ECRelationshipClass>
+</ECSchema>

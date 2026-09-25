@@ -73,6 +73,14 @@ _HOOK_SOURCE_EXTS = (
     '.rs', '.java', '.rb', '.c', '.h', '.cpp', '.hpp', '.cc', '.cs', '.kt',
     '.swift', '.php', '.scala', '.lua', '.sh', '.md', '.rst', '.txt', '.mdx',
 )
+try:
+    import graphify.lang_registry
+    graphify.lang_registry.apply_registry()
+    # Merge registry suffixes into HOOK_SOURCE_EXTS
+    for suffix in graphify.lang_registry.get_registry_suffixes():
+        _HOOK_SOURCE_EXTS += (suffix,)
+except Exception:
+    pass
 _GEMINI_NUDGE_TEXT = (
     'graphify: knowledge graph at graphify-out/. For focused questions, run '
     '`graphify query "<question>"` (scoped subgraph, usually much smaller than '
@@ -3214,6 +3222,15 @@ def dispatch_command(cmd: str) -> None:
             print(_global_path())
         else:
             print("Usage: graphify global [add|remove|list|path]", file=sys.stderr); sys.exit(1)
+
+    elif cmd == "lang":
+        if (sys.argv[2] if len(sys.argv) > 2 else "") != "list":
+            print("Usage: graphify lang list", file=sys.stderr); sys.exit(1)
+        try:
+            import graphify.lang_registry
+            print(graphify.lang_registry.format_languages())
+        except Exception as exc:
+            print(f"error: language registry unavailable: {exc}", file=sys.stderr); sys.exit(1)
 
     elif cmd == "extract":
         # Headless full-pipeline extraction for CI / scripts (#698).

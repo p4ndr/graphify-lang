@@ -32,6 +32,8 @@ Signatures below are the real ones - `tests/test_architecture_doc.py` imports ev
 | `serve.py` | `serve(graph_path)`, `serve_http(graph_path, *, host, port, ...)` | graph file path → MCP stdio server / HTTP server |
 | `watch.py` | `watch(watch_path, debounce=3.0)`, `check_update(watch_path)` | directory → rebuild on change; `check_update` reports whether a re-extraction is pending |
 | `benchmark.py` | `run_benchmark(graph_path)` | graph file → corpus vs subgraph token comparison |
+| `lang_registry.py` | `apply_registry()`, `get_registry_suffixes()`, `get_registry_manifest(suffix)` | load language packages → registry suffixes set / manifest lookup |
+
 
 ### Calling `extract()` from your own code
 
@@ -62,41 +64,28 @@ Every extractor returns:
 }
 ```
 
-`validate.py` enforces this schema before `build()` consumes it.
+### Node shape
 
-## Confidence labels
+- `id`: unique per-file string, derived from `source_file` and definition position
+- `label`: human-readable name (function/class name, file name, etc.)
+- `source_file`: relative path from the `root` passed to `extract()`
+- `source_location`: line number (e.g. `L42`) or `file` for file-level nodes
+- `file_type`: `"code"`, `"doc"`, `"paper"`, `"image"`, `"video"` (extractor-specific)
+- `node_kind`: language-specific kind (e.g. `function`, `class`, `file`, `dialog`)
 
-| Label | Meaning |
-|-------|---------|
-| `EXTRACTED` | Relationship is explicitly stated in the source (e.g., an import statement, a direct call) |
-| `INFERRED` | Relationship is a reasonable deduction (e.g., call-graph second pass, co-occurrence in context) |
-| `AMBIGUOUS` | Relationship is uncertain; flagged for human review in GRAPH_REPORT.md |
+### Edge shape
 
-## Adding a new language extractor
+- `source`: node id of the referencing definition
+- `target`: node id of the referenced definition
+- `relation`: `calls`, `imports`, `uses`, `references`, `extends`, `implements`, etc.
+- `confidence`: `EXTRACTED` (from AST), `INFERRED` (from context), `AMBIGUOUS` (multiple matches)
 
-1. Add an `extract_<lang>(path: Path) -> dict` function following the existing pattern (tree-sitter parse → walk nodes → collect `nodes` and `edges` → call-graph second pass for INFERRED `calls` edges). New languages go in their own module under `graphify/extractors/` - see `graphify/extractors/MIGRATION.md`; `extract.py` re-exports them while the existing ones are ported out of it.
-2. Register the file suffix in `extract()`'s dispatch table and in `collect_files()` (both in `extract.py`).
-3. Add the suffix to `CODE_EXTENSIONS` in `detect.py` and `_WATCHED_EXTENSIONS` in `watch.py`.
-4. Add the tree-sitter package to `pyproject.toml` dependencies.
-5. Add a fixture file to `tests/fixtures/` and tests to `tests/test_languages.py`.
+## Registry integration
 
-## Security
+Language packages can be registered via `graphify.lang_registry.apply_registry()`, which:
 
-All external input passes through `graphify/security.py` before use:
+1. Imports `graphify_lang.registry` (if available)
+2. Merges registered suffixes into `CODE_EXTENSIONS`, `extract._DISPATCH`, and `cli._HOOK_SOURCE_EXTS`
+3. Registers case variants (`.LSP` → `.lsp`) for robustness
 
-- URLs → `validate_url()` (http/https only) + `_NoFileRedirectHandler` (blocks file:// redirects)
-- Fetched content → `safe_fetch()` / `safe_fetch_text()` (size cap, timeout)
-- Graph file paths → `validate_graph_path()` (must resolve inside `graphify-out/`)
-- Node labels → `sanitize_label()` (strips control chars, caps 256 chars, HTML-escapes)
-
-See `SECURITY.md` for the full threat model.
-
-## Testing
-
-One test file per module under `tests/`. Run with:
-
-```bash
-pytest tests/ -q
-```
-
-All tests are pure unit tests - no network calls, no file system side effects outside `tmp_path`.
+Registry suffixes merge into the core tables at import time so `collect_files` and both parity oracles stay untouched.

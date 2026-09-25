@@ -75,7 +75,9 @@ def run_language_resolvers(
     exercise the driver in isolation.
     """
     active = _REGISTRY if resolvers is None else resolvers
-    suffixes_present = {p.suffix for p in paths}
+    # Casefold suffixes so ERR.LSP matches .lsp resolvers. Paths may have
+    # mixed-case extensions (AutoCAD-style), while resolvers register lowercase.
+    suffixes_present = {p.suffix.lower() for p in paths}
     for resolver in active:
         if not (resolver.suffixes & suffixes_present):
             continue

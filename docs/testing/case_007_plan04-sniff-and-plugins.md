@@ -121,3 +121,63 @@ a `.r` dependency gives no edge. No edge in the run dangles.
   (`build/PublicSDK/PreCompileHeader`). Upstream salts the two file ids apart
   (with the path) before the language resolvers run; the resolver reads each
   ref's source id back from the node, so the edges follow the salted ids.
+
+## cargo (S10, T29.3)
+
+**Date:** 2026-09-25
+**Branch:** `lang-cargo` (off `lang-bmake` `483d6ae`); engine hook `d3d052d`, plugin `1e8244c`
+**Fork:** `/home/p4ndr/repos/graphify-lang/.venv` (editable fork; augment `graphify_lang/cargo`, kind `augment` on `.toml`, `[match]` filename `Cargo.toml`)
+**Corpus HEADs:** moxide `a234d74`, oa-graph `c36fa1c`, oag-dev `6aff8c3`, tmllm `1c950f3`, llm-linter-tool `4123a92`, comment-sidecar `dd93c0d`
+**Instrument:** per repo, `_get_extractor(Path(...))(Path(...))` on each `Cargo.toml` outside `target/`, compared with `extract_package_manifest(Path(...))`; truth = `cargo metadata --no-deps --offline --format-version 1` `workspace_members` (cargo 1.97.1), run in the workspace root.
+**Test suite:** `.venv/bin/python -m pytest tests/ -q` → 6102 passed, 14 skipped.
+
+### Start point (D9)
+
+`_get_extractor` sends `Cargo.toml` to `extract_package_manifest` by file name,
+before `_DISPATCH`. Measured on the corpus before the augment:
+
+| Manifest | Nodes | Edges |
+|:--|:--|:--|
+| virtual workspace root (`moxide/Cargo.toml`, `oa-graph/engine/Cargo.toml`) | 0 | 0 |
+| member crate (`moxide/crates/mox_core/Cargo.toml`) | 1 (`pkg_mox_core`, `type=package`) | 16 `depends_on` to `pkg_<dep key>` (runtime deps only) |
+
+A path or workspace dependency on a sibling crate already lands on that
+crate's `pkg_` node (ids are keyed by name). External crates get an edge that
+the build prunes, so they disappear. No workspace node, no member edges.
+
+### Workspace members against cargo
+
+| Repo | Cargo.toml files | `has_member` edges | cargo `workspace_members` | Equal |
+|:--|--:|--:|--:|:--|
+| moxide | 17 | 16 | 16 | yes |
+| oa-graph (`engine/`) | 6 | 5 | 5 | yes |
+| oag-dev (`engine/`) | 6 | 5 | 5 | yes |
+| tmllm | 1 | 0 | 1 | no workspace: see below |
+| llm-linter-tool | 1 | 0 | 1 | no workspace: see below |
+| comment-sidecar | 0 | - | - | no `Cargo.toml` (Python repo) |
+
+tmllm and llm-linter-tool have no `[workspace]` table; cargo reports the root
+package as the one member of an implicit workspace. The augment adds a
+workspace node only for a `[workspace]` table, so these two get none.
+
+### Other additions
+
+| Addition | Count |
+|:--|--:|
+| workspace nodes (`cargo_workspace_<dir>`) | 3 |
+| crate nodes with `external_deps` / names listed: moxide | 45 names |
+| oa-graph / oag-dev | 23 / 23 names |
+| tmllm / llm-linter-tool | 14 / 17 names |
+| `depends_on` edges for a path dep renamed with `package =` | 0 (none in the corpus; fixture pinned) |
+
+On every corpus `Cargo.toml` the base nodes (minus the new `external_deps`
+key) and base edges are unchanged. `pyproject.toml`: 3 files under `~/repos`,
+`_get_extractor` returns `extract_package_manifest` itself and the JSON is
+byte-identical. In a full `extract()` over moxide's 17 manifests, all 16
+`has_member` targets are nodes.
+
+### Known limits
+
+- The workspace node id is `cargo_workspace_<dir name>`: two workspaces with
+  the same directory name in one graph share a node.
+- Dev- and build-dependencies stay out, as in core (runtime scope).

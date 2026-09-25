@@ -67,10 +67,10 @@ def test_out_of_scope_unchanged(path):
     assert _get_extractor(path)(path) == extract_markdown(path)
 
 
-def _graph():
+def _graph(cache):
     paths = (sorted(DOCS.glob("*.md")) + [FIXTURE / "scripts" / "tool.ps1", FIXTURE / "README.md",
              FIXTURE / "agents" / "ag-x.md", FIXTURE / "skills" / "s" / "SKILL.md"])
-    res = extract(paths)
+    res = extract(paths, cache_root=cache)   # the AST cache key does not cover plugin code
     label = {n["id"]: Path(n["source_file"]).name for n in res["nodes"] if n.get("source_file")}
     page = {Path(n["source_file"]).name: n for n in res["nodes"] if n.get("node_kind") == "page"}
     edges = sorted((label[e["source"]], label[e["target"]], e["relation"], e.get("context"))
@@ -78,8 +78,8 @@ def _graph():
     return edges, page
 
 
-def test_resolved_edges_and_dangling():
-    edges, page = _graph()
+def test_resolved_edges_and_dangling(tmp_path):
+    edges, page = _graph(tmp_path)
     assert edges == [
         ("README.md", "cc-XX000.000.md", "cites", "cc_ref"),
         ("README.md", "tool.ps1", "cites", "code_ref"),

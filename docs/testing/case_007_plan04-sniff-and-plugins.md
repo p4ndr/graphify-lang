@@ -381,14 +381,14 @@ variant: `base` (every element off), `all`, and `all` minus one element
 (`GRAPHIFY_CC_KB_OFF`). A cell is the position of the first node from the
 relevant doc among the NODE lines, or `-` when none is in the output.
 
-| Question | Relevant doc | base | all | no attrs | no cc_ref | no hub_spoke | no code_ref |
-|:--|:--|--:|--:|--:|--:|--:|--:|
-| Q1 where is db.ps1 write ownership documented | `cc-SY050.001` | - | 7 | 7 | 9 | 7 | - |
-| Q2 which docs reference cc-SY050.000 | `cc-SY050.000` | 54 | 17 | 17 | 31 | 17 | 15 |
-| Q2 docs citing `cc-SY050.000` in the output (of 40) | | 5 | 17 | 17 | 11 | 16 | 14 |
-| Q3 what is the retrieval spec | `cc-SY060.000` | - | - | - | - | - | - |
-| Q4 which hub lists the style guides | `cc-SG000.000` | 2 | 2 | 2 | 2 | 2 | 2 |
-| Q5 what documents the graphify skip hook | `cc-SY010.007` | - | 8 | 8 | 12 | 8 | - |
+| Question | Relevant doc | base | all | no attrs | no cc_ref | no hub_spoke | no code_ref | all + D11 |
+|:--|:--|--:|--:|--:|--:|--:|--:|--:|
+| Q1 where is db.ps1 write ownership documented | `cc-SY050.001` | - | 7 | 7 | 9 | 7 | - | 7 |
+| Q2 which docs reference cc-SY050.000 | `cc-SY050.000` | 54 | 17 | 17 | 31 | 17 | 15 | 18 |
+| Q2 docs citing `cc-SY050.000` in the output (of 40) | | 5 | 17 | 17 | 11 | 16 | 14 | 16 (+2 root, of 2) |
+| Q3 what is the retrieval spec | `cc-SY060.000` | - | - | - | - | - | - | - |
+| Q4 which hub lists the style guides | `cc-SG000.000` | 2 | 2 | 2 | 2 | 2 | 2 | 2 |
+| Q5 what documents the graphify skip hook | `cc-SY010.007` | - | 8 | 8 | 12 | 8 | - | 9 |
 
 No element pushes a relevant node out of the budget, so all four are kept.
 `code_ref` gives the Q1 and Q5 hits; `cc_ref` moves Q1, Q2 and Q5 up;
@@ -398,10 +398,38 @@ except Q3, whose start nodes are the `Retrieval` heading of `PROMPT-BASE.md`
 and a graphify skill reference: `PROMPT-BASE.md` names `cc-SY060.000` but is
 not a `docs/cc-*.md` file, so the augment does not read it.
 
+### D11: root, agent and skill files (`9aa125f`)
+
+The augment also reads the root `*.md`, `agents/**/*.md` and
+`skills/**/*.md` files of a harness root, a folder whose `docs/` holds a
+`cc-*.md` file. It adds `cc_ref` and `code_ref` edges from their page nodes;
+attributes and `hub_spoke` stay on `docs/cc-*.md`. The `[match]` glob is
+`*.md`, because a glob matches at any folder depth; the augment scopes each
+file and returns nothing for any other `.md`. Same scratch copy and build as
+above (`all + D11`):
+
+| Check | Result |
+|:--|:--|
+| Edges | 22863 (`all` 22538): `cc_ref` 1776 (1555), `code_ref` 1088 (984), `hub_spoke` 241 (241) |
+| New edges by source | agents 104 `cc_ref` + 26 `code_ref`, skills 101 + 76, root (`CLAUDE.md`, `CROSS-HOST.md`, `PROMPT-BASE.md`) 16 + 19; 72 files |
+| `all` edges kept | 22521 of 22538; the other 17 pairs are joined by the reverse edge (an agent or skill file citing the doc that cites its path), one edge per pair |
+| Base nodes, with and without | identical (15972) after removing the added keys and `community`; base edges kept (19758) |
+| `cc_id` outside `docs/cc-*.md`; `hub_spoke` from a non-doc | 0; 0 |
+| Second `graphify update`, `PROMPT-BASE.md` edited | edge counts unchanged |
+| D10 for the new file set (`~/.claude/graphify-out`, read-only) | 131 files: 130 in the graph via AST, 0 semantic-backed, 1 not in the graph |
+| Non-harness repos (git-tracked copy, all on against all off) | tmllm: 4601 nodes, 11609 edges, 0 extra edges. graphify-lang: 19214 nodes, 14 extra edges, all from its `.claude/docs/cc-*.md` (T30 scope) and the `tests/lang/fixtures/cc_kb` fixture tree. Base nodes identical in both |
+
+Q3 is still not reached. `PROMPT-BASE.md` now cites `cc-SY060.000`, but the
+edge is on its page node, and the query starts at the `Retrieval` heading:
+`Retrieval` <- H1 <- `PROMPT-BASE.md` -> `cc-SY060.000.md` is 3 hops, and
+the default traversal depth is 2. Q2 now shows the 2 root citers of
+`cc-SY050.000` (`CLAUDE.md`, `PROMPT-BASE.md`) in the budget, which moves the
+doc from 17 to 18 and one `docs/` citer out.
+
 ### Known limits
 
-- Only `docs/cc-*.md` is read. Root files that cite the KB (`CLAUDE.md`,
-  `PROMPT-BASE.md`, agents, skills) add no `cc_ref` edge (the Q3 miss).
+- Mention edges start at the page node, not at the heading whose section
+  holds the mention (the Q3 miss: 3 hops from a heading start node).
 - An incremental update resolves the changed docs against the whole graph,
   but a new hub gets its `contains` edges only when each spoke is next
   extracted (the edge is owned by the spoke's file).

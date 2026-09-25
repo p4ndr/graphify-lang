@@ -348,9 +348,12 @@ def _augment_plugin(tmp_path: Path, suffix: str, glob: str) -> None:
 def test_augment_adds_without_changing_base(clean_registry, tmp_path):
     from graphify.extract import extract_markdown
     _augment_plugin(tmp_path, ".md", "docs/cc-*.md")
-    wrapped = registry.dispatch_table({".md": extract_markdown})[".md"]
-    assert wrapped.__name__ == "augmented[.md]"
+    assert ".md" not in registry.dispatch_table({".md": extract_markdown})  # per path
     doc = _file(tmp_path, "docs/cc-XX000.001.md", "# Title\n\n## Section\n\nSee cc-XX000.000.\n")
+    assert registry.augment_extractor(doc, extract_markdown).__name__ == "augmented[.md]"
+
+    def wrapped(p):
+        return registry.augment_extractor(p, extract_markdown)(p)
     base, got = extract_markdown(doc), wrapped(doc)
     base_ids = [n["id"] for n in base["nodes"]]
     assert [n["id"] for n in got["nodes"]] == base_ids + [f"stub_kb_{doc.stem}"]
@@ -367,7 +370,10 @@ def test_augment_adds_without_changing_base(clean_registry, tmp_path):
 def test_augment_composes_with_router(clean_registry, tmp_path):
     registry._register_manifest(_manifest(tmp_path))
     _augment_plugin(tmp_path, ".cls", "**/*.cls")
-    wrapped = registry.dispatch_table({".cls": extract_apex})[".cls"]
+    router = registry.dispatch_table({".cls": extract_apex})[".cls"]
+
+    def wrapped(p):
+        return registry.augment_extractor(p, router)(p)
     got = wrapped(FIXTURES / "vba_class.cls")
     assert [n["label"] for n in got["nodes"]] == ["vba", "extra"]
     apex = wrapped(FIXTURES / "apex_class.cls")
@@ -438,6 +444,6 @@ def test_augment_failure_keeps_base(clean_registry, tmp_path, caplog):
     registry._register_manifest(replace(m, augment=boom))
     doc = _file(tmp_path, "docs/cc-XX000.001.md", "# Title\n")
     with caplog.at_level(logging.WARNING):
-        got = registry.dispatch_table({".md": extract_markdown})[".md"](doc)
+        got = registry.augment_extractor(doc, extract_markdown)(doc)
     assert got == extract_markdown(doc)
     assert "bad augment" in caplog.text

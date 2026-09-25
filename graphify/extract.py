@@ -6912,7 +6912,14 @@ def _get_extractor(path: Path) -> Any | None:
         interp = _shebang_interpreter(path)
         if interp is not None:
             return _SHEBANG_DISPATCH.get(interp)
-    return _DISPATCH.get(suffix)
+    extractor = _DISPATCH.get(suffix)
+    if extractor is not None:
+        try:
+            import graphify.lang_registry
+            return graphify.lang_registry.augment_extractor(path, extractor)
+        except Exception:
+            pass
+    return extractor
 
 
 def _safe_extract_with_xaml_root(extractor, path: Path, root: Path) -> dict:

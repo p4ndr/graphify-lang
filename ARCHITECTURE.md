@@ -32,7 +32,7 @@ Signatures below are the real ones - `tests/test_architecture_doc.py` imports ev
 | `serve.py` | `serve(graph_path)`, `serve_http(graph_path, *, host, port, ...)` | graph file path → MCP stdio server / HTTP server |
 | `watch.py` | `watch(watch_path, debounce=3.0)`, `check_update(watch_path)` | directory → rebuild on change; `check_update` reports whether a re-extraction is pending |
 | `benchmark.py` | `run_benchmark(graph_path)` | graph file → corpus vs subgraph token comparison |
-| `lang_registry.py` | `apply_registry()`, `get_registry_suffixes()`, `get_registry_manifest(suffix)` | load language packages → registry suffixes set / manifest lookup |
+| `lang_registry.py` | `apply_registry()`, `get_registry_suffixes()`, `get_registry_manifest(suffix)`, `apply_dispatch()`, `claims_file(path)` | load language packages → registry suffixes set / manifest lookup; plugin extractors and sniff routers into `_DISPATCH`; per-path CODE claim for data suffixes |
 
 
 ### Calling `extract()` from your own code
@@ -87,5 +87,7 @@ Language packages can be registered via `graphify.lang_registry.apply_registry()
 1. Imports `graphify_lang.registry` (if available)
 2. Merges registered suffixes into `CODE_EXTENSIONS`, `extract._DISPATCH`, and `cli._HOOK_SOURCE_EXTS`
 3. Registers case variants (`.LSP` → `.lsp`) for robustness
+
+`apply_dispatch()` puts a `sniff_router[<suffix>]` in `_DISPATCH` when a plugin with a `[sniff]` or `[match]` shares a suffix with the built-in or another plugin, and an `augmented[<suffix>]` wrapper for an augment plugin. `classify_file` calls `claims_file(path)` before its extension test; suffixes claimed only through `[match]` stay out of `CODE_EXTENSIONS`.
 
 Registry suffixes merge into the core tables at import time so `collect_files` and both parity oracles stay untouched.

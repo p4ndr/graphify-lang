@@ -417,3 +417,12 @@ def test_hook_suffixes_union_all_manifests(clean_registry, tmp_path):
         augments=frozenset({".md"}), hook_suffixes=(".md",)))
     assert registry.hook_suffixes() == {".yml", ".yaml", ".md"}
     assert ".yml" not in registry.registered_suffixes()
+
+
+def test_augment_extra_keys_ride_along(clean_registry, tmp_path):
+    """A resolver payload key is carried; a key the base has is never replaced."""
+    m = LanguageManifest(name="kb", suffixes=frozenset(), extract=_stub("kb"),
+                         kind="augment", augments=frozenset({".md"}))
+    base = {"nodes": [], "edges": [], "raw_calls": ["base"]}
+    got = registry._merge(m, base, {"kb_refs": [1], "raw_calls": ["augment"]})
+    assert got["kb_refs"] == [1] and got["raw_calls"] == ["base"]

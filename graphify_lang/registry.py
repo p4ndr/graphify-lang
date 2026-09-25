@@ -414,7 +414,11 @@ def _merge(m: LanguageManifest, base: dict, extra: dict) -> dict:
             _LOG.info("augment %s: attr %s on %s kept (not overwritten)", m.name, key, node["id"])
         nodes[i] = {**node, **{k: v for k, v in add.items() if k not in node}}
     edges = list(base.get("edges", [])) + list(extra.get("edges", []))
-    return {**base, "nodes": nodes, "edges": edges}
+    # Any other key (a resolver payload such as ``<plugin>_refs``) rides along
+    # when the base result does not already carry it.
+    carried = {k: v for k, v in extra.items()
+               if k not in ("nodes", "edges", "attrs") and k not in base}
+    return {**base, **carried, "nodes": nodes, "edges": edges}
 
 
 def claims_file(path: Path) -> bool:

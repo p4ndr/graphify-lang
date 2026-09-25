@@ -37,41 +37,6 @@ This document is a LIVE file containing a list of TASKS to be carried out.
 - `[x]` T4.4 | Add one row to the `## Module responsibilities` table in `ARCHITECTURE.md` (test-pinned by `tests/test_architecture_doc.py`)
 - `[x]` T4.5 | Tests are subprocess-based wherever they compare with-plugin against without-plugin; SC2, SC3, SC13, SC14 must pass and `guard-core` must show exactly four files
 
-### `[~]` T5 | S005 (autolisp) Rules runtime and manifest templates — plan §S005
-
-- `[x]` T5.1 | Check in the corpus file list generated from the S001-pinned SHA
-- `[ ]` T5.2 | graphify_lang/rules.py: `build(manifest_path, manifest)` returning the `Callable[[Path], dict]`
-- `[ ]` T5.3 | queries.py (F7, tree-sitter tag queries) and regex_rules.py (F8, full key set) as the two rule tiers
-- `[ ]` T5.4 | builtins.py reads `builtins_file` (one name per line, `#` comments); Python hooks via `[extract.python] post_file = "module:fn"`
-- `[ ]` T5.5 | Emission contract: `file_type: "code"`, kind in `node_kind`, ids from `base._file_stem`, line number appended on collision
-- `[ ]` T5.6 | Ship `templates/{programming,markup,prose}.toml` (F11)
-
-### `[~]` T6 | S006 (autolisp) AutoLISP nodes — plan §S006
-
-- `[x]` T6.1 | graphify_lang/autolisp/graphify-lang.toml per SRS §6.3, and cap the extra at `tree-sitter-commonlisp>=0.4.1,<0.5`
-- `[ ]` T6.2 | queries/tags.scm with two definition rules, not one — `[(sym_lit) (package_lit)]` is what captures all 27 defuns
-- `[x]` T6.3 | data/builtins.txt: the AutoLispExt union, shipped with its Apache-2.0 sidecar licence
-- `[ ]` T6.4 | `post_file` hook joins `package_lit` children into one symbol, so `err:trap` is one node
-- `[x]` T6.5 | Fixtures under tests/lang/fixtures/src/core/ — the tree must mirror the corpus path prefix or every asserted id breaks
-- `[x]` T6.6 | Check in the measured collision set (11 groups) and meet SC4 (27 distinct function nodes from `err.lsp`) and SC5 (the three `C:` commands)
-
-### `[~]` T7 | S007 (autolisp) AutoLISP edges and the cross-file resolver — plan §S007
-
-- `[x]` T7.1 | Define the unresolved-call contract shared by F13 and F14
-- `[x]` T7.2 | Apply the structural exclusions on the reference rule first; binding forms never yield a `calls` edge for their bound position
-- `[x]` T7.3 | Quoted function references (`'name`) are `calls`
-- `[ ]` T7.4 | `loads` from a literal `load` path (EXTRACTED) and from the `err:safe-load` wrapper; `module_depends` from `@depends`; `sidecar_doc` from `@sidecar`/`@doc`; stamp `target_file` on every cross-file edge
-- `[x]` T7.5 | resolve.py: a `LanguageResolver` covering `.lsp`, `.mnl` and `.dcl`
-- `[x]` T7.6 | Run `analyze.god_nodes` over the corpus and check the top 10 are real; meet SC6a (`err:trap` has at least one inbound cross-file `calls` edge) and SC7
-
-### `[~]` T8 | S008 (autolisp) DCL and MNL — plan §S008
-
-- `[x]` T8.1 | graphify_lang/autolisp/dcl.toml as a second manifest, not a second package
-- `[ ]` T8.2 | Four regex rules, including the `pop` rule — without it nested tiles attach to the wrong dialog, which is a real defect
-- `[x]` T8.3 | AutoLISP side: `dcl_references` (function → dialog) from `new_dialog`, and `dcl_action` from `action_tile`
-- `[ ]` T8.4 | Authored fixtures for what the corpus cannot supply: `@include`, `defun-q`, direct `(load "x")` and `.mnl`
-- `[x]` T8.5 | Claim `.mnl` as an AutoLISP suffix (F16); meet SC6b (at least one `dcl_references` edge into `lithp_mgr`)
-
 ### `[x]` T9 | S009 (autolisp) Packaging, hook and watch coverage, recorded measurements — plan §S009
 
 - `[x]` T9.1 | Append the plugin to `[tool.setuptools] packages` (graphify_lang.autolisp added to packages list)
@@ -87,3 +52,9 @@ This document is a LIVE file containing a list of TASKS to be carried out.
 - `[ ]` T10.3 | Cite issues #3180 and #1070, which both ask for exactly this
 - `[ ]` T10.4 | Include the `run_language_resolvers` casefold as a separate small fix
 - `[ ]` T10.5 | Expect to carry the registry indefinitely; plan accordingly
+
+### `[ ]` T31 | P04-E Release, rebuild graphs, docs — plan 04 S15-S17
+
+- `[ ]` T31.1 | S15 Merge branches, tag v0.9.67+lang.3, build wheel, pipx install --force
+- `[ ]` T31.2 | S16 Back up graph.json, clear cache/ast, graphify update for 12 corpus repos + ~/.claude
+- `[ ]` T31.3 | S17 Learnings; update $CLAUDE_HOME/CLAUDE.md graphify paragraph

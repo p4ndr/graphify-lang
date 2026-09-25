@@ -71,3 +71,7 @@ Approved 2026-09-24 after case 005 (docs/testing/case_005_rerun-fork-vs-stock.md
 ## D-006 — Add a `graphify lang list` subcommand (reverses plan 01 out-of-scope note)
 
 Owner decision 2026-09-24, settling legacy P7-P13 (7 copies of SRS F26 / F18.4-F18.10). The subcommand lists registered languages, suffixes, grammar and resolver. It is a core edit in graphify/cli.py and must be try-wrapped like the other registry call sites. Tracked as T26.3.
+
+## D-008 — The regex rules runtime is kept as a fallback/utility layer; language plugins use purpose-built extractors and do not depend on it.
+
+Option 2: repair the regex rules runtime to the S005 emission contract and keep it as a fallback/utility layer; new plugins use their own extractors and may call it. (owner, 2026-09-25). Settles P16: Keep, repair or retire the generic TOML rules runtime (graphify_lang/rules.py, queries.py, regex_rules.py, builtins.py, templates/)?

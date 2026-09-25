@@ -15,6 +15,69 @@ This document is a LIVE file containing a list of TASKS that have been carried o
 
 ## 3. TASK LIST
 
+### `[x]` T30 | P04-D (lang-cc-kb) KB markdown augment and value test — plan 04 S13-S14
+
+- `[x]` T30.1 | S13 cc-* links, class/group attrs + hub->spoke, cc_id key, backtick code-path edges; run on ~/.claude/docs and claude-config
+- `[x]` T30.2 | S14 Value test: 5 fixed queries with/without each element; drop noisy elements; write docs/testing/case_005_plan04-sniff-and-plugins.md
+
+### `[x]` T29 | P04-C Language plugins, one branch each — plan 04 S8-S12
+
+- `[x]` T29.1 | S8 lang-vba: VBA extractor + resolver; corpus BentleyTools, bentley-model-management, bim-chk; Apex sample.cls unchanged
+- `[x]` T29.2 | S9 lang-bmake: .mki/.mke extractor; corpus BentleyHelp
+- `[x]` T29.3 | S10 lang-cargo: Cargo.toml extractor; check vs cargo metadata --no-deps on 6 Rust repos
+- `[x]` T29.4 | S11 lang-astgrep: rule/test/snapshot extractor; corpus llm-linter-tool
+- `[x]` T29.5 | S12 lang-ecschema: <ECSchema root only; corpus BentleyHelp, bentley-pyplace
+
+### `[x]` T8 | S008 (autolisp) DCL and MNL — plan §S008
+
+- `[x]` T8.1 | graphify_lang/autolisp/dcl.toml as a second manifest, not a second package
+- `[x]` T8.2 | Four regex rules, including the `pop` rule — without it nested tiles attach to the wrong dialog, which is a real defect
+- `[x]` T8.3 | AutoLISP side: `dcl_references` (function → dialog) from `new_dialog`, and `dcl_action` from `action_tile`
+- `[x]` T8.4 | Authored fixtures for what the corpus cannot supply: `@include`, `defun-q`, direct `(load "x")` and `.mnl`
+- `[x]` T8.5 | Claim `.mnl` as an AutoLISP suffix (F16); meet SC6b (at least one `dcl_references` edge into `lithp_mgr`)
+
+### `[x]` T7 | S007 (autolisp) AutoLISP edges and the cross-file resolver — plan §S007
+
+- `[x]` T7.1 | Define the unresolved-call contract shared by F13 and F14
+- `[x]` T7.2 | Apply the structural exclusions on the reference rule first; binding forms never yield a `calls` edge for their bound position
+- `[x]` T7.3 | Quoted function references (`'name`) are `calls`
+- `[x]` T7.4 | `loads` from a literal `load` path (EXTRACTED) and from the `err:safe-load` wrapper; `module_depends` from `@depends`; `sidecar_doc` from `@sidecar`/`@doc`; stamp `target_file` on every cross-file edge
+- `[x]` T7.5 | resolve.py: a `LanguageResolver` covering `.lsp`, `.mnl` and `.dcl`
+- `[x]` T7.6 | Run `analyze.god_nodes` over the corpus and check the top 10 are real; meet SC6a (`err:trap` has at least one inbound cross-file `calls` edge) and SC7
+
+### `[x]` T6 | S006 (autolisp) AutoLISP nodes — plan §S006
+
+- `[x]` T6.1 | graphify_lang/autolisp/graphify-lang.toml per SRS §6.3, and cap the extra at `tree-sitter-commonlisp>=0.4.1,<0.5`
+- `[x]` T6.2 | queries/tags.scm with two definition rules, not one — `[(sym_lit) (package_lit)]` is what captures all 27 defuns
+- `[x]` T6.3 | data/builtins.txt: the AutoLispExt union, shipped with its Apache-2.0 sidecar licence
+- `[x]` T6.4 | `post_file` hook joins `package_lit` children into one symbol, so `err:trap` is one node
+- `[x]` T6.5 | Fixtures under tests/lang/fixtures/src/core/ — the tree must mirror the corpus path prefix or every asserted id breaks
+- `[x]` T6.6 | Check in the measured collision set (11 groups) and meet SC4 (27 distinct function nodes from `err.lsp`) and SC5 (the three `C:` commands)
+
+### `[x]` T5 | S005 (autolisp) Rules runtime and manifest templates — plan §S005
+
+- `[x]` T5.1 | Check in the corpus file list generated from the S001-pinned SHA
+- `[x]` T5.2 | graphify_lang/rules.py: `build(manifest_path, manifest)` returning the `Callable[[Path], dict]`
+- `[x]` T5.3 | queries.py (F7, tree-sitter tag queries) and regex_rules.py (F8, full key set) as the two rule tiers
+- `[x]` T5.4 | builtins.py reads `builtins_file` (one name per line, `#` comments); Python hooks via `[extract.python] post_file = "module:fn"`
+- `[x]` T5.5 | Emission contract: `file_type: "code"`, kind in `node_kind`, ids from `base._file_stem`, line number appended on collision
+- `[x]` T5.6 | Ship `templates/{programming,markup,prose}.toml` (F11)
+
+### `[x]` T28 | P04-B (lang-rules) Repair the regex rules runtime to the S005 emission contract — plan 04 S7, P16 option 2
+
+- `[x]` T28.1 | File node, label/source_file/file_type, _file_stem ids, line suffix on clashes, @reference call edges, builtins filter
+- `[x]` T28.2 | Query tier fails loudly; templates/ in package data
+- `[x]` T28.3 | Replace vacuous checks in tests/lang/test_rules.py; rules-based DCL run matches extract_dcl
+
+### `[x]` T27 | P04-A (lang-sniff) Sniff router, detect hook, augment kind — plan 04 S1-S6
+
+- `[x]` T27.1 | S1 Red tests: tests/fixtures/sniff/*.cls (VBA, VBA BOM+CRLF, Apex, Apex with VB comment, empty, binary) + tests/test_lang_sniff.py
+- `[x]` T27.2 | S2 Manifest schema: [sniff], [match], kind/augments keys, validation errors
+- `[x]` T27.3 | S3 Registry claimant table, sniff router in _DISPATCH, tie warning, lang list sniff/shared columns
+- `[x]` T27.4 | S4 Detect hook for [match] data suffixes (.yml/.toml/.xml), unmatched files unchanged
+- `[x]` T27.5 | S5 Augment kind: wrapper, merge rules, composed with router; stub .md augment test
+- `[x]` T27.6 | S6 README/ARCHITECTURE/plan 01 T10 notes; tag v0.9.67+lang.2
+
 ### `[x]` T26 | Settled items follow-up: fork version string (P9), restore detect.py (P10), `graphify lang list` subcommand (P7-P13)
 
 - `[x]` T26.1 | P9: set fork package version to 0.9.55+lang.1 so the AST cache dir differs from stock; verify stock and fork no longer read each other's entries; then close T24.2

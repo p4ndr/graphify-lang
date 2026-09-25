@@ -395,6 +395,27 @@ python3 -m venv ~/.venvs/graphify-lang
 graphifyy` as upstream's route, and `pipx install -e .` is the equivalent
 here if a second CLI is wanted on `PATH`.
 
+## Installing the fork
+
+Since 2026-09-25 the pipx venv `~/.local/share/pipx/venvs/graphifyy` runs this
+fork in place of stock graphify (plan 03). The venv name is unchanged, so the
+MCP entries in `~/.claude.json` and `~/.omp/agent/mcp.json` need no edit. To
+release a new version:
+
+```bash
+git fetch upstream && git rebase upstream/v8        # on autolisp; then pytest tests/ -q
+# bump version in pyproject.toml (e.g. 0.9.68+lang.1), commit
+git tag -a v<version> -m "graphify-lang <version>" && git push origin autolisp v<version>
+rm -rf dist && uv build --wheel
+cp dist/*.whl ~/.local/share/graphify-lang/wheels/
+pipx install --force "graphifyy[mcp,commonlisp] @ file://$HOME/.local/share/graphify-lang/wheels/graphifyy-<version>-py3-none-any.whl"
+~/.local/share/pipx/venvs/graphifyy/bin/python -c "from graphify.install import _copy_skill_file; _copy_skill_file('claude')"
+```
+
+Do not run `graphify install` or `graphify claude install` from `$HOME`: it
+rewrites the shared `settings.json`. Rollback to stock:
+`pipx install --force "graphifyy[mcp,commonlisp]==0.9.55"`.
+
 ## Status
 
 No code yet. As of 2026-09-07 the fork consists of this README, the moved

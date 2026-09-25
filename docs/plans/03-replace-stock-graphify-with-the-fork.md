@@ -2,7 +2,7 @@
 
 Replace the pipx `graphifyy 0.9.55` install with a pinned build of this fork, rebased on `upstream/v8`, and rebuild the graph of every graphed repo on this host.
 
-- Status: DRAFT
+- Status: DONE
 - Created: 2026-09-25
 - Tasks: <TASK numbers in docs/30-TODO.md, when ACTIVE>
 

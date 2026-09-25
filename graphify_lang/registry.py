@@ -369,8 +369,14 @@ def _augmented(suffix: str, inner: Callable[[Path], dict],
         result = inner(path)
         head = _head_reader(path, size)
         for m in augmenters:
-            if _sniff_score(m, path, head) is not None:
-                result = _merge(m, result, m.augment(path, result) or {})
+            if _sniff_score(m, path, head) is None:
+                continue
+            try:
+                extra = m.augment(path, result) or {}
+            except Exception as exc:  # an augment bug must not cost the base result
+                _LOG.warning("augment %s failed on %s: %s", m.name, path, exc)
+                continue
+            result = _merge(m, result, extra)
         return result
     augmented.__name__ = augmented.__qualname__ = f"augmented[{suffix}]"
     return augmented

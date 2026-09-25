@@ -1,8 +1,10 @@
 """Content-sniff router for suffixes that a plugin shares (plan 04 §3.1, S1/S3).
 
-The VBA manifest here is test-only: a `[sniff]` table and a stub extractor that
-returns one marker node. The real VBA plugin is T29. `.cls` is the shared
-suffix: the built-in claimant is `extract_apex`.
+Routing per fixture runs the real `vba-cls` manifest (`graphify_lang/vba`,
+plan 04 S8). The engine tests (ties, `head_bytes`, priorities) keep a
+test-only manifest with a stub extractor that returns one marker node, because
+they vary the priority and the window. `.cls` is the shared suffix: the
+built-in claimant is `extract_apex`.
 """
 from __future__ import annotations
 
@@ -75,6 +77,15 @@ def _is_stub(result: dict, tag: str = "vba") -> bool:
     return [n.get("label") for n in result["nodes"]] == [tag]
 
 
+def _real_vba_cls() -> LanguageManifest:
+    from graphify_lang.vba import _get_manifest
+    return next(m for m in _get_manifest() if m.name == "vba-cls")
+
+
+def _is_vba(result: dict) -> bool:
+    return any(n.get("node_kind") == "class" for n in result["nodes"])
+
+
 @pytest.mark.parametrize("fixture, to_vba", [
     ("vba_class.cls", True),               # headerless: body rules only (R1)
     ("vba_class_bom_crlf.cls", True),      # BOM stripped before ^, CRLF lines
@@ -83,12 +94,12 @@ def _is_stub(result: dict, tag: str = "vba") -> bool:
     ("empty.cls", False),
     ("binary.cls", False),                 # NUL bytes: never sniffed as text
 ])
-def test_routing_per_fixture(clean_registry, tmp_path, fixture, to_vba):
-    route = _router(_manifest(tmp_path))
+def test_routing_per_fixture(clean_registry, fixture, to_vba):
+    route = _router(_real_vba_cls())
     path = FIXTURES / fixture
     result = route(path)
     if to_vba:
-        assert _is_stub(result)
+        assert _is_vba(result)
     else:
         assert result == extract_apex(path)
 
@@ -149,13 +160,14 @@ def test_get_extractor_uses_router(clean_registry, tmp_path, monkeypatch):
     assert extract._get_extractor(apex)(apex) == extract_apex(apex)
 
 
-def test_measured_start_point_vba_is_not_apex(clean_registry, tmp_path):
+def test_measured_start_point_vba_is_not_apex(clean_registry):
     """A real exported workbook class goes to the plugin (plan 04 §1)."""
     home = Path(os.path.expanduser(f"~{getpass.getuser()}"))  # conftest sandboxes HOME
     path = home / "repos/bim-chk/src/document/ThisWorkbook.cls"
     if not path.is_file():
         pytest.skip("bim-chk corpus not on this host")
-    assert _is_stub(_router(_manifest(tmp_path))(path))
+    result = _router(_real_vba_cls())(path)
+    assert _is_vba(result) and len(result["nodes"]) > 1
 
 
 # --- manifest schema (plan 04 S2) -------------------------------------------
@@ -223,7 +235,7 @@ def test_lsp_override_unchanged():
     import graphify.extract as extract
     from graphify_lang.autolisp import extract_autolisp
     assert extract._DISPATCH[".lsp"] is extract_autolisp
-    assert extract._DISPATCH[".cls"] is extract_apex
+    assert extract._DISPATCH[".cls"].__name__ == "sniff_router[.cls]"  # vba-cls, plan 04 S8
 
 
 # --- detect hook for [match] data suffixes (plan 04 S4, §3.2) -----------------

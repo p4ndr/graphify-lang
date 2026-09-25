@@ -151,3 +151,11 @@ def test_corpus_rules_and_tests(tmp_path):
     per_rule = Counter(e["source"] for e in graph["edges"] if e["relation"] == "tested_by")
     assert {r["id"]: per_rule[r["id"]] for r in rules if r["label"] in tests} == \
         {r["id"]: 1 for r in rules if r["label"] in tests}
+
+
+def test_hook_set_has_data_and_plugin_suffixes():
+    """A .yml / .xml edit rebuilds the graph; neither becomes a code suffix."""
+    import graphify.cli
+    from graphify.detect import CODE_EXTENSIONS
+    assert {".yml", ".xml", ".mke", ".frm"} <= set(graphify.cli._HOOK_SOURCE_EXTS)
+    assert CODE_EXTENSIONS.isdisjoint({".yml", ".yaml", ".xml"})

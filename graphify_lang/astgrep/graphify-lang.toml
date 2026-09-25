@@ -8,6 +8,7 @@ schema = 1
 name = "astgrep"
 type = "data"
 suffixes = [".yml", ".yaml"]
+hook_suffixes = [".yml", ".yaml"]
 
 # Directory names are ast-grep's `sg new` defaults (ruleDirs = rules,
 # testDir = rule-tests, utilDirs = utils).

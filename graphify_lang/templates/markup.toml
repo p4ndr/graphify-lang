@@ -22,7 +22,7 @@ case_insensitive = true
 
 [grammar]
 # Tree-sitter grammar module
-module = "tree-sitter-markup"
+module = "tree_sitter_markup"
 
 # Language function name
 language_fn = "language"
@@ -40,13 +40,6 @@ runtime = "graphify_lang.rules"
 # Optional: Python hooks
 # post_file = "module:fn"
 
-[node_kind]
-# Define markup node kinds
-# element = "element"
-# attribute = "attribute"
-# text = "text"
-
-[edge_kind]
-# Define markup relations
-# contains = "contains"
-# references = "references"
+# Node kinds and relations are not declared in a table: the query tier takes
+# them from the capture names (@definition.<node_kind>, @reference.<relation>)
+# and the regex tier from each rule's `node = "<kind>"` / `edge = "<relation>"`.

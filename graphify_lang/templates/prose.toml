@@ -25,7 +25,7 @@ case_insensitive = true
 
 [grammar]
 # Tree-sitter grammar module
-module = "tree-sitter-markdown"
+module = "tree_sitter_markdown"
 
 # Language function name
 language_fn = "language"
@@ -40,15 +40,6 @@ runtime = "graphify_lang.rules"
 # NOTE: section/reference/entity node kinds are not yet implemented (F20).
 # These are reserved for future prose-specific extraction tiers.
 
-[node_kind]
-# Basic prose node kinds
-# heading = "heading"
-# paragraph = "paragraph"
-# list = "list"
-# code_block = "code_block"
-# quote = "quote"
-
-[edge_kind]
-# Basic prose relations
-# contains = "contains"
-# references = "references"
+# Node kinds and relations are not declared in a table: the query tier takes
+# them from the capture names (@definition.<node_kind>, @reference.<relation>)
+# and the regex tier from each rule's `node = "<kind>"` / `edge = "<relation>"`.

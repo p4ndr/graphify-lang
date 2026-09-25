@@ -8,12 +8,17 @@ when present. ``cc_id`` is the join key to ``kb.db``; no DB is read here.
 
 The cross-file part (doc -> doc mentions, hub -> spoke, doc -> code file)
 needs the whole corpus, so the result carries a ``cc_kb_refs`` payload that
-``resolve.py`` consumes:
+``resolve.py`` consumes. Scope (D6, D11): a ``docs/cc-*.md`` doc, and the
+root ``*.md``, ``agents/**/*.md`` and ``skills/**/*.md`` files of a harness
+root, which is a folder whose ``docs/`` holds a ``cc-*.md`` file. Only
+``docs/cc-*.md`` docs get the attributes and hub -> spoke edges; any other
+``.md`` file is returned unchanged.
 
 - ``cc``: every ``cc-XXGGG.SSS[-SNNN]`` mention other than the doc itself,
   with the line of its first occurrence;
 - ``code``: every backticked path, optionally ``:line``, that is a file under
-  the repo root (the parent of ``docs/``), repo-relative, first line only.
+  the harness root, root-relative, first line only;
+- ``up``: the number of folders from the file up to the harness root.
   ``$CLAUDE_HOME/`` and ``~/.claude/`` prefixes are read as the repo root.
 
 ``GRAPHIFY_CC_KB_OFF`` (comma list of ``attrs``, ``cc``, ``hubs``, ``code``)
@@ -51,6 +56,27 @@ def parse_cc_id(name: str) -> dict | None:
     return attrs
 
 
+def _is_root(folder: Path) -> bool:
+    """A harness root: ``folder/docs`` holds a ``cc-*.md`` file."""
+    try:
+        return any(_NAME.fullmatch(e.name) for e in os.scandir(folder / "docs"))
+    except OSError:
+        return False
+
+
+def _scope(path: Path) -> tuple[Path, int, bool] | None:
+    """(harness root, folders up to it, is a ``docs/cc-*.md`` file) when in scope."""
+    parent = path.parent
+    if parent.name == "docs" and path.name.startswith("cc-") and _is_root(parent.parent):
+        return parent.parent, 2, True
+    if _is_root(parent):
+        return parent, 1, False
+    for up, folder in enumerate(path.parents, 1):
+        if folder.name in ("agents", "skills") and _is_root(folder.parent):
+            return folder.parent, up + 1, False
+    return None
+
+
 def _code_ref(span: str, root: Path) -> tuple[str, int | None] | None:
     text = span.strip().replace("\\", "/")
     for alias in _ROOT_ALIASES:
@@ -73,6 +99,10 @@ def _code_ref(span: str, root: Path) -> tuple[str, int | None] | None:
 
 def augment_cc_kb(path: Path, base: dict) -> dict:
     path = Path(path)
+    scope = _scope(path)
+    if scope is None:
+        return {}
+    root, up, kb_doc = scope
     page = next((i for i, n in enumerate(base.get("nodes", []))
                  if n.get("node_kind") == "page"), None)
     if page is None:
@@ -81,9 +111,8 @@ def augment_cc_kb(path: Path, base: dict) -> dict:
         lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError:
         return {}
-    me = parse_cc_id(path.name)
+    me = parse_cc_id(path.name) if kb_doc else None
     self_id = me["cc_id"] if me else None
-    root = path.parent.parent
     cc: dict[str, int] = {}
     code: dict[str, int] = {}
     fenced = False
@@ -103,8 +132,9 @@ def augment_cc_kb(path: Path, base: dict) -> dict:
     out: dict = {}
     if me and not off("attrs"):
         out["attrs"] = {base["nodes"][page]["id"]: me}
-    refs = {"node": page, "cc": [] if off("cc") else sorted(cc.items()),
-            "code": [] if off("code") else sorted(code.items()), "hubs": not off("hubs")}
-    if refs["cc"] or refs["code"] or (me and refs["hubs"]):
+    refs = {"node": page, "up": up, "cc": [] if off("cc") else sorted(cc.items()),
+            "code": [] if off("code") else sorted(code.items()),
+            "hubs": bool(me) and not off("hubs")}
+    if refs["cc"] or refs["code"] or refs["hubs"]:
         out["cc_kb_refs"] = refs
     return out

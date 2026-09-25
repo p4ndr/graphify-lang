@@ -1,16 +1,17 @@
 """cc-kb cross-file resolver (plan 04 §3.4, S13).
 
-Consumes the ``cc_kb_refs`` payload of each augmented ``cc-*.md`` result.
-Targets are found by file name, never by id scheme:
+Consumes the ``cc_kb_refs`` payload of each augmented result (a ``cc-*.md``
+doc, or a root, agent or skill ``.md`` file). The harness root is ``up``
+folders above the file. Targets are found by file name, never by id scheme:
 
-- a ``cc`` mention -> the page node of ``cc-<id>.md`` in the same ``docs/``
+- a ``cc`` mention -> the page node of ``cc-<id>.md`` in the root's ``docs/``
   folder (edge ``RELATION``,
   context ``cc_ref``); a mention with no such doc in the corpus goes to the
   ``dangling_cc_refs`` list on the citing page node;
 - ``hubs`` -> ``contains`` (context ``hub_spoke``) from the parent doc:
   ``cc-XXGGG.000`` for ``cc-XXGGG.SSS``, ``cc-XXGGG.SSS`` for its ``-SNNN``
   spoke. The edge is owned by the child's file;
-- a ``code`` path -> the file node of that path under the doc's repo root
+- a ``code`` path -> the file node of that path under the harness root
   (edge ``RELATION``, context ``code_ref``). A path that is not a graphed
   file adds nothing.
 
@@ -75,25 +76,28 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
         if isinstance(res, dict) and res.get("cc_kb_refs"):
             node = res["nodes"][res["cc_kb_refs"]["node"]]
             me = next((n for n in all_nodes if n.get("id") == node["id"]), node)
-            work.append((res["cc_kb_refs"], me, node.get("source_file", "")))
+            sf = node.get("source_file", "")
+            root = _norm(sf)
+            for _ in range(res["cc_kb_refs"].get("up", 2)):
+                root = posixpath.dirname(root)
+            work.append((res["cc_kb_refs"], me, sf, root))
 
     # Hub -> spoke first: a structural edge wins a pair over a mention.
-    for refs, me, sf in work:
+    for refs, me, sf, root in work:
         if refs.get("hubs"):
-            parent = docs.get((posixpath.dirname(_norm(sf)), _parent(str(me.get("label", ""))[:-3])))
+            parent = docs.get((posixpath.join(root, "docs"), _parent(str(me.get("label", ""))[:-3])))
             if parent is not None:
                 add(parent["id"], me["id"], "contains", "hub_spoke", sf, 1)
-    for refs, me, sf in work:
+    for refs, me, sf, root in work:
         dangling = []
         for cc_id, line in refs.get("cc", []):
-            target = docs.get((posixpath.dirname(_norm(sf)), cc_id))
+            target = docs.get((posixpath.join(root, "docs"), cc_id))
             if target is None:
                 dangling.append(cc_id)
             else:
                 add(me["id"], target["id"], RELATION, "cc_ref", sf, line)
         if dangling and "dangling_cc_refs" not in me:
             me["dangling_cc_refs"] = dangling
-        root = posixpath.dirname(posixpath.dirname(_norm(sf)))
         for rel, line in refs.get("code", []):
             target = files.get(_norm(posixpath.join(root, rel)))
             if target is not None:

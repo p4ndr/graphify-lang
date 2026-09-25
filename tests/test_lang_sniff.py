@@ -390,3 +390,18 @@ def test_augment_on_package_manifest_path(clean_registry, tmp_path):
     assert got["nodes"][-1]["id"] == f"stub_kb_{proj.stem}"
     other = _file(tmp_path, "sub/Cargo.toml", "[package]\nname = 'x'\n")  # [match] miss
     assert _get_extractor(other) is extract_package_manifest
+
+
+@pytest.mark.parametrize("encoding", ["utf-16-le", "utf-16-be"])
+def test_utf16_with_bom_is_sniffed(clean_registry, tmp_path, encoding):
+    # A UTF-16 BOM means the NULs are the encoding, not binary content.
+    path = tmp_path / f"{encoding}.cls"
+    text = 'Attribute VB_Name = "Wide"\r\nPublic Sub Go()\r\nEnd Sub\r\n'
+    path.write_bytes("﻿".encode(encoding) + text.encode(encoding))
+    assert _is_stub(_router(_manifest(tmp_path))(path))
+
+
+def test_utf16_without_bom_stays_binary(clean_registry, tmp_path):
+    path = tmp_path / "nobom.cls"
+    path.write_bytes('Attribute VB_Name = "Wide"\r\n'.encode("utf-16-le"))
+    assert _router(_manifest(tmp_path))(path) == extract_apex(path)

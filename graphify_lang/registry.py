@@ -253,9 +253,12 @@ def _sniff_score(m: LanguageManifest, path: Path, head: Callable[[int], bytes]) 
     if m.sniff is None:
         return 0
     raw = head(m.sniff.head_bytes)
-    if not raw or b"\x00" in raw:  # empty or binary: never code by content
+    if raw[:2] in (codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE):  # NULs are the encoding here
+        text = raw[: len(raw) // 2 * 2].decode("utf-16", errors="replace").removeprefix("\ufeff")
+    elif not raw or b"\x00" in raw:  # empty or binary: never code by content
         return None
-    text = raw.removeprefix(codecs.BOM_UTF8).decode("utf-8", errors="replace")
+    else:
+        text = raw.removeprefix(codecs.BOM_UTF8).decode("utf-8", errors="replace")
     score = m.sniff.score(text)
     return score if score >= m.sniff.min_score else None
 

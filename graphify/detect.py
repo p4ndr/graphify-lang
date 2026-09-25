@@ -528,6 +528,12 @@ def classify_file(path: Path) -> FileType | None:
     # Compound extensions must be checked before simple suffix lookup
     if path.name.lower().endswith(".blade.php"):
         return FileType.CODE
+    try:
+        import graphify.lang_registry
+        if graphify.lang_registry.claims_file(path):
+            return FileType.CODE
+    except Exception:
+        pass
     ext = path.suffix.lower()
     if not ext:
         return _shebang_file_type(path)

@@ -310,6 +310,6 @@ def test_lang_list_subcommand() -> None:
         ).stdout
 
     rows = {line.split()[0]: line.split() for line in run(False).splitlines()[1:]}
-    assert rows["autolisp"] == ["autolisp", ".lsp", ".mnl", "tree_sitter_commonlisp", "autolisp"]
-    assert rows["autolisp-dcl"] == ["autolisp-dcl", ".dcl", "-", "autolisp"]
+    assert rows["autolisp"] == ["autolisp", ".lsp*", ".mnl", "tree_sitter_commonlisp", "-", "autolisp"]
+    assert rows["autolisp-dcl"] == ["autolisp-dcl", ".dcl", "-", "-", "autolisp"]
     assert run(True).strip() == "No plugin languages registered."

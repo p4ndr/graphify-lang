@@ -57,27 +57,37 @@ def get_registry_manifest(suffix: str) -> object | None:
     except Exception as exc:
         _LOG.warning("registry manifest lookup failed for %s: %s", suffix, exc)
         return None
+# The core extractor table as it was before any plugin changed it: the
+# built-in claimant of each suffix for the sniff router (plan 04 §3.1).
+_BUILTIN_DISPATCH: dict | None = None
+
+
 def apply_dispatch() -> None:
-    """Apply registry extractors to _DISPATCH in graphify.extract."""
-    global _REGISTRY_AVAILABLE
+    """Apply registry extractors and sniff routers to _DISPATCH in graphify.extract."""
+    global _REGISTRY_AVAILABLE, _BUILTIN_DISPATCH
     if not _REGISTRY_AVAILABLE:
         return
     try:
         import graphify.extract as extract_module
         from graphify_lang import registry as lang_registry
-        
-        for suffix in _REGISTRY_SUFFIXES:
-            manifest = lang_registry.get_manifest_for_suffix(suffix)
-            if manifest and manifest.extract:
-                # Use the suffix's base name for a stable __name__
-                base = suffix.lstrip('.')
-                extract_module._DISPATCH[suffix] = manifest.extract
-                # Also register case variant
-                extract_module._DISPATCH[suffix.upper()] = manifest.extract
-                _LOG.debug("registered %s → %s", suffix, manifest.name)
+
+        if _BUILTIN_DISPATCH is None:
+            _BUILTIN_DISPATCH = dict(extract_module._DISPATCH)
+        for suffix, extractor in lang_registry.dispatch_table(_BUILTIN_DISPATCH).items():
+            extract_module._DISPATCH[suffix] = extractor
+            extract_module._DISPATCH[suffix.upper()] = extractor
+            _LOG.debug("registered %s -> %s", suffix, extractor.__name__)
     except Exception as exc:
         _LOG.warning("registry dispatch failed: %s", exc)
         _REGISTRY_AVAILABLE = False
+
+
+def claims_file(path) -> bool:
+    """True when a plugin's ``[match]`` and sniff claim this data file as code."""
+    if not _REGISTRY_AVAILABLE:
+        return False
+    from graphify_lang import registry as lang_registry
+    return lang_registry.claims_file(path)
 
 
 # Expose apply_registry for call sites
@@ -85,7 +95,10 @@ apply_registry: Callable[[], None] = _apply_registry
 
 
 def format_languages() -> str:
-    """Table of registered plugin languages for ``graphify lang list``."""
+    """Table of registered plugin languages for ``graphify lang list``.
+
+    ``*`` after a suffix: shared with a built-in or another plugin (sniff-routed).
+    """
     try:
         from graphify_lang import registry as lang_registry
     except ImportError:
@@ -93,11 +106,20 @@ def format_languages() -> str:
     manifests = list(lang_registry.iter_manifests())
     if not manifests:
         return "No plugin languages registered."
-    rows = [("language", "suffixes", "grammar", "resolver")]
+    import graphify.extract  # noqa: F401  (fills _BUILTIN_DISPATCH)
+    builtins = _BUILTIN_DISPATCH or {}
+
+    def shared(suffix: str) -> str:
+        many = suffix in builtins or len(lang_registry.claimants(suffix)) > 1
+        return suffix + ("*" if many else "")
+
+    rows = [("language", "suffixes", "grammar", "sniff", "resolver")]
     for m in manifests:
         resolver = getattr(m.resolver, "name", None) or "-"
-        rows.append((m.name, " ".join(sorted(m.suffixes)), m.grammar or "-", resolver))
-    widths = [max(len(r[i]) for r in rows) for i in range(3)]
+        sniff = "+".join(k for k, on in (("sniff", m.sniff), ("match", m.has_match)) if on) or "-"
+        suffixes = " ".join(shared(s) for s in sorted(m.suffixes))
+        rows.append((m.name, suffixes, m.grammar or "-", sniff, resolver))
+    widths = [max(len(r[i]) for r in rows) for i in range(4)]
     return "\n".join(
-        "  ".join(c.ljust(w) for c, w in zip(r[:3], widths)) + "  " + r[3] for r in rows
+        "  ".join(c.ljust(w) for c, w in zip(r[:4], widths)) + "  " + r[4] for r in rows
     )

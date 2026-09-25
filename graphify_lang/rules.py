@@ -1,89 +1,132 @@
-"""Rules runtime for language manifests.
+"""Declarative rules runtime: a manifest dict -> an extract callable.
 
-This module implements the declarative rules system for extracting
-nodes and edges from source files using tree-sitter queries and regex rules.
+A fallback and utility layer (plan 04 D7): language plugins have their own
+extractors and may call this; none depends on it. Two tiers feed one sink:
 
-The build() function returns (extract, resolver) callables that the
-registry uses to dispatch language extraction.
+- query tier (``queries.py``): tree-sitter ``tags.scm`` captures
+  ``@definition.<kind>`` / ``@name`` / ``@reference.<relation>``;
+- regex tier (``regex_rules.py``): ``[[rule]]`` tables, ctags-optlib scopes.
+
+Emission contract (plan 01 S005, ``.claude/docs/cc-IP000.001.md``): a file
+node from ``_file_stem``; every node carries ``label``, ``source_file``,
+``file_type = "code"`` and ``node_kind``; symbol ids ``_make_id(stem, label)``
+with the definition line appended on a clash (the ``extract_markdown``
+recipe); a ``contains`` edge per symbol; reference edges resolved within the
+file after the builtins filter. A configuration fault never yields a silent
+empty result: every call returns ``error`` carrying ``not installed`` or
+``failed to load`` so the core #1745 warning fires.
 """
 
 from __future__ import annotations
 
+import importlib
+import logging
 from pathlib import Path
 from typing import Any, Callable
 
+from graphify.extractors.base import _file_stem, _make_id
 from graphify_lang.builtins import Builtins
 from graphify_lang.queries import QueryRules
 from graphify_lang.regex_rules import RegexRules
 
+log = logging.getLogger(__name__)
 
-def build(manifest_path: Path, manifest: dict[str, Any]) -> tuple[Callable[[Path], dict], Callable[[Path, str], list[str]] | None]:
-    """Build the extract and resolver callables from a manifest.
 
-    Args:
-        manifest_path: Path to the manifest TOML file.
-        manifest: Parsed manifest dictionary.
+class Out:
+    """Node / edge sink for one file."""
 
-    Returns:
-        A tuple of (extract, resolver) where:
-        - extract is a Callable[[Path], dict] that extracts nodes/edges
-        - resolver is a Callable[[Path, str], list[str]] or None for cross-file resolution
-    """
-    # Load rule tiers
-    queries = QueryRules.from_manifest(manifest_path, manifest)
-    # Set the grammar from the manifest
-    queries._grammar = manifest.get("grammar", manifest.get("grammar", None))
-    regex = RegexRules.from_manifest(manifest_path, manifest)
-    builtins = Builtins.from_manifest(manifest_path, manifest)
+    def __init__(self, path: Path, builtins: Builtins) -> None:
+        self.sf = str(path)
+        self.stem = _make_id(_file_stem(path))
+        self.builtins = builtins
+        self.nodes: list[dict] = []
+        self.edges: list[dict] = []
+        self._ids: set[str] = set()
+        self._by_label: dict[str, str] = {}
+        self._refs: list[tuple[str, str, str, int]] = []
+        self._edge_keys: set[tuple[str, str, str]] = set()
+        self.file_nid = self._add(self.stem, path.name, "file", 1)
+
+    def _add(self, nid: str, label: str, kind: str, line: int) -> str:
+        self._ids.add(nid)
+        self.nodes.append({"id": nid, "label": label, "file_type": "code", "node_kind": kind,
+                           "source_file": self.sf, "source_location": f"L{line}"})
+        return nid
+
+    def node(self, kind: str, label: str, line: int) -> str:
+        nid = _make_id(self.stem, label)
+        if nid in self._ids:
+            nid = _make_id(self.stem, label, str(line))
+        self._add(nid, label, kind, line)
+        self._by_label.setdefault(self.builtins.fold(label), nid)
+        self.edge(self.file_nid, nid, "contains", line)
+        return nid
+
+    def ref(self, source: str, name: str, relation: str, line: int) -> None:
+        if not self.builtins.is_builtin(name):
+            self._refs.append((source, name, relation, line))
+
+    def edge(self, src: str, tgt: str, relation: str, line: int) -> None:
+        if (src, tgt, relation) in self._edge_keys:
+            return
+        self._edge_keys.add((src, tgt, relation))
+        self.edges.append({"source": src, "target": tgt, "relation": relation,
+                           "confidence": "EXTRACTED", "source_file": self.sf,
+                           "source_location": f"L{line}", "weight": 1.0})
+
+    def result(self) -> dict:
+        # ponytail: in-file resolution only; a cross-file ref needs a plugin resolver.
+        for src, name, relation, line in self._refs:
+            tgt = self._by_label.get(self.builtins.fold(name))
+            if tgt:
+                self.edge(src, tgt, relation, line)
+        return {"nodes": self.nodes, "edges": self.edges}
+
+
+def _hook(manifest: dict[str, Any]) -> Callable | None:
+    extract_cfg = manifest.get("extract", {})
+    spec = extract_cfg.get("post_file") or extract_cfg.get("python", {}).get("post_file")
+    if not spec:
+        return None
+    module, _, fn = spec.partition(":")
+    try:
+        return getattr(importlib.import_module(module), fn)
+    except (ImportError, AttributeError) as exc:
+        raise RuntimeError(f"post_file hook {spec!r} failed to load: {exc}") from exc
+
+
+def build(manifest_path: Path, manifest: dict[str, Any]) -> tuple[Callable[[Path], dict], None]:
+    """Return ``(extract, resolver)`` for a parsed manifest; the resolver is always None."""
+    try:
+        queries = QueryRules.from_manifest(manifest_path, manifest)
+        regex = RegexRules.from_manifest(manifest_path, manifest)
+        builtins = Builtins.from_manifest(manifest_path, manifest)
+        hook = _hook(manifest)
+    except Exception as exc:  # every manifest fault ends here, loudly
+        reason = f"graphify_lang.rules: {manifest_path}: {exc}"
+        if "not installed" not in reason:
+            reason = reason if "failed to load" in reason else f"{reason} (failed to load)"
+        log.warning(reason)
+
+        def failed(path: Path) -> dict:
+            return {"nodes": [], "edges": [], "error": reason}
+
+        return failed, None
 
     def extract(path: Path) -> dict:
-        """Extract nodes and edges from a file path."""
-        # Read source
         try:
             source = path.read_bytes()
-        except OSError as e:
-            return {"nodes": [], "edges": [], "error": f"failed to read file: {e}"}
+        except OSError as exc:
+            return {"nodes": [], "edges": [], "error": f"failed to read {path}: {exc}"}
+        out = Out(path, builtins)
+        tree = queries.apply(source, out) if queries else None
+        if regex:
+            regex.apply(source.decode("utf-8", errors="replace"), path, out)
+        result = out.result()
+        if hook:
+            got = hook(path, tree, result["nodes"], result["edges"], manifest)
+            if isinstance(got, dict):
+                result = {**result, **got}
+        return result
 
-        # Run query rules
-        query_results = queries.apply(source, str(path))
-
-        # Run regex rules
-        regex_results = regex.apply(source, str(path))
-
-        # Apply builtins (case-folding if needed)
-        query_results = builtins.apply_to_results(query_results)
-        regex_results = builtins.apply_to_results(regex_results)
-
-        # Merge results
-        nodes = query_results.get("nodes", []) + regex_results.get("nodes", [])
-        edges = query_results.get("edges", []) + regex_results.get("edges", [])
-
-        # Apply Python hooks if configured
-        # Check for post_file in extract section first (AutoLISP style), then in python sub-section
-        post_file_cfg = manifest.get("extract", {}).get("post_file")
-        if post_file_cfg is None:
-            post_file_cfg = manifest.get("extract", {}).get("python", {}).get("post_file")
-        
-        if post_file_cfg:
-            module, fn = post_file_cfg.split(":")
-            try:
-                import importlib
-                mod = importlib.import_module(module)
-                hook = getattr(mod, fn)
-                result = hook(path, None, nodes, edges, manifest)
-                if result is not None:
-                    if isinstance(result, dict):
-                        nodes = result.get("nodes", nodes)
-                        edges = result.get("edges", edges)
-                    elif isinstance(result, (tuple, list)) and len(result) == 2:
-                        nodes = result[0]
-                        edges = result[1]
-            except (ImportError, AttributeError) as e:
-                return {"nodes": [], "edges": [], "error": f"failed to load python hook: {e}"}
-        
-        return {"nodes": nodes, "edges": edges}
-
-    # Resolver is None for now; AutoLISP resolver will be implemented in S007
-    resolver: Callable[[Path, str], list[str]] | None = None
-
-    return extract, resolver
+    return extract, None

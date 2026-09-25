@@ -1,0 +1,16 @@
+# Test-only: DCL as a rules-runtime manifest (plan 04 S7). Must emit the same
+# file and dialog nodes as graphify_lang.autolisp.extract.extract_dcl.
+schema = 1
+
+[language]
+name = "rules-dcl"
+suffixes = [".dcl"]
+case_insensitive = true
+
+[extract]
+runtime = "graphify_lang.rules"
+comments = '/\*.*?\*/|//[^\n]*'
+
+[[rule]]
+pattern = '\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*:\s*dialog\s*\{'
+node = "dialog"

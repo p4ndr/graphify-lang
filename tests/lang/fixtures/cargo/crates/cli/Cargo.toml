@@ -1,0 +1,14 @@
+[package]
+name = "demo-cli"
+version = "0.1.0"
+
+[dependencies]
+demo-core = { workspace = true }
+gen = { path = "../../tools/gen", package = "demo-gen" }
+clap = "4"
+
+[target.'cfg(windows)'.dependencies]
+windows = "0.58"
+
+[dev-dependencies]
+tempfile = "3"

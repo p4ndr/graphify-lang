@@ -1,0 +1,19 @@
+schema = 1
+
+# Cargo manifests. Core already extracts Cargo.toml (extract_package_manifest:
+# one pkg_<name> node per crate, depends_on edges for runtime dependencies,
+# nothing for a virtual workspace root). This augment adds only what is missing:
+# a workspace node, workspace -> member edges, and external crates as a node
+# attribute. [match] is enough: a Cargo.toml with neither [package] nor
+# [workspace] gets nothing, so no sniff.
+[language]
+name = "cargo"
+kind = "augment"
+augments = [".toml"]
+
+[match]
+filenames = ["Cargo.toml"]
+
+# graphify_lang.cargo.augment:augment_cargo
+[extract]
+runtime = "graphify_lang.cargo.augment"

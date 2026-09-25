@@ -1,0 +1,29 @@
+schema = 1
+
+# Class modules. .cls is shared with the built-in extract_apex: a file comes
+# here only when the sniff scores min_score or more (plan 04 D2, R1).
+[language]
+name = "vba-cls"
+type = "programming"
+suffixes = [".cls"]
+priority = 10
+
+[grammar]
+kind = "regex"
+language_fn = "vba"
+
+[sniff]
+head_bytes = 4096
+min_score = 5
+rules = [
+  { re = '^VERSION 1\.0 CLASS', weight = 10 },
+  { re = '^Attribute VB_Name', weight = 10 },
+  { re = '^Option (Explicit|Compare|Base|Private Module)\b', weight = 5, flags = "i" },
+  { re = '^\s*(Public |Private |Friend )?(Static )?(Sub|Function|Property (Get|Let|Set)) \w+\s*\(', weight = 3, flags = "i" },
+  { re = '^\s*End (Sub|Function|Property)\b', weight = 3, flags = "i" },
+  { re = '^\s*Dim \w+ As ', weight = 3, flags = "i" },
+]
+
+[extract]
+runtime = "graphify_lang.vba.extract"
+builtins_file = "data/builtins.txt"

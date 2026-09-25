@@ -1,0 +1,27 @@
+#--------------------------------------------------------------
+# app.mke - fixture for the bmake plugin. # %include ignored.mki
+#--------------------------------------------------------------
+appName = app
+
+%if defined (BSIBUILD)
+baseDir = $(SrcRoot)app/
+%else
+baseDir = $(_MakeFilePath)
+%endif
+
+PolicyFile = $(baseDir)policy.mki
+o = $(out)app/
+
+%include common.mki
+%include $(SharedMki)sub/rules.mki
+%include $(PolicyFile)
+%include missing.mki
+#%include commented.mki
+
+always:
+    !~@mkdir $(o)
+
+$(o)foo$(oext) : $(baseDir)src/foo.cpp \
+                 $(baseDir)src/foo.h $(o)foo.r   # .r is not graphed
+
+OBJS + $(o)foo$(oext)

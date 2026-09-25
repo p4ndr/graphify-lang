@@ -52,9 +52,3 @@ This document is a LIVE file containing a list of TASKS to be carried out.
 - `[ ]` T10.3 | Cite issues #3180 and #1070, which both ask for exactly this
 - `[ ]` T10.4 | Include the `run_language_resolvers` casefold as a separate small fix
 - `[ ]` T10.5 | Expect to carry the registry indefinitely; plan accordingly
-
-### `[ ]` T31 | P04-E Release, rebuild graphs, docs — plan 04 S15-S17
-
-- `[ ]` T31.1 | S15 Merge branches, tag v0.9.67+lang.3, build wheel, pipx install --force
-- `[ ]` T31.2 | S16 Back up graph.json, clear cache/ast, graphify update for 12 corpus repos + ~/.claude
-- `[ ]` T31.3 | S17 Learnings; update $CLAUDE_HOME/CLAUDE.md graphify paragraph

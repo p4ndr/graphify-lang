@@ -373,8 +373,14 @@ Directories that exist are upstream's. Planned directories are marked.
 | `tests/` | upstream | one file per module; `test_languages.py`, `test_extractors_registry.py`, `fixtures/` |
 | `docs/` | upstream, plus this fork's `UPSTREAM-README.md` | upstream docs and translations |
 | `.claude/` | fork | `CLAUDE.md` and the harness docs, tracked here although upstream's `.gitignore:19` ignores the directory |
-| `graphify_lang/` | planned | the registry and manifest; the namespace root for language packages |
-| `graphify_lang/autolisp/` | planned | manifest, extractor, DCL reader, resolver, fixtures, tests |
+| `graphify_lang/` | fork | the registry and manifest; the namespace root for language packages |
+| `graphify_lang/autolisp/` | fork | AutoLISP (`.lsp`, `.mnl`) and DCL (`.dcl`): manifests, extractor, resolver |
+| `graphify_lang/vba/` | fork | VBA (`.bas`, `.frm`; `.cls` by sniff against Apex) |
+| `graphify_lang/bmake/` | fork | Bentley bmake (`.mki`, `.mke`) |
+| `graphify_lang/cargo/` | fork | `Cargo.toml` workspace and path-dependency edges (augments `extract_package_manifest`) |
+| `graphify_lang/astgrep/` | fork | ast-grep `sgconfig.yml` and rule YAML |
+| `graphify_lang/ecschema/` | fork | Bentley ECSchema XML (root `<ECSchema`) |
+| `graphify_lang/cc_kb/` | fork | augment on `.md`: harness KB `cc-*` attributes and `cites` edges |
 
 ## Working with upstream
 

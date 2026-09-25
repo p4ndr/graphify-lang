@@ -1,14 +1,24 @@
-"""Regex rules for full key set extraction (F8).
+"""Regex tier: ``[[rule]]`` tables (S005 F8), ctags-optlib scope semantics.
 
-This module implements regex-based extraction rules with the full key set:
-- pattern: regex pattern to match
-- name_group: capture group name for the symbol
-- node or edge: whether this creates a node or edge
-- scope (push/pop/ref/set): scope tracking for edges
-- edge_from_scope: source of cross-file edges
-- target: target symbol for ref edges
-- multiline: whether pattern spans multiple lines
-- suffix: file suffix constraint
+Keys per rule:
+
+- ``pattern`` (required): Python regex, compiled with ``re.MULTILINE``;
+  ``multiline = true`` adds ``re.DOTALL`` so ``.`` crosses lines.
+- ``name_group`` (default ``"name"``): group holding the symbol name.
+- ``node = "<node_kind>"`` or ``edge = "<relation>"``: a definition or a
+  reference. A rule with neither must be ``scope = "pop"``.
+- ``scope``: ``push`` (node opens a scope), ``set`` (node replaces the
+  current scope), ``pop`` (close the current scope), ``ref`` (default).
+- ``target``: group holding an edge's target name (default ``name_group``).
+- ``edge_from_scope`` (default true): the edge starts at the current scope;
+  false, or no open scope, starts it at the file node.
+- ``suffix``: a suffix or list of suffixes the rule is limited to.
+- ``kind``: omitted or ``"regex"``; other kinds are not regex rules.
+
+``[extract] comments``: one regex; matched text is blanked (newlines kept)
+before any rule runs, so commented-out code emits nothing.
+
+All matches of all rules run in source order, so scopes nest across rules.
 """
 
 from __future__ import annotations
@@ -17,183 +27,75 @@ import re
 from pathlib import Path
 from typing import Any
 
+_SCOPES = ("push", "pop", "set", "ref")
+
 
 class RegexRules:
-    """Regex extraction rules."""
-
-    def __init__(
-        self,
-        rules: list[dict[str, Any]],
-    ):
-        """Initialize regex rules.
-
-        Args:
-            rules: List of rule dictionaries with keys:
-                pattern, name_group, type (node/edge), scope,
-                edge_from_scope, target, multiline, suffix
-        """
+    def __init__(self, rules: list[tuple[re.Pattern[str], dict[str, Any]]],
+                 comments: re.Pattern[str] | None = None) -> None:
         self.rules = rules
-        self._compiled: list[tuple[re.Pattern, dict[str, Any]]] = []
-
-        # Compile patterns
-        for rule in self.rules:
-            pattern = rule.get("pattern", "")
-            flags = re.MULTILINE if rule.get("multiline", False) else 0
-            try:
-                compiled = re.compile(pattern, flags)
-                self._compiled.append((compiled, rule))
-            except re.error:
-                # Skip invalid patterns
-                continue
+        self.comments = comments
 
     @classmethod
-    def from_manifest(
-        cls, manifest_path: Path, manifest: dict[str, Any]
-    ) -> RegexRules:
-        """Build RegexRules from a manifest.
+    def from_manifest(cls, manifest_path: Path, manifest: dict[str, Any]) -> RegexRules | None:
+        rules = []
+        for i, rule in enumerate(manifest.get("rule", [])):
+            if rule.get("kind", "regex") != "regex":
+                continue
+            where = f"rule[{i}]"
+            if not isinstance(rule.get("pattern"), str):
+                raise RuntimeError(f"{where}: pattern missing (failed to load)")
+            scope = rule.get("scope", "ref")
+            if scope not in _SCOPES:
+                raise RuntimeError(f"{where}: scope must be one of {_SCOPES} (failed to load)")
+            n_kinds = ("node" in rule) + ("edge" in rule)
+            if n_kinds > 1 or (n_kinds == 0 and scope != "pop"):
+                raise RuntimeError(f"{where}: needs exactly one of node / edge (failed to load)")
+            flags = re.MULTILINE | (re.DOTALL if rule.get("multiline") else 0)
+            try:
+                rx = re.compile(rule["pattern"], flags)
+            except re.error as exc:
+                raise RuntimeError(f"{where}: bad pattern, failed to load: {exc}") from exc
+            suffix = rule.get("suffix", ())
+            rules.append((rx, {**rule, "scope": scope,
+                               "suffix": {suffix} if isinstance(suffix, str) else set(suffix)}))
+        comments = manifest.get("extract", {}).get("comments")
+        if comments:
+            try:
+                comments = re.compile(comments, re.DOTALL)
+            except re.error as exc:
+                raise RuntimeError(f"extract.comments: bad pattern, failed to load: {exc}") from exc
+        if not rules:
+            return None
+        return cls(rules, comments or None)
 
-        Looks for [[rule]] entries in the manifest.
-        """
-        rules: list[dict[str, Any]] = []
-
-        # Check for [[rule]] entries
-        if "rule" in manifest:
-            for rule_cfg in manifest["rule"]:
-                # Only process regex rules
-                if rule_cfg.get("kind") != "regex":
-                    continue
-                rule = {
-                    "name": rule_cfg.get("name", ""),
-                    "pattern": rule_cfg.get("pattern", ""),
-                    "name_group": rule_cfg.get("name_group", "name"),
-                    "type": rule_cfg.get("type", "node"),
-                    "scope": rule_cfg.get("scope", "ref"),
-                    "edge_from_scope": rule_cfg.get("edge_from_scope", ""),
-                    "target": rule_cfg.get("target", ""),
-                    "multiline": rule_cfg.get("multiline", False),
-                    "suffix": rule_cfg.get("suffix", ""),
-                }
-                rules.append(rule)
-
-        return cls(rules)
-
-    def apply(self, source: bytes, source_file: str = "") -> dict[str, list[dict]]:
-        """Apply regex rules to source code.
-
-        Returns nodes and edges based on regex matches.
-        """
-        nodes: list[dict] = []
-        edges: list[dict] = []
-
-        if not self._compiled:
-            return {"nodes": nodes, "edges": edges}
-
-        text = source.decode("utf-8", errors="replace")
-
-        # Track scopes for push/pop semantics
-        scope_stack: list[str] = []
-        current_scope = ""
-
-        for pattern, rule in self._compiled:
-            matches = list(pattern.finditer(text))
-
-            for match in matches:
-                # Get the captured name
-                name_group = rule.get("name_group", "name")
-                if name_group in match.groupdict():
-                    symbol = match.group(name_group)
-                else:
-                    symbol = match.group(0)
-
-                # Determine scope
-                scope = rule.get("scope", "ref")
-                if scope == "push":
-                    scope_stack.append(symbol)
-                    current_scope = symbol
-                elif scope == "pop":
-                    if scope_stack:
-                        scope_stack.pop()
-                        current_scope = scope_stack[-1] if scope_stack else ""
+    def apply(self, text: str, path: Path, out: Any) -> None:
+        if self.comments:
+            text = self.comments.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)
+        suffix = path.suffix.lower()
+        hits = sorted((
+            (m.start(), i, m, rule)
+            for i, (rx, rule) in enumerate(self.rules)
+            if not rule["suffix"] or suffix in rule["suffix"]
+            for m in rx.finditer(text)
+        ), key=lambda h: h[:2])
+        stack: list[str] = []
+        for start, _, m, rule in hits:
+            line = text.count("\n", 0, start) + 1
+            scope = rule["scope"]
+            if "node" in rule:
+                nid = out.node(rule["node"], _group(m, rule.get("name_group", "name")), line)
+                if scope == "push" or (scope == "set" and not stack):
+                    stack.append(nid)
                 elif scope == "set":
-                    current_scope = symbol
+                    stack[-1] = nid
+            elif "edge" in rule:
+                name = _group(m, rule.get("target", rule.get("name_group", "name")))
+                src = stack[-1] if stack and rule.get("edge_from_scope", True) else out.file_nid
+                out.ref(src, name, rule["edge"], line)
+            if scope == "pop" and stack:
+                stack.pop()
 
-                # Determine edge_from_scope
-                edge_from_scope = rule.get("edge_from_scope", "")
-                if edge_from_scope:
-                    if scope_stack:
-                        source_symbol = scope_stack[-1]
-                    else:
-                        source_symbol = current_scope
-                else:
-                    source_symbol = ""
-                # Create node or edge
-                rule_type = rule.get("type", "node")
-                if rule_type == "node":
-                    node_dict = self._make_node(symbol, match, rule)
-                    nodes.append(node_dict)
-                else:
-                    target = rule.get("target", "")
-                    if not target:
-                        target = match.group("target") if "target" in match.groupdict() else ""
-                    elif target in match.groupdict():
-                        # Use the matched value from the named group
-                        target = match.group(target)
-                    edge_dict = self._make_edge(
-                        source_symbol,
-                        target,
-                        match,
-                        rule,
-                        current_scope,
-                    )
-                    edges.append(edge_dict)
 
-        return {"nodes": nodes, "edges": edges}
-
-    def _make_node(self, symbol: str, match: re.Match, rule: dict) -> dict:
-        """Create a node dictionary."""
-        start = match.start()
-        end = match.end()
-
-        # Calculate line/column from position
-        text = match.string
-        lines_before = text[:start].count('\n')
-        line_start = text.rfind('\n', 0, start) + 1
-        col_start = start - line_start
-
-        return {
-            "kind": rule.get("name_group", symbol),
-            "start_line": lines_before + 1,
-            "start_col": col_start,
-            "end_line": lines_before + 1,
-            "end_col": col_start + (end - start),
-            "text": symbol,
-            "id": f"{symbol}_{lines_before + 1}_{col_start}",
-        }
-
-    def _make_edge(
-        self,
-        source: str,
-        target: str,
-        match: re.Match,
-        rule: dict,
-        current_scope: str,
-    ) -> dict:
-        """Create an edge dictionary."""
-        start = match.start()
-        end = match.end()
-        text = match.string
-        lines_before = text[:start].count('\n')
-        line_start = text.rfind('\n', 0, start) + 1
-        col_start = start - line_start
-
-        return {
-            "kind": rule.get("name_group", "edge"),
-            "source": source,
-            "target": target,
-            "start_line": lines_before + 1,
-            "start_col": col_start,
-            "end_line": lines_before + 1,
-            "end_col": col_start + (end - start),
-            "text": match.group(0),
-            "id": f"{source}_{target}_{lines_before + 1}_{col_start}",
-        }
+def _group(m: re.Match[str], group: str) -> str:
+    return m.group(group) if group in m.re.groupindex else m.group(0)

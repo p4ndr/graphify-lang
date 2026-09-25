@@ -1,193 +1,259 @@
-"""Tests for rules runtime (T5.3-T5.4).
+"""Rules runtime (plan 01 S005, repaired in plan 04 S7 / T28).
 
-This module tests the query rules and regex rules extraction tiers.
+Every rules call runs from the fixture root on a relative path, so ids carry
+the corpus prefix (``src_core_err_...``) as they do under ``extract(root=)``.
 """
 
+import sys
+import tomllib
+import types
 from pathlib import Path
 
 import pytest
 
-# Test fixtures
+from graphify_lang.rules import build
+
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 CORPUS_FILES = Path(__file__).parent / "corpus_files.txt"
+TEMPLATES = Path(__file__).parent.parent.parent / "graphify_lang" / "templates"
+ERR = Path("src/core/err.lsp")
+CONTRACT = ("id", "label", "file_type", "node_kind", "source_file", "source_location")
+
+LISP_REGEX = [
+    {"pattern": r"\(defun\s+(?P<name>[^\s()]+)", "node": "function", "scope": "set"},
+    {"pattern": r"\((?P<name>[^\s()';\"]+)", "edge": "calls"},
+]
+LISP_TAGS = """
+(defun (defun_header function_name: (_) @name)) @definition.function
+(list_lit . [(sym_lit) (package_lit)] @name) @reference.calls
+"""
+COMMONLISP = {"kind": "tree-sitter", "module": "tree_sitter_commonlisp"}
 
 
-def test_corpus_file_list_exists():
-    """T5.1: Verify corpus file list exists and is readable."""
-    assert CORPUS_FILES.exists(), "corpus_files.txt should exist"
-    content = CORPUS_FILES.read_text()
-    assert content.strip(), "corpus_files.txt should have content"
-    assert content.startswith("#"), "corpus_files.txt should have header comment"
+@pytest.fixture(autouse=True)
+def _at_fixture_root(monkeypatch):
+    monkeypatch.chdir(FIXTURE_DIR)
 
 
-def test_corpus_file_list_count():
-    """T5.1: Verify corpus file list has expected file count."""
-    content = CORPUS_FILES.read_text()
-    lines = [l.strip() for l in content.splitlines() if l.strip() and not l.startswith("#")]
+def _run(manifest, path=ERR, manifest_path=None):
+    extract, resolver = build(manifest_path or FIXTURE_DIR / "m.toml", manifest)
+    assert resolver is None
+    return extract(Path(path))
+
+
+def _kinds(result, kind):
+    return {n["label"]: n["id"] for n in result["nodes"] if n["node_kind"] == kind}
+
+
+def _edges(result, relation):
+    return {(e["source"], e["target"]) for e in result["edges"] if e["relation"] == relation}
+
+
+def _tags_manifest(tmp_path, text=LISP_TAGS, grammar=COMMONLISP):
+    (tmp_path / "tags.scm").write_text(text)
+    return {"manifest": {"grammar": grammar, "extract": {"queries": "tags.scm"}},
+            "manifest_path": tmp_path / "m.toml"}
+
+
+# --- corpus list (T5.1) ---------------------------------------------------
+
+def test_corpus_file_list():
+    lines = [l.strip() for l in CORPUS_FILES.read_text().splitlines()
+             if l.strip() and not l.startswith("#")]
+    assert CORPUS_FILES.read_text().startswith("#")
     assert len(lines) == 84, "81 .lsp + 3 .dcl at autolithp d5a2074 (SRS §1.3)"
+    assert all(not l.startswith("/") and "/" in l for l in lines)
 
 
-def test_corpus_file_list_paths():
-    """T5.1: Verify corpus file list has correct paths."""
-    content = CORPUS_FILES.read_text()
-    lines = [l.strip() for l in content.splitlines() if l.strip() and not l.startswith("#")]
-    
-    for line in lines:
-        # Paths should be relative and use forward slashes
-        assert not line.startswith("/"), f"Path should be relative: {line}"
-        assert "/" in line, f"Path should include directory: {line}"
+# --- emission contract ----------------------------------------------------
+
+def test_empty_manifest_emits_the_file_node():
+    r = _run({})
+    assert r["edges"] == []
+    assert r["nodes"] == [{"id": "src_core_err", "label": "err.lsp", "file_type": "code",
+                           "node_kind": "file", "source_file": "src/core/err.lsp",
+                           "source_location": "L1"}]
 
 
-def test_rules_build_signature():
-    """T5.2: Verify build() returns (extract, resolver) tuple."""
-    from graphify_lang.rules import build
-    
-    # Create a minimal manifest
-    manifest = {
-        "name": "test-lang",
-        "suffixes": [".test"],
-        "extract": {"runtime": "graphify_lang.rules"},
-    }
-    
-    manifest_path = Path(__file__)
-    extract, resolver = build(manifest_path, manifest)
-    
-    assert callable(extract), "extract should be callable"
-    assert resolver is None or callable(resolver), "resolver should be None or callable"
+def test_regex_tier_on_err_lsp():
+    r = _run({"rule": LISP_REGEX})
+    assert "error" not in r
+    fns = _kinds(r, "function")
+    assert len(fns) == 27 and len(_kinds(r, "file")) == 1
+    # err:_trap and err:trap normalise to one id; the later one takes its line
+    assert (fns["err:_trap"], fns["err:trap"]) == ("src_core_err_err_trap", "src_core_err_err_trap_161")
+    for n in r["nodes"]:
+        assert all(n.get(k) for k in CONTRACT), n
+        assert n["file_type"] == "code" and n["source_file"] == "src/core/err.lsp"
+    assert _edges(r, "contains") == {("src_core_err", nid) for nid in fns.values()}
+    calls = _edges(r, "calls")
+    assert ("src_core_err_err_trap_161", "src_core_err_err_trap") in calls
+    assert len(calls) == 29
 
 
-def test_rules_extract_returns_dict():
-    """T5.5: Verify extract returns dict with nodes/edges keys."""
-    from graphify_lang.rules import build
-    
-    manifest = {
-        "name": "test-lang",
-        "suffixes": [".test"],
-        "extract": {"runtime": "graphify_lang.rules"},
-    }
-    
-    manifest_path = Path(__file__)
-    extract, _ = build(manifest_path, manifest)
-    
-    # Extract from a test file
-    result = extract(Path(__file__))
-    
-    assert isinstance(result, dict), "extract result should be a dict"
-    assert "nodes" in result, "extract result should have nodes key"
-    assert "edges" in result, "extract result should have edges key"
+def test_query_tier_matches_regex_tier_on_err_lsp(tmp_path):
+    q = _run(**_tags_manifest(tmp_path))
+    r = _run({"rule": LISP_REGEX})
+    assert "error" not in q
+    assert len(_kinds(q, "function")) == 27
+    assert q["nodes"] == r["nodes"]
+    assert _edges(q, "calls") == _edges(r, "calls")
+    assert all(all(n.get(k) for k in CONTRACT) for n in q["nodes"])
 
 
-def test_queries_module_exists():
-    """T5.3: Verify queries.py module exists and is importable."""
-    from graphify_lang import queries
-    
-    assert hasattr(queries, "QueryRules"), "queries should expose QueryRules"
-    assert hasattr(queries.QueryRules, "from_manifest"), "QueryRules should have from_manifest"
+@pytest.mark.parametrize("pred, keep", [
+    ('(#not-match? @name "^err:_")', lambda t: not t.startswith("err:_")),
+    ('(#match? @name "^err:_")', lambda t: t.startswith("err:_")),
+    ('(#any-of? @name "err:_report" "err:_log")', lambda t: t in ("err:_report", "err:_log")),
+    ('(#not-eq? @name "err:_report")', lambda t: t != "err:_report"),
+])
+def test_query_predicates_filter_captures(tmp_path, pred, keep):
+    """Evaluated in Python: tree-sitter 0.23 inverts #not-match? and ignores #any-of?."""
+    tags = LISP_TAGS.replace("@name) @reference.calls", f"@name {pred}) @reference.calls")
+    q = _run(**_tags_manifest(tmp_path, tags))
+    labels = {n["id"]: n["label"] for n in q["nodes"]}
+    all_targets = {labels[t] for _, t in _edges(_run({"rule": LISP_REGEX}), "calls")}
+    targets = {labels[t] for _, t in _edges(q, "calls")}
+    assert targets == {t for t in all_targets if keep(t)} != set()
 
 
-def test_regex_rules_module_exists():
-    """T5.3: Verify regex_rules.py module exists and is importable."""
-    from graphify_lang import regex_rules
-    
-    assert hasattr(regex_rules, "RegexRules"), "regex_rules should expose RegexRules"
-    assert hasattr(regex_rules.RegexRules, "from_manifest"), "RegexRules should have from_manifest"
+def test_id_clash_gets_the_line_number(tmp_path):
+    f = tmp_path / "dup.lsp"
+    f.write_text("(defun foo ()\n  1)\n(defun foo ()\n  (foo))\n")
+    r = _run({"rule": LISP_REGEX}, f)
+    ids = [n["id"] for n in r["nodes"] if n["node_kind"] == "function"]
+    stem = r["nodes"][0]["id"]
+    assert ids == [f"{stem}_foo", f"{stem}_foo_3"]
+    assert _edges(r, "calls") == {(f"{stem}_foo_3", f"{stem}_foo")}
 
 
-def test_builtins_module_exists():
-    """T5.4: Verify builtins.py module exists and is importable."""
-    from graphify_lang import builtins
-    
-    assert hasattr(builtins, "Builtins"), "builtins should expose Builtins"
-    assert hasattr(builtins.Builtins, "from_manifest"), "Builtins should have from_manifest"
+def test_builtins_filter_names_prefixes_and_case(tmp_path):
+    (tmp_path / "b.txt").write_text("# comment\nERR:_TRAP\n")
+    base = {"rule": LISP_REGEX, "language": {"case_insensitive": True}}
+    full = _edges(_run({"rule": LISP_REGEX}), "calls")
+    named = _edges(_run({**base, "extract": {"builtins_file": "b.txt"}},
+                        manifest_path=tmp_path / "m.toml"), "calls")
+    assert full - named == {(s, t) for s, t in full if t == "src_core_err_err_trap"} != set()
+    r = _run({**base, "extract": {"builtins_prefixes": ["Err:_"]}})
+    labels = {n["id"]: n["label"] for n in r["nodes"]}
+    pref = _edges(r, "calls")
+    assert pref and not any(labels[t].startswith("err:_") for _, t in pref)
+    exact = _edges(_run({"rule": LISP_REGEX, "extract": {"builtins_prefixes": "Err:_"}}), "calls")
+    assert exact == full  # case-sensitive: "Err:_" matches nothing
 
 
-def test_templates_exist():
-    """T5.6: Verify template files exist."""
-    templates_dir = Path(__file__).parent.parent.parent / "graphify_lang" / "templates"
-
-    assert (templates_dir / "programming.toml").exists(), "programming.toml should exist"
-    assert (templates_dir / "markup.toml").exists(), "markup.toml should exist"
-    assert (templates_dir / "prose.toml").exists(), "prose.toml should exist"
-
-def test_templates_are_valid_toml():
-    """T5.6: Verify templates are valid TOML."""
-    import tomli
-    
-    templates_dir = Path(__file__).parent.parent.parent / "graphify_lang" / "templates"
-    
-    for template in ["programming.toml", "markup.toml", "prose.toml"]:
-        content = (templates_dir / template).read_text()
-        try:
-            tomli.loads(content)
-        except tomli.TOMLDecodeError as e:
-            pytest.fail(f"{template} is not valid TOML: {e}")
+def test_scope_push_pop_and_edge_from_scope(tmp_path):
+    f = tmp_path / "s.blk"
+    f.write_text("block a {\n  use b\n}\nuse a\nblock b {\n}\n")
+    rules = [
+        {"pattern": r"block (?P<name>\w+) \{", "node": "block", "scope": "push"},
+        {"pattern": r"^\}", "scope": "pop"},
+        {"pattern": r"use (?P<name>\w+)", "edge": "uses"},
+    ]
+    r = _run({"rule": rules}, f)
+    stem = r["nodes"][0]["id"]
+    assert _edges(r, "uses") == {(f"{stem}_a", f"{stem}_b"), (stem, f"{stem}_a")}
+    rules[2] = {**rules[2], "edge_from_scope": False}
+    assert _edges(_run({"rule": rules}, f), "uses") == {(stem, f"{stem}_b"), (stem, f"{stem}_a")}
+    rules[2] = {**rules[2], "suffix": ".other"}
+    assert _edges(_run({"rule": rules}, f), "uses") == set()
 
 
-def test_templates_have_required_fields():
-    """T5.6: Verify templates have required manifest fields."""
-    import tomli
-    
-    templates_dir = Path(__file__).parent.parent.parent / "graphify_lang" / "templates"
-    required_fields = ["schema", "language", "grammar", "extract"]
-    
-    for template in ["programming.toml", "markup.toml", "prose.toml"]:
-        content = (templates_dir / template).read_text()
-        data = tomli.loads(content)
-        
-        for field in required_fields:
-            assert field in data, f"{template} should have {field} field"
+def test_post_file_hook(monkeypatch):
+    seen = {}
+
+    def hook(path, tree, nodes, edges, manifest):
+        seen["tree"] = tree
+        return {"nodes": nodes + [{"id": "extra"}]}
+
+    monkeypatch.setitem(sys.modules, "rules_hook_mod", types.SimpleNamespace(hook=hook))
+    r = _run({"rule": LISP_REGEX, "extract": {"post_file": "rules_hook_mod:hook"}})
+    assert r["nodes"][-1] == {"id": "extra"} and seen["tree"] is None
+    bad = _run({"extract": {"post_file": "rules_hook_mod:nope"}})
+    assert bad["nodes"] == [] and "failed to load" in bad["error"]
 
 
-def test_emission_contract_file_type_code():
-    """T5.5: Verify nodes use file_type: code."""
-    from graphify_lang.rules import build
-    
-    manifest = {
-        "name": "test-lang",
-        "suffixes": [".test"],
-        "extract": {"runtime": "graphify_lang.rules"},
-    }
-    
-    manifest_path = Path(__file__)
-    extract, _ = build(manifest_path, manifest)
-    
-    result = extract(Path(__file__))
-    
-    for node in result.get("nodes", []):
-        # file_type defaults to "code" per S005
-        assert node.get("kind") is not None, "Node should have kind"
+# --- loud failures --------------------------------------------------------
+
+@pytest.mark.parametrize("grammar, query, marker", [
+    ({"module": "tree_sitter_not_there"}, LISP_TAGS, "not installed"),
+    ({}, LISP_TAGS, "failed to load"),
+    (COMMONLISP, "(no_such_node) @definition.x", "failed to load"),
+])
+def test_query_tier_fails_loudly(tmp_path, caplog, grammar, query, marker):
+    r = _run(**_tags_manifest(tmp_path, query, grammar))
+    assert r["nodes"] == [] and r["edges"] == []
+    assert marker in r["error"]
+    assert marker in caplog.text
 
 
-def test_emission_contract_line_disambiguation():
-    """T5.5: Verify line-based disambiguation for id collisions."""
-    from graphify_lang.rules import build
-    
-    manifest = {
-        "name": "test-lang",
-        "suffixes": [".test"],
-        "extract": {"runtime": "graphify_lang.rules"},
-    }
-    
-    manifest_path = Path(__file__)
-    extract, _ = build(manifest_path, manifest)
-    
-    result = extract(Path(__file__))
-    
-    # Check that nodes have start_line
-    for node in result.get("nodes", []):
-        assert "start_line" in node, "Node should have start_line for disambiguation"
+def test_missing_query_file_fails_loudly(tmp_path):
+    r = _run({"grammar": COMMONLISP, "extract": {"queries": "absent.scm"}}, manifest_path=tmp_path / "m.toml")
+    assert r["nodes"] == [] and "failed to load" in r["error"]
 
 
-def test_python_hooks_configuration():
-    """T5.4: Verify [extract.python] post_file hook configuration."""
-    import tomli
-    
-    templates_dir = Path(__file__).parent.parent.parent / "graphify_lang" / "templates"
-    
-    # Check programming template for python hooks
-    content = (templates_dir / "programming.toml").read_text()
-    data = tomli.loads(content)
-    
-    # Should have commented example for python hooks
-    assert "post_file" in content or "# post_file" in content, \
-        "programming.toml should document post_file hook"
+@pytest.mark.parametrize("rule", [
+    {"pattern": "("},
+    {"pattern": "x", "node": "a", "edge": "b"},
+    {"pattern": "x"},
+    {"pattern": "x", "node": "a", "scope": "open"},
+])
+def test_bad_regex_rule_fails_loudly(rule):
+    r = _run({"rule": [rule]})
+    assert r["nodes"] == [] and "failed to load" in r["error"]
+
+
+# --- DCL parity (plan 04 S7 acceptance) -----------------------------------
+
+def _rules_dcl():
+    path = Path(__file__).parent / "rules_dcl.toml"
+    return build(path, tomllib.loads(path.read_text()))[0]
+
+
+def test_rules_dcl_matches_extract_dcl_on_fixtures():
+    from graphify_lang.autolisp.extract import extract_dcl
+
+    files = sorted(p.relative_to(FIXTURE_DIR) for p in FIXTURE_DIR.rglob("*.dcl"))
+    assert len(files) >= 2
+    extract = _rules_dcl()
+    for f in files:
+        want, got = extract_dcl(f), extract(f)
+        assert _kinds(want, "dialog"), f
+        assert got["nodes"] == want["nodes"], f
+        assert got["edges"] == want["edges"], f
+
+
+def test_rules_dcl_skips_commented_dialogs(tmp_path):
+    from graphify_lang.autolisp.extract import extract_dcl
+
+    f = tmp_path / "c.dcl"
+    f.write_text("/* old : dialog {\n} */\n// gone : dialog {\nreal : dialog {\n}\n")
+    got = _rules_dcl()(f)
+    assert list(_kinds(got, "dialog")) == ["real"]
+    assert got["nodes"] == extract_dcl(f)["nodes"]
+
+
+# --- templates ------------------------------------------------------------
+
+def test_templates_are_valid_manifests():
+    for name in ("programming.toml", "markup.toml", "prose.toml"):
+        data = tomllib.loads((TEMPLATES / name).read_text())
+        assert {"schema", "language", "grammar", "extract"} <= data.keys(), name
+        assert data["extract"]["runtime"] == "graphify_lang.rules"
+    assert "post_file" in (TEMPLATES / "programming.toml").read_text()
+
+
+def test_programming_template_runs(tmp_path):
+    path = TEMPLATES / "programming.toml"
+    extract, _ = build(path, tomllib.loads(path.read_text()))
+    f = tmp_path / "s.ext"
+    f.write_text("def a(x):\n    b(x)\ndef b(y):\n    print(y)\n")
+    r = extract(f)
+    stem = r["nodes"][0]["id"]
+    assert list(_kinds(r, "function")) == ["a", "b"]
+    assert _edges(r, "calls") == {(f"{stem}_a", f"{stem}_b")}
+
+
+def test_templates_are_package_data():
+    pyproject = tomllib.loads((TEMPLATES.parent.parent / "pyproject.toml").read_text())
+    assert "templates/*.toml" in pyproject["tool"]["setuptools"]["package-data"]["graphify_lang"]

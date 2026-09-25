@@ -181,3 +181,50 @@ byte-identical. In a full `extract()` over moxide's 17 manifests, all 16
 - The workspace node id is `cargo_workspace_<dir name>`: two workspaces with
   the same directory name in one graph share a node.
 - Dev- and build-dependencies stay out, as in core (runtime scope).
+
+## astgrep (S11, T29.4)
+
+**Date:** 2026-09-25
+**Branch:** `lang-astgrep` (off `lang-cargo` `70bcfae`); plugin `680ce58`, tests `9c6be53`
+**Fork:** `/home/p4ndr/repos/graphify-lang/.venv` (editable fork; plugin `graphify_lang/astgrep`, suffixes `.yml` `.yaml`, `[match]` + sniff; PyYAML 6.0.3 in `.venv`)
+**Corpus HEAD:** llm-linter-tool `4123a92`
+**Instrument:** `classify_file(Path(...))` on each `git ls-files '*.yml' '*.yaml'` path; `extract(files, cache_root=..., root=CORPUS)` on the 82 corpus files; the same classification with `GRAPHIFY_LANG_DISABLE=1` as the upstream reference.
+**Test suite:** `.venv/bin/python -m pytest tests/ -q` → 6113 passed, 14 skipped.
+
+### Classification (D3)
+
+| Scope | `.yml`/`.yaml` files | document (upstream) | code (fork) | document (fork) |
+|:--|--:|--:|--:|--:|
+| llm-linter-tool | 82 | 82 | 82 | 0 |
+| every git repo under `~/repos` | 100 | 100 | 82 | 18 |
+| `.github/workflows/*.yml` under `~/repos` | 7 | 7 | 0 | 7 |
+
+The only files whose class changed are the 82 in llm-linter-tool
+(`sgconfig.yml`, 27 rules, 27 tests, 27 snapshots). `utils/` is empty there.
+
+### Corpus counts
+
+| Check | Measured | Truth | Equal |
+|:--|--:|--:|:--|
+| rule nodes | 27 | `rules/**/*.yml` files with `^id:`: 27 | yes |
+| `tested_by` edges per rule with a test | 1 (all 27) | 27 test files, one per rule id | yes |
+| `has_snapshot` edges | 27 | 27 snapshot files | yes |
+| `loads` edges (sgconfig -> rule files) | 27 | 27 files under `ruleDirs: [rules]` | yes |
+| `references` edges (`matches:`) | 0 | `matches:` in corpus: 0 | yes |
+
+All resolver edges are EXTRACTED (one candidate per id). Local and global
+util references, multi-document files and malformed YAML are covered by the
+fixture only (`tests/lang/test_astgrep.py`).
+
+### Known limits
+
+- The globs use ast-grep's default directory names (`rules`, `rule-tests`,
+  `utils`). A project that names other `ruleDirs` / `testDir` / `utilDirs`
+  in `sgconfig.yml` is not claimed there.
+- PyYAML is not a graphify dependency and is absent from the pipx runtime.
+  There the flat fallback parses top-level keys only and finds `matches:` by
+  a line regex, so a local util's references are credited to its rule.
+- A file whose YAML does not parse keeps its file node with no
+  `astgrep_role`, so it gets no `loads` edge.
+- `.yml` is not in `hook_suffixes`: editing a rule does not trigger the git
+  hook rebuild.

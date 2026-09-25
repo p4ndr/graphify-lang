@@ -1,0 +1,5 @@
+# Included by app.mke: appName resolves up the include chain.
+%if !defined (appName)
+    %error appName is not defined
+%endif
+commonName = $(appName)common

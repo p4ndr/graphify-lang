@@ -1,0 +1,6 @@
+# Recipe lines are uses only: `x = y` below is not a macro.
+%ifdef o
+    rules:
+        x = $(o)
+
+%endif

@@ -13,7 +13,9 @@ folders above the file. Targets are found by file name, never by id scheme:
   spoke. The edge is owned by the child's file;
 - a ``code`` path -> the file node of that path under the harness root
   (edge ``RELATION``, context ``code_ref``). A path that is not a graphed
-  file adds nothing.
+  file adds nothing;
+- ``cc_heads`` / ``code_heads`` (D12): the same edge again from the heading
+  node whose section holds the mention, added after every page-level edge.
 
 A pair that any edge already joins (a Markdown link, say) gets no second edge.
 """
@@ -80,15 +82,15 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
             root = _norm(sf)
             for _ in range(res["cc_kb_refs"].get("up", 2)):
                 root = posixpath.dirname(root)
-            work.append((res["cc_kb_refs"], me, sf, root))
+            work.append((res["cc_kb_refs"], me, sf, root, res["nodes"]))
 
     # Hub -> spoke first: a structural edge wins a pair over a mention.
-    for refs, me, sf, root in work:
+    for refs, me, sf, root, _ in work:
         if refs.get("hubs"):
             parent = docs.get((posixpath.join(root, "docs"), _parent(str(me.get("label", ""))[:-3])))
             if parent is not None:
                 add(parent["id"], me["id"], "contains", "hub_spoke", sf, 1)
-    for refs, me, sf, root in work:
+    for refs, me, sf, root, _ in work:
         dangling = []
         for cc_id, line in refs.get("cc", []):
             target = docs.get((posixpath.join(root, "docs"), cc_id))
@@ -102,5 +104,15 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
             target = files.get(_norm(posixpath.join(root, rel)))
             if target is not None:
                 add(me["id"], target["id"], RELATION, "code_ref", sf, line)
+    # Heading -> target (D12) last, so the page-level edges above are unchanged.
+    for refs, me, sf, root, nodes in work:
+        for cc_id, line, node in refs.get("cc_heads", []):
+            target = docs.get((posixpath.join(root, "docs"), cc_id))
+            if target is not None:
+                add(nodes[node]["id"], target["id"], RELATION, "cc_ref", sf, line)
+        for rel, line, node in refs.get("code_heads", []):
+            target = files.get(_norm(posixpath.join(root, rel)))
+            if target is not None:
+                add(nodes[node]["id"], target["id"], RELATION, "code_ref", sf, line)
 
 RESOLVER = LanguageResolver(name="cc-kb", suffixes=frozenset({".md"}), resolve=resolve)

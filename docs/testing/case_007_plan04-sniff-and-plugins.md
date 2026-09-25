@@ -381,14 +381,14 @@ variant: `base` (every element off), `all`, and `all` minus one element
 (`GRAPHIFY_CC_KB_OFF`). A cell is the position of the first node from the
 relevant doc among the NODE lines, or `-` when none is in the output.
 
-| Question | Relevant doc | base | all | no attrs | no cc_ref | no hub_spoke | no code_ref | all + D11 |
-|:--|:--|--:|--:|--:|--:|--:|--:|--:|
-| Q1 where is db.ps1 write ownership documented | `cc-SY050.001` | - | 7 | 7 | 9 | 7 | - | 7 |
-| Q2 which docs reference cc-SY050.000 | `cc-SY050.000` | 54 | 17 | 17 | 31 | 17 | 15 | 18 |
-| Q2 docs citing `cc-SY050.000` in the output (of 40) | | 5 | 17 | 17 | 11 | 16 | 14 | 16 (+2 root, of 2) |
-| Q3 what is the retrieval spec | `cc-SY060.000` | - | - | - | - | - | - | - |
-| Q4 which hub lists the style guides | `cc-SG000.000` | 2 | 2 | 2 | 2 | 2 | 2 | 2 |
-| Q5 what documents the graphify skip hook | `cc-SY010.007` | - | 8 | 8 | 12 | 8 | - | 9 |
+| Question | Relevant doc | base | all | no attrs | no cc_ref | no hub_spoke | no code_ref | all + D11 | heading anchor | heading anchor, first only | all + D11 + D12 |
+|:--|:--|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+| Q1 where is db.ps1 write ownership documented | `cc-SY050.001` | - | 7 | 7 | 9 | 7 | - | 7 | 16 | 23 | 7 |
+| Q2 which docs reference cc-SY050.000 | `cc-SY050.000` | 54 | 17 | 17 | 31 | 17 | 15 | 18 | 11 | 11 | 14 |
+| Q2 docs citing `cc-SY050.000` in the output (of 40) | | 5 | 17 | 17 | 11 | 16 | 14 | 16 (+2 root, of 2) | 10 | 9 | 17 |
+| Q3 what is the retrieval spec | `cc-SY060.000` | - | - | - | - | - | - | - | 3 | 3 | 3 |
+| Q4 which hub lists the style guides | `cc-SG000.000` | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 |
+| Q5 what documents the graphify skip hook | `cc-SY010.007` | - | 8 | 8 | 12 | 8 | - | 9 | 14 | 13 | 9 |
 
 No element pushes a relevant node out of the budget, so all four are kept.
 `code_ref` gives the Q1 and Q5 hits; `cc_ref` moves Q1, Q2 and Q5 up;
@@ -426,10 +426,45 @@ the default traversal depth is 2. Q2 now shows the 2 root citers of
 `cc-SY050.000` (`CLAUDE.md`, `PROMPT-BASE.md`) in the budget, which moves the
 doc from 17 to 18 and one `docs/` citer out.
 
+### D12: heading anchor (`ae3d751`)
+
+A `cc_ref` or `code_ref` mention also gets a `cites` edge from the heading
+node whose section holds it (the nearest `extract_markdown` heading at or
+above the line), one per section and target. The page-level edges stay as in
+`all + D11` and are resolved first; text above the first heading keeps the
+page edge only. Same scratch copy and build. Three variants were measured
+(S14 columns above):
+
+- heading anchor: heading edges only, no page edges. Q3 is reached, but Q1
+  drops 7 -> 16, Q5 9 -> 14 and Q2 shows 10 citers: heading nodes take the
+  neighbour slots the page nodes held. Rejected.
+- heading anchor, first only: page edges plus one heading edge per target, at
+  its first section. Q1 7 -> 8. Rejected.
+- `all + D11 + D12` (kept): page edges plus a heading edge per section. No
+  row is worse than `all + D11`; Q3 is reached at 3 from the `Retrieval`
+  heading of `PROMPT-BASE.md`, Q2 moves 18 -> 14.
+
+| Check | Result |
+|:--|:--|
+| Edges | 29969 (`all + D11` 22863): `cc_ref` 7163 (1776 page + 5387 heading), `code_ref` 2807 (1088 + 1719), `hub_spoke` 241 |
+| `all + D11` edges kept | all 3105 `cites` and `hub_spoke` edges, same keys; base edges kept (19758) |
+| D11 reverse pairs | the 17 file-level pairs missing from `all + D11` are joined, by a heading edge |
+| Heading edges on a pair the page level already joins | 1231 heading `cc_ref` edges sit beside a page-to-page Markdown link, 538 beside `hub_spoke`, 92 beside a reverse `code_ref`: a heading pair is a new pair, so the one-edge-per-pair rule does not stop them |
+| Base nodes, with and without | identical (15972) after removing the added keys and `community` |
+| Second `graphify update`, `cc-SY050.001.md` edited | 10211 augment edges before, 10211 kept, 0 lost, 0 new |
+| tmllm (git-tracked copy, all on against all off) | 4601 nodes, 11609 edges both: 0 extra edges |
+| `dangling_cc_refs` | 451, unchanged |
+
+The AST cache key is the `graphifyy` version plus the file content, not the
+plugin code: the fixture test first read the old payload from the repo's
+`graphify-out/cache` (`7595070` gives the test its own `cache_root`). A
+payload change reaches an existing graph only with a new `+lang.N` tag.
+
 ### Known limits
 
-- Mention edges start at the page node, not at the heading whose section
-  holds the mention (the Q3 miss: 3 hops from a heading start node).
+- A mention yields up to one heading edge per section, so a doc that names a
+  target in many sections adds that many edges (5387 heading `cc_ref` edges
+  for 1776 page ones).
 - An incremental update resolves the changed docs against the whole graph,
   but a new hub gets its `contains` edges only when each spoke is next
   extracted (the edge is owned by the spoke's file).

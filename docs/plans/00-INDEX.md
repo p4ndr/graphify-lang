@@ -40,4 +40,5 @@ When a CONDITION is TRUE, execute the tasks listed under that CONDITION.
 | `01-language-extension-layer-and-autolisp-plugin.md` | Language-extension layer and AutoLISP plugin | A registry that lets a language be registered from outside `graphify/extract.py`, plus an AutoLISP/DCL plugin built on it. | ACTIVE |
 | `02-autolisp-extractor-fixes-from-case-003.md` | AutoLISP extractor fixes from case 003 | Fix defects D1-D12 from `docs/testing/case_003_local-autolisp-repos.md` and add the edges agreed on 2026-09-24, so that an AutoLISP repo gi… | ACTIVE |
 | `03-replace-stock-graphify-with-the-fork.md` | Replace stock graphify with the fork | Replace the pipx `graphifyy 0.9.55` install with a pinned build of this fork, rebased on `upstream/v8`, and rebuild the graph of every grap… | DONE |
+| `04-content-sniffing-augment-plugins-and-five-new-languages.md` | Content sniffing, augment plugins, and five new languages | A content-sniff router for suffixes that two languages share, an `augment` manifest kind that adds to a built-in extractor's output, and pl… | ACTIVE |
 <!-- MANIFEST-END -->

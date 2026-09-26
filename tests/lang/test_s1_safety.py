@@ -166,12 +166,16 @@ def test_l2_large_schema_linear(tmp_path):
 
 
 def test_s1_m1_many_utils_linear(tmp_path):
-    n = 20_000
-    path = _rule_file(tmp_path, "id: r\nlanguage: python\nrule: {pattern: x}\nutils:\n"
-                      + "".join(f"  u{i}: {{pattern: y}}\n" for i in range(n)))
-    secs, nodes, edges, _ = _timed("graphify_lang.astgrep.extract", "extract_astgrep", path)
-    assert secs < 2, f"{n} utils took {secs:.2f} s"
-    assert (nodes, edges) == (n + 2, n + 1)
+    """4x the utils must cost well under 16x the time (quadratic: 14x, 18.93 s
+    at 20 000). A ratio, not a wall-clock bound: pure-Python PyYAML parsing
+    dominates and runs 3x slower on a CI runner."""
+    secs = {}
+    for n in (5_000, 20_000):
+        path = _rule_file(tmp_path, "id: r\nlanguage: python\nrule: {pattern: x}\nutils:\n"
+                          + "".join(f"  u{i}: {{pattern: y}}\n" for i in range(n)), f"rules/u{n}.yml")
+        secs[n], nodes, edges, _ = _timed("graphify_lang.astgrep.extract", "extract_astgrep", path)
+        assert (nodes, edges) == (n + 2, n + 1)
+    assert secs[20_000] < 8 * secs[5_000], f"5000 utils {secs[5_000]:.2f} s, 20 000 {secs[20_000]:.2f} s"
 
 
 def test_s1_l2_document_error_names_its_type(tmp_path, monkeypatch, caplog):

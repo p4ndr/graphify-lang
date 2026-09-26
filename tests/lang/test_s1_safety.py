@@ -188,7 +188,6 @@ def test_s1_l2_document_error_names_its_type(tmp_path, monkeypatch, caplog):
     assert "skipped" not in caplog.text
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S1-E2: no document size cap")
 def test_s1_e2_oversized_document_skipped(tmp_path, caplog):
     path = _rule_file(tmp_path, "id: small\nrule: {pattern: x}\n---\nid: big\nrule: {pattern: x}\n"
                                 "note: " + "x" * 1_100_000 + "\n")

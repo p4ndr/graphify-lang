@@ -17,7 +17,8 @@ snapshot's rule id, and the ``ruleDirs`` / ``utilDirs`` of an sgconfig.
 
 PyYAML (a runtime dependency) parses each document. A document that does not
 parse adds nothing; any other error stops the document, keeps what it added
-so far and logs the exception type (S1-L2).
+so far and logs the exception type (S1-L2). A document over 1 000 000
+characters is skipped with a warning (S1-E2).
 """
 from __future__ import annotations
 
@@ -32,6 +33,9 @@ from graphify_lang._common import Sink, _make_id, line_index
 _LOG = logging.getLogger(__name__)
 _DOC_SPLIT_RE = re.compile(r"^---[ \t]*(?:#.*)?$", re.MULTILINE)
 _INDENTED_KEY_RE = re.compile(r"^[ \t]+([^:\n]*):", re.MULTILINE)
+# S1-E2: real rule files are a few KB; the cap bounds every per-document cost
+# (PyYAML alone takes seconds on a 400 KB nested document).
+_MAX_DOC_CHARS = 1_000_000
 
 
 def _matches(obj, seen: set[int] | None = None) -> list[str]:
@@ -163,6 +167,10 @@ def extract_astgrep(path: Path) -> dict:
         return {"nodes": [], "edges": [], "error": str(exc)}
     out = Sink(path)
     for first, chunk in _documents(text):
+        if len(chunk) > _MAX_DOC_CHARS:
+            _LOG.warning("astgrep: %s line %d: document skipped (%d characters, over the"
+                         " %d size cap)", path, first, len(chunk), _MAX_DOC_CHARS)
+            continue
         try:
             _document(out, path, chunk, first)
         except yaml.YAMLError as exc:  # nothing added yet

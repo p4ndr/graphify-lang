@@ -30,18 +30,9 @@ import re
 from pathlib import Path
 from xml.parsers import expat
 
+from graphify_lang._common import Sink, _make_id
+
 _LOG = logging.getLogger(__name__)
-
-
-def _file_stem(path):
-    # Lazy: graphify.extractors at plugin load re-enters graphify.detect (see autolisp).
-    from graphify.extractors.base import _file_stem as f
-    return f(path)
-
-
-def _make_id(*parts):
-    from graphify.extractors.base import _make_id as f
-    return f(*parts)
 
 
 _CLASS_KINDS = {"ECEntityClass": "entity", "ECStructClass": "struct",
@@ -102,44 +93,6 @@ def _parse(raw: bytes) -> _El | None:
     return top[0] if top else None
 
 
-class _Out:
-    """Node / edge / ref sink for one file (the bmake / astgrep plugins' shape)."""
-
-    def __init__(self, path: Path) -> None:
-        self.sf = str(path)
-        self.stem = _make_id(_file_stem(path))
-        self.nodes: list[dict] = []
-        self.edges: list[dict] = []
-        self.refs: list[dict] = []
-        self._ids: set[str] = set()
-        self._order: dict[str, int] = {}
-        self._edge_keys: set[tuple[str, str, str]] = set()
-        self.file_nid = self.add(self.stem, path.name, "file", 1)
-
-    def add(self, nid: str, label: str, kind: str, line: int, **attrs) -> str:
-        if nid in self._ids:
-            nid = f"{nid}_l{line}"
-        self._ids.add(nid)
-        self._order[nid] = len(self.nodes)
-        self.nodes.append({"id": nid, "label": label, "file_type": "code", "node_kind": kind,
-                           "source_file": self.sf, "source_location": f"L{line}", **attrs})
-        return nid
-
-    def edge(self, src: str, tgt: str, relation: str, line: int) -> None:
-        if src == tgt or (src, tgt, relation) in self._edge_keys:
-            return
-        self._edge_keys.add((src, tgt, relation))
-        self.edges.append({"source": src, "target": tgt, "relation": relation,
-                           "confidence": "EXTRACTED", "source_file": self.sf,
-                           "source_location": f"L{line}", "weight": 1.0})
-
-    def ref(self, kind: str, source: str, schema: str, line: int, **extra) -> None:
-        # The resolver reads the source id back through the node index (ids may be
-        # salted apart before resolvers run; see bmake).
-        self.refs.append({"kind": kind, "node": self._order[source], "schema": schema,
-                          "line": line, "source_file": self.sf, **extra})
-
-
 def _class_kind(el: _El) -> str:
     if el.tag != "ECClass":
         return _CLASS_KINDS[el.tag]
@@ -160,7 +113,7 @@ def extract_ecschema(path: Path) -> dict:
         raw = path.read_bytes()
     except OSError as exc:
         return {"nodes": [], "edges": [], "error": str(exc)}
-    out = _Out(path)
+    out = Sink(path)
     try:
         root = _parse(raw)
     except (expat.ExpatError, ValueError) as exc:  # malformed: keep the file node, never crash
@@ -187,7 +140,7 @@ def extract_ecschema(path: Path) -> dict:
         for key in ("alias", "prefix"):
             if r.attrs.get(key):
                 aliases[r.attrs[key]] = rname
-        out.ref("schema", schema, rname, r.line, version=r.attrs.get("version", ""))
+        out.ref("schema", schema, r.line, schema=rname, version=r.attrs.get("version", ""))
 
     local: dict[str, str] = {}   # class / enumeration name -> node id
     classes: list[tuple[_El, str]] = []
@@ -216,7 +169,7 @@ def extract_ecschema(path: Path) -> dict:
             if member in local:
                 out.edge(src, local[member], relation, line)
         else:
-            out.ref("member", src, target_schema, line, name=member, relation=relation)
+            out.ref("member", src, line, schema=target_schema, name=member, relation=relation)
 
     for c, nid in classes:
         for child in c.children:
@@ -235,4 +188,4 @@ def extract_ecschema(path: Path) -> dict:
                 out.edge(nid, pid, "contains", child.line)
                 if ptype:
                     link(pid, ptype, "uses", child.line)
-    return {"nodes": out.nodes, "edges": out.edges, "ecschema_refs": out.refs}
+    return out.result("ecschema_refs")

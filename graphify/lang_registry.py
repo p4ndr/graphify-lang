@@ -218,3 +218,17 @@ def format_languages() -> str:
     return "\n".join(
         "  ".join(c.ljust(w) for c, w in zip(r[:4], widths)) + "  " + r[4] for r in rows
     )
+
+
+def check_languages() -> tuple[str, bool]:
+    """``graphify lang list --check`` (cc-CR000.001 E4): one row per plugin,
+    ``ok`` or the load error, and whether every plugin loaded."""
+    from graphify_lang import registry as lang_registry
+
+    rows = [(m.name, "ok") for m in lang_registry.iter_manifests()]
+    errors = lang_registry.load_errors()
+    rows += [(source, f"error: {err}") for source, err in errors.items()]
+    if not rows:
+        return "No plugin languages registered.", True
+    width = max(len(name) for name, _ in rows)
+    return "\n".join(f"{name.ljust(width)}  {status}" for name, status in rows), not errors

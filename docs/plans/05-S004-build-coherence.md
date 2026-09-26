@@ -48,4 +48,7 @@ Deviations from §1:
 - **E5 scope.** The parity test touches only plugin files and compares edges between graphed nodes; the two upstream behaviours it excludes are in case 008 §4.
 - **cc-kb payload on every `.md`.** A pure augment cannot know whether a file is in a harness root, so any `.md` with a mention or a path-like span carries a `cc_kb_refs` payload; the resolver drops files with no graphed root. Out-of-scope files keep base nodes and edges.
 - **Known limit.** An incremental build re-resolves only the changed files' payloads: a crate added under an unchanged workspace manifest gets its `has_member` edge on the next full or cached build, not on the incremental one (the edge belongs to the root manifest).
+- **Parity test file** (cc-CR000.003 S4-N3). §1 names `tests/lang/test_parity.py`; the test landed as `tests/lang/test_s4_build_coherence.py::test_e5_incremental_parity`.
+- **`cc_kb_links` outside harness roots** (S4-N1). The field is set on every Markdown page that links to an existing `.md` file, in any repo (BentleyTools: 36 non-harness pages, 47 KB), and reaches JSON and GraphML exports. It is needed for pair suppression when such a page is a cite target; out-of-scope pages keep base nodes and edges plus this one attribute.
+- **Fingerprint scope** (S4-L4, review-fix `d21f7b2`). The M2/E1 fingerprint covers plugin code and, since the review fix, `graphify/lang_registry.py`; "without a `+lang.N` bump" holds for those only. Other fork edits under `graphify/` still need a version change. Learning 1490 is superseded by 1498.
 

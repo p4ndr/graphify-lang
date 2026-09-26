@@ -72,6 +72,16 @@ runtime = "graphify_lang.rules"
 # post_file = "<your_package>.<module>:fn"  (graphify_lang.* or the package passed as
 #   rules.build(..., package="<your_package>"); any other module is rejected)
 
+[resolve]
+# Node fields your resolver reads on OTHER files' nodes (default ["node_kind"]).
+# On an incremental build (`graphify watch`, `graphify extract` on an existing
+# graph) an unchanged file reaches the resolver only as a context node: id,
+# label, source_file (root-relative), file_type, type, the fields listed here,
+# and no payloads (refs) and no edges but contains / method / inherits. A
+# cross-file fact the resolver needs must be one of these fields. Compare
+# paths with graphify_lang._common.source_of(node), never node["source_file"].
+context_fields = ["node_kind"]
+
 # Regex tier - one [[rule]] per pattern; see graphify_lang/regex_rules.py.
 # node = "<kind>" emits a definition; edge = "<relation>" emits a reference
 # resolved to a definition in the same file (builtins are dropped first).

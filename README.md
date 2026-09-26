@@ -266,13 +266,18 @@ a plugin breaks one.
 - **Augments add, never replace.** An augment returns `nodes`, `edges` and
   `attrs` keyed by base node id; new ids start with the plugin name prefix,
   and no base node or attribute is replaced.
-- **`[resolve] context_fields`.** On an incremental build a resolver sees an
-  unchanged file only as a context node read from `graph.json`: no payloads,
-  few edges, and a root-relative `source_file`. A cross-file fact a resolver
-  needs from an unchanged file must be a node field listed in
+- **`[resolve] context_fields`.** On an incremental build (`graphify watch`,
+  `graphify extract` on an existing graph) a resolver sees an unchanged file
+  only as a context node read from `graph.json`: `id`, `label`, a
+  root-relative `source_file`, `file_type`, `type`, the declared fields, no
+  payloads (refs) and no edges but `contains` / `method` / `inherits`. Any
+  field a resolver reads on another file's node (default `["node_kind"]`), and
+  any cross-file fact it needs from an unchanged file, must be listed in
   `context_fields` (bmake `bmake_includes`, cc-kb `cc_kb_links`, cargo
-  `cargo_ws_deps`). The core hook forwards those fields and adds
-  `_lang_source_file`, the absolute path.
+  `cargo_ws_deps`); otherwise full builds work and every incremental build
+  drops the edge. The core hook (`graphify.lang_registry.enrich_context`)
+  forwards the union of all manifests' fields and adds `_lang_source_file`,
+  the absolute path. The templates carry the section.
 - **`source_of`.** A resolver compares node paths through
   `graphify_lang._common.source_of(node)`, never `node["source_file"]`
   directly, so fresh and context nodes compare alike.
@@ -293,11 +298,15 @@ Known limits:
   file (an unchanged hub's `cites`, a workspace's `has_member`, a `calls` from
   an unchanged file) into a newly added file appears only on the next full
   build. This is upstream's incremental model, not a plugin defect.
+  [`tests/lang/test_s4_build_coherence.py::test_s4_e1_add_file_limit`, strict
+  xfail]
 - **Toggling `GRAPHIFY_LANG_DISABLE` re-extracts once.** The AST cache
-  namespace carries a fingerprint of the loaded plugin set (names, code, and
+  namespace carries a fingerprint of the loaded plugin set (names,
+  distribution versions, plugin code, `graphify/lang_registry.py`, and
   `GRAPHIFY_LANG_PATH` folders), so the first build after the plugin set
   changes, including turning discovery off or on, re-extracts every file.
-  Later builds with the same set reuse the cache.
+  Later builds with the same set reuse the cache. Other fork edits under
+  `graphify/` need a version change to reach cached files.
 
 ### Upstream seams the fork depends on
 

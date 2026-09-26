@@ -114,7 +114,10 @@ New node fields (attributes only; ids and edges unchanged): `cargo_ws_deps` on
 a cargo workspace node, `bmake_includes` on a bmake file node that includes
 something, `cc_kb_links` on a Markdown page node that links to another `.md`
 file. They are declared as `[resolve] context_fields`, so an incremental build
-keeps them on the context nodes of unchanged files (H1).
+keeps them on the context nodes of unchanged files (H1). `cc_kb_links` is set
+in any repo, not only inside a harness root (cc-CR000.003 S4-N1): 36
+non-harness pages / 47 KB on BentleyTools, 296 nodes / 28 KB on
+claude-config, 0.1-0.2 % of `graph.json`; it reaches JSON and GraphML exports.
 
 ## 4. Stage 4: incremental parity (E5, H1)
 
@@ -123,6 +126,11 @@ tree, a clean `_rebuild_code(root)`, then for each plugin file in turn an
 incremental `_rebuild_code(root, changed_paths=[f])`; node ids and
 `(source, target, relation)` edges between graphed nodes must equal the clean
 build.
+Since the review fix (cc-CR000.003 S4-L2) the test runs on both hooked paths
+(`_rebuild_code` and `graphify extract --code-only`, the latter without cc-kb
+because `--code-only` skips `.md`), appends a byte to each file, and compares
+whole node and edge dicts (minus `_origin`, `community`, `weight`) with a clean
+build of the edited tree: 0 differing files on every tree and path.
 
 | Fixture | Plugin files | Differing files before (`a5961fe`) | After (`cd55efb`) |
 |:--|--:|--:|--:|

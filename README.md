@@ -570,8 +570,8 @@ rewrites the shared `settings.json`. Rollback to stock:
 
 - **Released**: `v0.9.67+lang.3`, installed in the pipx venv. Plan 05 (review
   remediation, `docs/plans/05-review-remediation-cc-cr000-001.md`) is on the
-  `rr-*` branches, rebased onto upstream 0.9.68, and ships as the next
-  `+lang` release.
+  `rr-*` branches, rebased onto upstream 0.9.68, and ships as
+  `v0.9.68+lang.4`.
 - **Languages**: 9 registered plugins. `graphify lang list` shows them:
 
   | Plugin | Suffixes | Kind |

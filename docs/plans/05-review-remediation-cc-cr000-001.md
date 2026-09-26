@@ -1,6 +1,6 @@
 # Review remediation (cc-CR000.001)
 
-A six-stage fix of all 35 defects (4 High, 12 Medium, 13 Low, 6 Nit) and the 9 enhancements in `.claude/docs/cc-CR000.001.md`, released as `v0.9.67+lang.4`.
+A six-stage fix of all 35 defects (4 High, 12 Medium, 13 Low, 6 Nit) and the 9 enhancements in `.claude/docs/cc-CR000.001.md`, released as `v0.9.68+lang.4`.
 
 - Status: ACTIVE
 - Created: 2026-09-26
@@ -10,7 +10,7 @@ This is the HUB. Each stage is a SPOKE file `05-S00N-*.md` in this folder. A spo
 
 ## 1. Goal
 
-Every finding in `cc-CR000.001.md` is fixed, or is closed with a written reason. Each fix has a test that fails before the fix and passes after it. The fork is then released as `v0.9.67+lang.4`, and the affected graphs are rebuilt.
+Every finding in `cc-CR000.001.md` is fixed, or is closed with a written reason. Each fix has a test that fails before the fix and passes after it. The fork is then released as `v0.9.68+lang.4`, and the affected graphs are rebuilt.
 
 ## 2. Decisions
 
@@ -41,7 +41,7 @@ Decisions (owner, 2026-09-26):
 | 3 | `05-S003-shared-plugin-core.md` | E2, L5, H2, M4, M6, E7, L3, E8, N3, L12 | One shared sink fixes the id contract (H2, M4) once, not five times. Stage 4 builds on the new ids. |
 | 4 | `05-S004-build-coherence.md` | H1, E3, E5, H3, L9, L11, M2, E1 | Incremental and cached builds give the same graph as a clean build. Needs the stage 3 ids. |
 | 5 | `05-S005-registry-robustness.md` | M1, E4, M5, M3, L6, L7, L8, L10, L13, N5 | Loader and hook behaviour. Independent of the plugin ids. |
-| 6 | `05-S006-tests-docs-and-release.md` | M12, M11, N1, N2, release `v0.9.67+lang.4`, graph rebuild, PR drafts | The docs describe the final state; the release carries every fix. |
+| 6 | `05-S006-tests-docs-and-release.md` | M12, M11, N1, N2, release `v0.9.68+lang.4`, graph rebuild, PR drafts | The docs describe the final state; the release carries every fix. |
 
 ## 5. Finding map
 
@@ -75,7 +75,7 @@ Every finding in `cc-CR000.001.md` appears once.
 
 - `cc-CR000.001.md` holds no open finding. Every finding is in `cc-CR000.002.md` as fixed (with the commit hash) or closed (with the reason).
 - The E5 parity test passes for every plugin fixture: a clean build gives the same nodes and edges as a clean build followed by an incremental build of one changed file.
-- `graphify --version` reports `0.9.67+lang.4`, and both MCP servers start.
+- `graphify --version` reports `0.9.68+lang.4`, and both MCP servers start.
 - The rebuilt graphs keep the plan 04 plugin edge counts in `docs/testing/case_007_plan04-sniff-and-plugins.md`, or a spoke records the cause of each difference (M4 changes the file-node ids).
 
 ## 7. Risks

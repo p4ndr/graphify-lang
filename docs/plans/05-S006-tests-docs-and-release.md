@@ -1,6 +1,6 @@
 # Plan 05 S006: tests, docs and release
 
-Stage 6 of plan 05: the test suite shows what CI really covers, the docs describe the fork as it is, the upstream PR drafts exist, and `v0.9.67+lang.4` is installed and graphed.
+Stage 6 of plan 05: the test suite shows what CI really covers, the docs describe the fork as it is, the upstream PR drafts exist, and `v0.9.68+lang.4` is installed and graphed.
 
 - Status: ACTIVE
 - Task: T37
@@ -27,7 +27,7 @@ Stage 6 of plan 05: the test suite shows what CI really covers, the docs describ
   - the registry lookups in `detect.py` / `extract.py`.
 
   Each draft holds the problem, the minimal upstream diff, and a test. Nothing is opened on GitHub without owner approval.
-- **Release.** Bump to `0.9.67+lang.4`. Fast-forward `autolisp` to `rr-s6`, then tag. `rm -rf build dist`; build the wheel; copy it to `~/.local/share/graphify-lang/wheels/`; install it with the README form, `pipx install --force "graphifyy[mcp,commonlisp] @ file://…"` (the plan 04 T31 lesson: the bare wheel path drops the `mcp` extra). Refresh the graphify skill copy (plan 03 S6). Do not run `graphify claude install`.
+- **Release.** Bump to `0.9.68+lang.4` in `pyproject.toml` and refresh `uv.lock` (`uv lock`, so CI's `--frozen` sync agrees). Fast-forward `autolisp` to `rr-s6`, then tag. `rm -rf build dist`; build the wheel; copy it to `~/.local/share/graphify-lang/wheels/`; install it with the README form, `pipx install --force "graphifyy[mcp,commonlisp] @ file://…"` (the plan 04 T31 lesson: the bare wheel path drops the `mcp` extra). Refresh the graphify skill copy (plan 03 S6). Do not run `graphify claude install`.
 - **Rebuild.** For the same 11 repos plus `~/.claude` as plan 04 S16: back up to `graph.pre-plan05.json`, delete `graphify-out/cache/ast/`, run `graphify update <path>`. E1 changes the cache namespace, so old AST entries are not reused anyway.
 
 ## 2. Steps
@@ -38,7 +38,7 @@ Stage 6 of plan 05: the test suite shows what CI really covers, the docs describ
 | S6.1 | M12 marker and corpus samples. | `pytest -m "not corpus" tests/ -q` exits 0, and the skip reasons read "corpus". |
 | S6.2 | M11, N1, N2 docs. | `git grep -n "No code yet\|0.9.55\|~/.venvs/graphify-lang\|extract.py:5630"` finds nothing in the fork's docs. |
 | S6.3 | PR drafts. | Each draft's test passes when its diff is applied to a scratch `upstream/v8` worktree. |
-| S6.4 | Release `v0.9.67+lang.4` and install. | `graphify --version` = `0.9.67+lang.4`; `graphify lang list --check` shows 9 `ok`; the MCP server starts; `import yaml` works in the pipx venv. |
+| S6.4 | Release `v0.9.68+lang.4` and install. | `graphify --version` = `0.9.68+lang.4`; `graphify lang list --check` shows 9 `ok`; the MCP server starts; `import yaml` works in the pipx venv. |
 | S6.5 | Rebuild the 12 graphs; do a second, no-change update; run the E5 parity test's incremental check on scratch copies of bim-chk and BentleyHelp. | Every repo exits 0. Plugin edge counts match `case_007`, or `case_008` records the cause. Cross-file edges survive the incremental update (this closes H1 on real corpora). |
 | S6.6 | Close out: every finding is in `cc-CR000.002.md`, and `cc-CR000.001.md` holds no open finding; plan 05 and all spokes set to DONE; learnings (ltm) for the purity contract, the index-ref contract and the context-field hook; ask the owner, then push `autolisp`, the `rr-*` branches and the tag to `origin`. | Hub §6 acceptance criteria are met. |
 
@@ -57,9 +57,9 @@ Owner decision (2026-09-26): S6.4 (release), S6.5 (graph rebuild) and S6.6 (clos
 Deviations from §1:
 
 - **S6.0 chain.** Only `rr-s6` is rebased; `rr-s1`..`rr-s5` stay as historical refs (owner, this run).
-- **Version.** The branch still says `0.9.67+lang.3` on an upstream 0.9.68 base. The release step (S6.4) must choose between `0.9.67+lang.4` (spoke) and `0.9.68+lang.4` (the real base).
+- **Version.** Settled (owner, review-fix pass, cc-CR000.003 S6-M1): the release is `0.9.68+lang.4`, on the real base. PEP 440 sorts `0.9.67+lang.4` before stock `0.9.68`, so `pipx upgrade` would replace the fork with stock graphify. S6.4 sets `pyproject.toml` and refreshes `uv.lock` (`uv lock`); the branch says `0.9.67+lang.3` until then.
 - **Upstream `8928031`** ("preserve cross-file edges during incremental updates") feeds context nodes into JS/Python symbol resolution in `resolution.py`; it does not touch `watch.py` or the fork's `context_fields` hooks, and the E5 parity tests still pass.
 - **M12 samples.** Only the tests that read a private corpus got a sample. bmake and ecschema already had corpus-shaped fixture trees, so they are reused; autolisp's corpus checks already run on `tests/lang/fixtures/src`; cargo and cc-kb have no corpus test.
 - **S6.2 check scope.** The `git grep` runs over `README.md` and `.claude/CLAUDE.md`. Plans, case files and review files are dated records and keep the old strings. The README's 'The problem' section keeps its `c9f9901` line numbers and says so.
 - **PR drafts differ from the fork's code.** Each draft is the smallest upstream seam, not the fork's hook: `pr-01` is an entry-point group with `SUFFIXES` + `extract` (no sniff, match or augment); `pr-02` puts `context_fields` on `LanguageResolver` and names the path field `_abs_source_file` (the fork: manifest key, `_lang_source_file`); `pr-03` is a predicate list in `watch.py`. Each draft says how the fork would switch to it.
-- **Deferred (owner, this run).** S6.4 to S6.6 wait for a review-fix pass. Open for S6.4: the version base (see S6.0).
+- **Deferred (owner, this run).** S6.4 to S6.6 wait for a review-fix pass. The version base is settled (see 'Version').

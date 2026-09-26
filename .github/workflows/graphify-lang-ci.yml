@@ -2,9 +2,10 @@ name: graphify-lang CI
 
 on:
   push:
-    branches: ["lang-registry", "v8"]
+    branches: ["autolisp", "lang-*", "rr-*", "v8"]
+    tags: ["v*"]
   pull_request:
-    branches: ["lang-registry", "v8"]
+    branches: ["autolisp", "lang-*", "rr-*", "v8"]
   workflow_dispatch:
 
 jobs:
@@ -53,7 +54,7 @@ jobs:
 
       - name: bandit (static security analysis)
         continue-on-error: true
-        run: uv run --frozen bandit -r graphify -ll
+        run: uv run --frozen bandit -r graphify graphify_lang -ll
 
       - name: pip-audit (dependency vulnerabilities)
         continue-on-error: true

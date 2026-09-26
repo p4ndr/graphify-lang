@@ -147,3 +147,33 @@ graph); bim-chk 33 files, 416 nodes / 1114 edges, no difference.
 | Open q. (a) | accepted | — | Recorded as S4-E1; no cargo special case. |
 | Open q. (b) | accepted | `f215fb0` | README line under `GRAPHIFY_LANG_DISABLE` (already there from S6.2) now lists the fingerprint inputs. |
 | S3-X1 | actioned | `5eb3902` test, `9541fcb` fix | AutoLISP extractor and resolver, VBA extractor and resolver keep `calls` self-loops (other relations still drop them). VBA: a Sub has no result variable, so a bare `Walk` in `Sub Walk` is a call; in a Function / Property `Name(...)` is a call, `Name = x` the result. Learning 1499 (repo). |
+
+## S005
+
+**Tests:** `.venv/bin/python -m pytest tests/ -q`: before 6288 passed, 14
+skipped, 4 xfailed; after 6302 passed, 14 skipped, 4 xfailed (+14 in
+`tests/lang/test_s5_registry_robustness.py`: 12 red-first strict xfails,
+`raises=` pinned, each removed by its fix commit, plus the green
+`test_s5_m2_augment_watch_predicate` and the rewritten N2 test). `git diff
+upstream/v8...HEAD -- graphify/extractors/` empty; `tests/lang_baseline.txt`,
+`tests/upstream_tables.json` and `tests/test_watch.py` unchanged.
+
+**Watch claim (S5-M2):** `graphify.lang_registry.watch_claims` over each set,
+old rule ("the augment adds anything") -> new rule (`watch_cc_kb`): this repo's
+tracked `.md` 349 -> 43 of 436; `~/.claude/docs/*.md` 648 -> 640 of 648;
+`~/repos/claude-config` `**/*.md` (no `.git` / `graphify-out`) 861 -> 841 of
+871. Claim check for 648 files: 3.1 s -> 0.6 s.
+
+| Id | Status | Commit(s) | Note |
+|:--|:--|:--|:--|
+| S5-H1 | actioned | `04990d7` test, `7ab39e7` fix | Path runtimes import as `graphify_lang_path._<sha256[:16] of folder>.<runtime>` (synthetic package per folder); `sys.path` untouched; nothing shadowed. The review's fix (fail the second folder) was replaced by the owner's (namespace both): a shared top-level runtime name, or one an importable module has, loads and is a `--check` `warning:` row (exit status unchanged). |
+| S5-M1 | actioned | `04990d7` test, `7ab39e7` fix | `expanduser`/`resolve` per entry and `entry_points()` inside a `try` (`load_errors` keys: the entry, `entry points`); `check_languages` calls `apply_registry()` and fails when `_REGISTRY_AVAILABLE` is False. `~nosuchuser_zz/plugins`: `.mki` stays in `CODE_EXTENSIONS`, `--check` exits 1. |
+| S5-M2 | actioned | `04990d7` test, `29d91ea` engine, `63a8e2c` cc-kb | Narrowed, as the owner directed (the review proposed keeping the rule): `LanguageManifest.watch` predicate (path plugin: `WATCH`), `registry.augment_watch_claims` (no predicate: old rule; failing predicate: claims). cc-kb `watch_cc_kb`: a mention of another cc id, or a backticked path that is a file under the page's harness root. Spoke 05-S005 deviation and known limit corrected (a cc doc with no mention and a links-only page stay docs; removing the last mention/path leaves stale `cites` until the next rebuild). |
+| S5-M3 | actioned | `04990d7` test, `7ab39e7` fix | A non-absolute entry after `~` expansion is a load error "must be an absolute path". |
+| S5-L1 | actioned | `04990d7` test, `7ab39e7` fix | Relative imports (`from . import helper`) work at top level and lazily, via the H1 package; no global `sys.path` change. Absolute `import helper` stays unsupported by design (it would reopen H1); README says so. |
+| S5-L2 | actioned | `04990d7` test, `7ab39e7` fix | Discovery registers through `_register_new`: first name wins, second (entry point or path) is a load error; a repeated folder loads once. `_register_manifest` itself still replaces (fork tests `test_lang_sniff.py` re-register on purpose). |
+| S5-L3 | actioned | `04990d7` test, `7ab39e7` fix | A `*.toml` that parses without `[language]` is skipped (debug log); an unparsable one still reaches `from_toml` and is reported. |
+| S5-N1 | actioned | `04990d7` test, `748befd` fix | `import logging as _lang_logging` at all seven L8 hook handlers (cli 1, detect 2, extract 4). |
+| S5-N2 | actioned | `f4a4cc8` | `watch`'s `time` replaced by a clock whose loop sleep raises `KeyboardInterrupt` once the rebuild ran (10 s deadline), so `watch` stops its observer; the thread is joined and asserted dead. |
+| S5-N3 | rejected (no change) | — | As the review advises: moving `_lang_claims` below the dotfile / `graphify-out` filters edits a second upstream line; no profile shows a cost. |
+| S5-E1 | actioned | `61d8388` | `graphify_lang/templates/path-plugin/` (`example.toml`, `example_lang.py`), shipped as package data and loaded by `test_s5_e1_path_plugin_template_loads`; README rules for absolute entries, manifests only, private package, relative imports, first name wins, fingerprint `.py`/`.toml` only, watch predicate. |

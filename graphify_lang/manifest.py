@@ -115,6 +115,9 @@ class LanguageManifest:
     context_fields: tuple[str, ...] = ("node_kind",)
     # ``[extract] runtime``: the module a GRAPHIFY_LANG_PATH plugin is loaded from.
     runtime: str | None = None
+    # Augment only: True when an edit of this path should rebuild under
+    # ``graphify watch`` (S5-M2). None: whenever the augment adds anything.
+    watch: Callable[[Path], bool] | None = None
 
     @property
     def has_match(self) -> bool:

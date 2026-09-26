@@ -179,9 +179,10 @@ def augment_extractor(path, extractor):
 
 def watch_claims(path, augments: bool = True) -> bool:
     """True when a plugin makes ``path`` code for ``graphify watch`` (cc-CR000.001
-    M3): a ``[match]`` plugin claims it, or (``augments``) an augment adds to
-    what the built-in extracts from it. A deleted path counts by its suffix, so
-    the rebuild's reconcile drops its nodes."""
+    M3): a ``[match]`` plugin claims it, or (``augments``) an augment that
+    claims it says so (``lang_registry.augment_watch_claims``: its ``watch``
+    predicate, else "adds anything"; S5-M2). A deleted path counts by its
+    suffix, so the rebuild's reconcile drops its nodes."""
     if not _REGISTRY_AVAILABLE:
         return False
     from pathlib import Path
@@ -202,11 +203,8 @@ def watch_claims(path, augments: bool = True) -> bool:
         return False
     from graphify.extract import _get_extractor
 
-    extractor = _get_extractor(path)
-    inner = getattr(extractor, "__wrapped__", None)
-    # ponytail: extracts the file twice to see whether an augment adds anything
-    # (cc-kb matches every .md); fine for a debounced watch batch.
-    return inner is not None and extractor(path) != inner(path)
+    inner = getattr(_get_extractor(path), "__wrapped__", None)
+    return inner is not None and lang_registry.augment_watch_claims(path, inner)
 
 
 def context_fields() -> tuple[str, ...]:

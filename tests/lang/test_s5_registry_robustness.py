@@ -507,6 +507,35 @@ def test_s5_m2_watch_claims_cc_mention_or_in_scope_path(tmp_path):
     }
 
 
+def test_s5_m2_augment_watch_predicate(tmp_path, caplog):
+    """Engine side of S5-M2: an augment's ``watch`` predicate decides; with none,
+    "adds anything" does; a failing predicate claims the file."""
+    from dataclasses import replace
+
+    from graphify.extract import extract_markdown
+
+    def adds(path, base):
+        return {"attrs": {base["nodes"][0]["id"]: {"aug_x": 1}}}
+
+    def boom(path):
+        raise RuntimeError("watch boom")
+
+    doc = tmp_path / "a.md"
+    doc.write_text("# T\n")
+    aug = LanguageManifest(name="aug", suffixes=frozenset(), extract=lambda p: {},
+                           kind="augment", augments=frozenset({".md"}),
+                           match_globs=("*.md",), augment=adds)
+    got = {}
+    for key, manifest in (("none", aug), ("false", replace(aug, watch=lambda p: False)),
+                          ("boom", replace(aug, watch=boom))):
+        registry.reset()
+        registry._register_manifest(manifest)
+        with caplog.at_level(logging.WARNING, logger="graphify_lang.registry"):
+            got[key] = registry.augment_watch_claims(doc, extract_markdown)
+    assert got == {"none": True, "false": False, "boom": True}
+    assert "watch boom" in caplog.text
+
+
 @pytest.mark.xfail(strict=True, raises=AssertionError,
                    reason="S5-N1: a hook's `import logging` makes logging a local name")
 def test_s5_n1_hook_logging_not_a_local_name():

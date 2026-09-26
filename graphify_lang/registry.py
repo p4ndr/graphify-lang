@@ -164,8 +164,8 @@ def _importable(name: str) -> bool:
 
 def _path_manifest(state: _RegistryState, folder: Path, toml: Path) -> LanguageManifest:
     """The manifest ``toml`` with the callables of its ``[extract] runtime``
-    module: ``extract`` (or ``augment`` for an augment) and an optional
-    ``RESOLVER``, as an entry-point package sets them. The
+    module: ``extract`` (or ``augment`` for an augment) and optional
+    ``RESOLVER`` and ``WATCH``, as an entry-point package sets them. The
     module is imported as ``<_folder_package(folder)>.<runtime>``. A runtime
     whose top-level name another folder's runtime or an importable module
     also has still loads, with a clash warning: an absolute ``import`` of that
@@ -188,7 +188,8 @@ def _path_manifest(state: _RegistryState, folder: Path, toml: Path) -> LanguageM
             f"runtime name {top!r} clashes with {clash}; loaded from {folder} "
             f"under a private package, so use relative imports inside it")
         _LOG.warning("manifest %s: %s", toml, state.load_warnings[str(toml)])
-    return replace(manifest, **{attr: func}, resolver=getattr(module, "RESOLVER", None))
+    return replace(manifest, **{attr: func}, resolver=getattr(module, "RESOLVER", None),
+                   watch=getattr(module, "WATCH", None))
 
 
 def _process_loader_result(result: Any) -> None:
@@ -468,6 +469,15 @@ def _augmented(suffix: str, inner: Callable[[Path], dict],
     return augmented
 
 
+def _claiming_augments(path: Path) -> list[LanguageManifest]:
+    suffix = path.suffix.lower()
+    on_suffix = [m for m in _init_state().manifests.values()
+                 if m.kind == "augment" and m.augment and suffix in m.augments]
+    size = max((m.sniff.head_bytes for m in on_suffix if m.sniff), default=0)
+    head = _head_reader(path, size)
+    return [m for m in on_suffix if _sniff_score(m, path, head) is not None]
+
+
 def augment_extractor(path: Path, inner: Callable[[Path], dict]) -> Callable[[Path], dict]:
     """``inner`` wrapped by the augments that claim ``path``, else ``inner`` itself.
 
@@ -475,13 +485,29 @@ def augment_extractor(path: Path, inner: Callable[[Path], dict]) -> Callable[[Pa
     package manifest, else from ``_DISPATCH``), so a file the augment's
     ``[match]`` does not claim keeps the plain built-in.
     """
-    suffix = path.suffix.lower()
-    on_suffix = [m for m in _init_state().manifests.values()
-                 if m.kind == "augment" and m.augment and suffix in m.augments]
-    size = max((m.sniff.head_bytes for m in on_suffix if m.sniff), default=0)
-    head = _head_reader(path, size)
-    claiming = [m for m in on_suffix if _sniff_score(m, path, head) is not None]
-    return _augmented(suffix, inner, claiming) if claiming else inner
+    claiming = _claiming_augments(path)
+    return _augmented(path.suffix.lower(), inner, claiming) if claiming else inner
+
+
+def augment_watch_claims(path: Path, inner: Callable[[Path], dict]) -> bool:
+    """True when an augment that claims ``path`` makes it code for ``graphify
+    watch`` (S5-M2): its ``watch`` predicate says so, or, with none, it adds
+    anything to ``inner``'s result. A failing check claims the file (a rebuild
+    too many, never a stale graph)."""
+    base = None
+    for m in _claiming_augments(path):
+        try:
+            if m.watch is not None:
+                hit = m.watch(path)
+            else:
+                base = inner(path) if base is None else base
+                hit = _merge(m, base, m.augment(path, base) or {}) != base
+        except Exception as exc:
+            _LOG.warning("augment %s: watch check failed on %s: %s", m.name, path, exc)
+            hit = True
+        if hit:
+            return True
+    return False
 
 
 def _merge(m: LanguageManifest, base: dict, extra: dict) -> dict:

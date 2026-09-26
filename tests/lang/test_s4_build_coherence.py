@@ -51,9 +51,7 @@ _PARITY = {
 # Keys that differ between builds by design: provenance and clustering.
 _VOLATILE = {"_origin", "community", "weight"}
 # (plugin, path): the CLI path runs ``--code-only``, which skips ``.md``.
-_T38 = pytest.mark.xfail(strict=True, raises=AssertionError,
-                         reason="T38: resolvers find file nodes by label == basename")
-_PATHS = [pytest.param(p, how, marks=_T38 if p.endswith("-dupname") else ())
+_PATHS = [(p, how)
           for p in _PARITY for how in ("watch", "cli")
           if (p, how) not in {("cc-kb", "cli"), ("cc-kb-dupname", "cli"), ("autolisp-dupname", "cli")}]
 

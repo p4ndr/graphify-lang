@@ -27,7 +27,7 @@ import posixpath
 
 from graphify.resolver_registry import LanguageResolver
 
-from graphify_lang._common import source_of
+from graphify_lang._common import is_file_node, source_of
 from graphify_lang.cc_kb.augment import CC_ID
 
 # Not ``references``: graphify.watch._reconcile_markdown_links prunes an AST
@@ -60,10 +60,10 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
         if n.get("cc_kb_links"):
             linking.append(n)
         sf = source_of(n)
-        if not sf or n.get("label") != posixpath.basename(_norm(sf)):
+        if not is_file_node(n):
             continue  # not a file / page node
         files.setdefault(_norm(sf), n)
-        name = str(n["label"])
+        name = posixpath.basename(_norm(sf))
         folder = posixpath.dirname(_norm(sf))
         if (CC_ID.fullmatch(name[:-3]) and name.endswith(".md") and n.get("node_kind") == "page"
                 and posixpath.basename(folder) == "docs"):
@@ -108,7 +108,7 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
     # Hub -> spoke first: a structural edge wins a pair over a mention.
     for refs, me, sf, root, _ in work:
         if refs.get("hubs"):
-            parent = docs.get((posixpath.join(root, "docs"), _parent(str(me.get("label", ""))[:-3])))
+            parent = docs.get((posixpath.join(root, "docs"), _parent(posixpath.basename(_norm(source_of(me)))[:-3])))
             if parent is not None:
                 add(parent["id"], me["id"], "contains", "hub_spoke", sf, 1)
     for refs, me, sf, root, _ in work:

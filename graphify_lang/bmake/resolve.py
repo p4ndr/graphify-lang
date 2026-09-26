@@ -26,7 +26,7 @@ from pathlib import Path
 
 from graphify.resolver_registry import LanguageResolver
 
-from graphify_lang._common import pick_by_prefix as _pick, refs_of, source_of
+from graphify_lang._common import is_file_node, pick_by_prefix as _pick, refs_of, source_of
 
 _OUR_SUFFIXES = (".mki", ".mke")
 
@@ -49,7 +49,7 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
     includers: list[dict] = []                 # bmake file nodes with includes
     for n in all_nodes:
         sf = source_of(n)
-        if n.get("label") == Path(sf).name:
+        if is_file_node(n):
             files.setdefault(Path(sf).name.casefold(), []).append(n)
             if sf.lower().endswith(_OUR_SUFFIXES) and n.get("node_kind") == "file":
                 file_of.setdefault(sf, n["id"])

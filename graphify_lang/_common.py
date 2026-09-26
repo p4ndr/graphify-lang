@@ -13,6 +13,8 @@ contracts every plugin follows, in one place.
   renames colliding ids in place before resolvers run (H2, ltm learning 1477).
 - ``source_of``: a node's path in the fresh nodes' form, for any node the
   resolver compares by path (incremental context nodes are root-relative).
+- ``is_file_node``: a file node by upstream's own test, so the path-suffix
+  label a colliding basename persists (#2032) still counts (T38).
 - ``pick_by_prefix``: one candidate, or the one sharing the longest directory
   prefix with the source (INFERRED); a tie resolves to nothing.
 - ``load_manifest`` / ``load_builtins``: a package's TOML manifest and its
@@ -111,6 +113,14 @@ def source_of(node: dict) -> str:
     unchanged file's context node (incremental build) has the root-relative
     ``source_file`` and, from the registry hook, its absolute form (H1)."""
     return str(node.get("_lang_source_file") or node.get("source_file", ""))
+
+
+def is_file_node(node: dict) -> bool:
+    """Whether ``node`` is its file's node: label = the basename, or the
+    shortest unique path suffix upstream persists when basenames collide
+    (#2032). An incremental build's context nodes carry that suffix (T38)."""
+    from graphify.build import _is_file_node_label
+    return _is_file_node_label(node.get("label"), source_of(node))
 
 
 def resolve_ref_id(res: dict, ref: dict) -> str | None:

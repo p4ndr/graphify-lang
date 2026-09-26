@@ -14,7 +14,7 @@ from pathlib import Path
 
 from graphify.resolver_registry import LanguageResolver
 
-from graphify_lang._common import pick_by_prefix, refs_of
+from graphify_lang._common import is_file_node, pick_by_prefix, refs_of
 
 _OUR_SUFFIXES = (".lsp", ".mnl", ".dcl")
 _GROUP = {"function": "fn", "command": "fn", "dialog": "dialog", "module": "module"}
@@ -22,9 +22,10 @@ _GROUP = {"function": "fn", "command": "fn", "dialog": "dialog", "module": "modu
 
 def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
     index: dict[str, dict[str, list[dict]]] = {}
-    by_label: dict[str, list[dict]] = {}
+    files: dict[str, list[dict]] = {}        # basename -> file nodes
     for node in all_nodes:
-        by_label.setdefault(str(node.get("label", "")), []).append(node)
+        if is_file_node(node):
+            files.setdefault(Path(str(node.get("source_file", ""))).name, []).append(node)
         group = _GROUP.get(node.get("node_kind"))
         if group and str(node.get("source_file", "")).lower().endswith(_OUR_SUFFIXES):
             index.setdefault(group, {}).setdefault(str(node.get("label", "")).casefold(), []).append(node)
@@ -64,7 +65,7 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
             doc = Path(ref["name"])
             # The doc's own file node: same file name, source_file = the path
             # (absolute, or already root-relative when its extractor ran first).
-            docs = [n["id"] for n in by_label.get(doc.name, ())
+            docs = [n["id"] for n in files.get(doc.name, ())
                     if str(doc) == str(n.get("source_file")) or str(doc).endswith("/" + str(n.get("source_file")))]
             add(ref["source"], docs[0] if len(docs) == 1 else None, relation="sidecar_doc", ref=ref)
         elif kind == "action":

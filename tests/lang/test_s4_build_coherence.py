@@ -89,8 +89,6 @@ def _edges(graph: dict, relation: str) -> set[tuple[str, str]]:
     return {(e["source"], e["target"]) for e in graph["edges"] if e["relation"] == relation}
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="cc-CR000.001 H3: cargo members are read at augment time")
 def test_h3_new_member_crate_appears(tmp_path):
     root, cache = tmp_path / "ws", tmp_path / "cache"
     files = _write(root, {
@@ -105,8 +103,6 @@ def test_h3_new_member_crate_appears(tmp_path):
                                             ("cargo_workspace_ws", "pkg_b")}
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="cc-CR000.001 H3: cc-kb code paths are checked at augment time")
 def test_h3_new_code_ref_target_appears(tmp_path):
     root, cache = tmp_path / "kb", tmp_path / "cache"
     doc_files = _write(root, {"docs/cc-XX000.000.md": "# Hub\n\nRuns `scripts/new.ps1`.\n"})
@@ -118,8 +114,6 @@ def test_h3_new_code_ref_target_appears(tmp_path):
     assert (page, script) in _edges(g, "cites")
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="cc-CR000.001 L9: the cargo augment reads parent manifests up to /")
 def test_l9_outer_workspace_ignored(tmp_path):
     outer = tmp_path / "outer"
     _write(outer, {"Cargo.toml": ('[workspace]\nmembers = ["repo"]\n[workspace.dependencies]\n'

@@ -183,20 +183,20 @@ def _get_extractor_result(path: Path) -> dict:
     return _get_extractor(path)(path)
 
 
-def test_e8_cc_kb_is_root_cached(monkeypatch):
+def test_e8_cc_kb_augment_reads_no_other_file(monkeypatch):
+    """E8, then H3 (plan 05 S4): the docs/ root scan left the augment for the
+    resolver, so the augment lists no folder and tests no other path."""
     import os
 
+    from graphify.extract import extract_markdown
     from graphify_lang.cc_kb import augment
 
-    getattr(augment._is_root, "cache_clear", lambda: None)()
+    docs = sorted((_CC_KB / "docs").glob("cc-*.md"))
+    bases = [extract_markdown(d) for d in docs]
     calls = []
-    real = os.scandir
-
-    def scandir(p):  # count the augment's own scans, not the core's
-        if sys._getframe(1).f_code.co_name == "_is_root":
-            calls.append(p)
-        return real(p)
-    monkeypatch.setattr(augment.os, "scandir", scandir)
-    for doc in sorted((_CC_KB / "docs").glob("cc-*.md")):
-        _get_extractor_result(doc)
-    assert len(calls) == 1
+    monkeypatch.setattr(os, "scandir", lambda p: calls.append(p))
+    monkeypatch.setattr(Path, "is_file", lambda p: calls.append(p) or True)
+    monkeypatch.setattr(Path, "samefile", lambda p, q: calls.append(q) or False)
+    for doc, base in zip(docs, bases):
+        augment.augment_cc_kb(doc, base)
+    assert calls == []

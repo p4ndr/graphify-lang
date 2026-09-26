@@ -17,3 +17,8 @@ filenames = ["Cargo.toml"]
 # graphify_lang.cargo.augment:augment_cargo
 [extract]
 runtime = "graphify_lang.cargo.augment"
+
+# Node fields the resolver reads on other files' nodes; an incremental
+# build keeps them on the context nodes of unchanged files (H1).
+[resolve]
+context_fields = ["cargo_ws_deps"]

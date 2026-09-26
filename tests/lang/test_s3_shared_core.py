@@ -9,6 +9,7 @@ M6 (the rules engine's ``post_file`` prefix rule) is pinned in ``test_rules.py``
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -164,8 +165,6 @@ class _CountingList(list):
         return super().__iter__()
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="cc-CR000.001 L3: one all_nodes scan per cc-kb payload")
 def test_l3_cc_kb_resolver_scans_nodes_once():
     from graphify_lang.cc_kb.resolve import resolve
 
@@ -184,8 +183,6 @@ def _get_extractor_result(path: Path) -> dict:
     return _get_extractor(path)(path)
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="cc-CR000.001 E8: _is_root re-scans docs/ for every .md")
 def test_e8_cc_kb_is_root_cached(monkeypatch):
     import os
 
@@ -194,7 +191,12 @@ def test_e8_cc_kb_is_root_cached(monkeypatch):
     getattr(augment._is_root, "cache_clear", lambda: None)()
     calls = []
     real = os.scandir
-    monkeypatch.setattr(augment.os, "scandir", lambda p: calls.append(p) or real(p))
+
+    def scandir(p):  # count the augment's own scans, not the core's
+        if sys._getframe(1).f_code.co_name == "_is_root":
+            calls.append(p)
+        return real(p)
+    monkeypatch.setattr(augment.os, "scandir", scandir)
     for doc in sorted((_CC_KB / "docs").glob("cc-*.md")):
         _get_extractor_result(doc)
     assert len(calls) == 1

@@ -50,7 +50,9 @@ def _parent(cc_id: str) -> str | None:
 def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
     docs: dict[tuple[str, str], dict] = {}  # (docs dir, cc_id) -> page node
     files: dict[str, dict] = {}
+    by_id: dict[str, dict] = {}
     for n in all_nodes:
+        by_id.setdefault(n.get("id"), n)
         sf = n.get("source_file")
         if not sf or n.get("label") != posixpath.basename(_norm(sf)):
             continue  # not a file / page node
@@ -77,7 +79,7 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
     for res in per_file:
         if isinstance(res, dict) and res.get("cc_kb_refs"):
             node = res["nodes"][res["cc_kb_refs"]["node"]]
-            me = next((n for n in all_nodes if n.get("id") == node["id"]), node)
+            me = by_id.get(node["id"], node)
             sf = node.get("source_file", "")
             root = _norm(sf)
             for _ in range(res["cc_kb_refs"].get("up", 2)):

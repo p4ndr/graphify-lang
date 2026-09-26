@@ -149,3 +149,102 @@ unchanged file's dangling edges (cargo `depends_on` to external crates), and
 re-extracting one of a same-stem pair (`src/foo.cpp`, `src/foo.h`) alone
 un-salts its id. The test compares only edges between graphed nodes and
 touches only plugin files.
+
+## 5. Stage 6: release rebuild (S6.5)
+
+**Date:** 2026-09-26
+**Build:** `graphify 0.9.68+lang.4` (pipx venv, wheel of tag `v0.9.68+lang.4`,
+commit `ddefbc7` on `rr-fix`).
+**Procedure:** one repo at a time by a logging script that stops on the first
+failure: `cp graphify-out/graph.json graphify-out/graph.pre-plan05.json`,
+`rm -rf graphify-out/cache/ast` (semantic caches kept), `graphify update <path>`,
+then a second `graphify update <path>` with no change. Counts by the plan 04
+S16 stats script (plugin rows by source-file suffix; `xfile` = edges whose ends
+are in two files). Every update exited 0 with no traceback; the only warnings
+are upstream's (zero-node `.yml` files, missing `tree_sitter_sql`, C++ syntax
+errors), as in plan 04 S16.
+
+| Repo | Before nodes / edges | After nodes / edges | 2nd update | Plugin rows after (nodes / edges / xfile) | New context fields after |
+|:--|:--|:--|:--|:--|:--|
+| bim-chk | 818 / 1598 | 818 / 1598 | same | vba 416 / 1114 / 319 | - |
+| bentley-model-management | 1406 / 4282 | 1406 / 4286 | same | vba 1126 / 3961 / 1821 | - |
+| BentleyTools | 36395 / 44499 | 36395 / 44521 | same | vba 2529 / 9954 / 4862; cites 452 | `cc_kb_links` 36 |
+| BentleyHelp | 22230 / 36945 | 22231 / 36946 | same | bmake 729 / 2254 / 347; ecschema 15252 / 22457 / 1773 | `bmake_includes` 15 |
+| bentley-pyplace | 3777 / 7475 | 3777 / 7475 | same | ecschema 7 / 8 / 0; cites 60 | `cc_kb_links` 1 |
+| moxide | 6046 / 15075 | 6046 / 15075 | same | cargo 17 / 35 / 35; cites 29 | `cc_kb_links` 1, `cargo_ws_deps` 1 |
+| oa-graph | 2434 / 3977 | 2434 / 3977 | same | cargo 6 / 12 / 12; cites 2 | `cc_kb_links` 4, `cargo_ws_deps` 1 |
+| oag-dev | 2587 / 4096 | 2587 / 4096 | same | cargo 6 / 12 / 12 | `cc_kb_links` 3, `cargo_ws_deps` 1 |
+| tmllm | 4623 / 11629 | 4623 / 11629 | same | cargo 1 / 0 / 0 | - |
+| llm-linter-tool | 1662 / 2882 | 1662 / 2882 | same | astgrep 82 / 81 / 54; cites 16 | - |
+| claude-config | 47568 / 64638 | 47568 / 64638 | same | cites 12104; cargo 4 / 6 / 6 | `cc_kb_links` 296, `cargo_ws_deps` 1 |
+| `~/.claude` | 18260 / 33774 | 18326 / 33834 | same | cites 10594; cargo 4 / 6 / 6 | `cc_kb_links` 200, `cargo_ws_deps` 1 |
+
+"Before" equals the plan 04 S16 "after" count in every repo except `~/.claude`
+(its tree changed since). Differences, each traced by an id-level diff of
+`graph.pre-plan05.json` against `graph.json`:
+
+- **bentley-model-management +4, BentleyTools +22 edges:** VBA `calls`
+  self-loops of recursive procedures (`Loader.ResolveDependencies`,
+  `PathUtils.CollectFiles`, ...; 21 `.bas` + 1 `.frm`). S3-X1 (`9541fcb`)
+  keeps a recursive call as a self-loop, as upstream's built-ins do. No edge
+  lost.
+- **BentleyHelp +1 node, +1 edge:** M4. `PyGeomTest.mke` and `pygeomtest.cpp`
+  (same folded stem) were one node; they are two now (`..._pygeomtest_mke_...`,
+  `..._pygeomtest_cpp_...`). The 33 `contains` edges to the makefile's macros
+  and targets now come from the `.mke` file node, so they are no longer
+  cross-file (bmake xfile 379 -> 347); the `.cpp` node keeps its own
+  `contains` and `imports`. One semantic node without `_origin` (id
+  `mspython`) now carries `_origin: semantic`; its edges are unchanged. The
+  `PrecompileHeader` pair renamed at `extract()` level in §2 shows no id
+  change in the graph.
+- **`~/.claude` +66 nodes, +60 edges:** Markdown headings and `contains` edges
+  of files added or rewritten since plan 04 S16 (six `skills/synced/...` skill
+  files, the regenerated `cc-LR000.001` sidecars). `cites` unchanged.
+- **The new node fields** (`cc_kb_links`, `cargo_ws_deps`, `bmake_includes`,
+  stage 4) appear in 8 graphs; attributes only.
+- Plugin edge counts otherwise equal plan 04 S16 in every repo; semantic node
+  counts are unchanged in every repo (BentleyHelp +1 is the `_origin` stamp
+  above).
+
+### Incremental check (E5 on real corpora)
+
+Instrument: two `git archive HEAD` copies per repo; clean
+`watch._rebuild_code` on copy A; append `\n` to the K plugin files with the
+most cross-file edges in both copies; incremental
+`_rebuild_code(A, changed_paths=<those files>)`; clean build of copy B; node
+and edge dicts compared minus `_origin`, `community`, `weight`, edges between
+graphed nodes (the `test_e5_incremental_parity` comparison).
+
+| Corpus | Files changed | Clean before (n / e / plugin xfile) | Incremental | Clean of edited tree | Differences |
+|:--|:--|:--|:--|:--|:--|
+| bim-chk | 6 `.bas` | 818 / 1598 / 319 | 818 / 1598 / 319 | 818 / 1598 / 319 | none |
+| BentleyHelp | 8 ecschema `.xml`, 1 `.mke` | 22505 / 37343 / 2172 | 22505 / 37342 / 2171 | 22505 / 37343 / 2172 | 1 bmake edge lost; 11 upstream Python edges retargeted |
+
+- **bim-chk:** every cross-file VBA edge survives.
+- **BentleyHelp, upstream:** 11 `imports_from` edges from unchanged `.py`
+  test files point to an `ambiguous_python_import_<hash>` stub whose hash
+  differs between the incremental and the clean build (22 node differences =
+  the 11 + 11 stubs). No plugin file or plugin node is involved.
+- **BentleyHelp, fork: H1 is not closed for duplicate basenames.** The
+  incremental build drops `PyDgnPlatform.mke` target `$(o)valueformat$(oext)`
+  `depends_on` `PyDgnPlatform/source/valueformat.cpp` (INFERRED). Cause:
+  upstream relabels file nodes whose basename collides
+  (`graphify.build._file_label_reassignments`, #2032), so the persisted label
+  of both `valueformat.cpp` nodes is a path suffix (`PyDgnPlatform/source/valueformat.cpp`).
+  In a clean build the resolver runs before the relabel and sees
+  `valueformat.cpp`; in an incremental build the context nodes carry the
+  persisted label, and `graphify_lang/bmake/resolve.py` indexes file nodes by
+  `label == Path(source_file).name`, so neither candidate is indexed and the
+  edge is dropped. `graphify_lang/cc_kb/resolve.py` has the same test.
+  Minimal repros (installed `0.9.68+lang.4`): two `source/vf.cpp` files and one
+  `.mke` depending on its own -> the edge is gone after
+  `_rebuild_code(changed_paths=[A/A.mke])`; `skills/x/SKILL.md` and
+  `skills/y/SKILL.md` with a `docs/cc-AA000.000.md` citing the first -> its
+  `cites` edge is gone after the doc changes. Full `graphify update` (no
+  `changed_paths`) is not affected, so the 12 graphs above are complete; the
+  git-hook and `graphify watch` incremental paths drop such edges until the
+  next full update. Proposed fix (not in `lang.4`): index file nodes with
+  upstream's `graphify.build._is_file_node_label(label, source_file)`, and
+  add a same-basename pair to the bmake and cc-kb E5 parity fixtures.
+
+Rollback per repo: `cp graphify-out/graph.pre-plan05.json graphify-out/graph.json`.

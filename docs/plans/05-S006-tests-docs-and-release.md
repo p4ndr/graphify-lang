@@ -2,10 +2,10 @@
 
 Stage 6 of plan 05: the test suite shows what CI really covers, the docs describe the fork as it is, the upstream PR drafts exist, and `v0.9.68+lang.4` is installed and graphed.
 
-- Status: ACTIVE
+- Status: DONE (2026-09-26; release `v0.9.68+lang.4` from `rr-fix` `ddefbc7`)
 - Task: T37
 - Hub: `05-review-remediation-cc-cr000-001.md`
-- Branch: `rr-s6` from `rr-s5`; the release is a fast-forward of `autolisp`
+- Branch: `rr-s6` from `rr-s5`; review fixes on `rr-fix`; the release is cut from `rr-fix` (`autolisp` untouched, see §3)
 - Findings: M12, M11, N1, N2, E3 (PR draft), and the PR drafts for M3 and L13
 
 ## 1. Design
@@ -53,6 +53,9 @@ Owner decision (2026-09-26): S6.4 (release), S6.5 (graph rebuild) and S6.6 (clos
 | S6.2 | M11 README (Status, Development setup, roadmap states, symbol citations, settled questions, Plugin contract, known limits, upstream seams, layout); N1 `.claude/CLAUDE.md` symbols; N2 plan 02 DONE, plan 01 ACTIVE for T10 only, `manifest` run. The §2 `git grep` over `README.md` and `.claude/CLAUDE.md` finds nothing. | `acdac5f` |
 | S6.3 | `docs/upstream/`: four drafts, each problem + diff + test: `pr-01` entry-point language plugins (`detect.py` / `extract.py` lookups), `pr-02` resolver `context_fields` (H1/E3, `watch.py` and `cli.py`), `pr-03` watch code-path claims (M3), `pr-04` resolver suffix case-fold (L13). In a scratch worktree of `upstream/v8`: each test red without its diff, green with it (2 / 3 / 3 / 2 passed); full upstream suite with each diff 5990 or 5991 passed, 14 skipped; re-applied from the draft text before commit; worktree removed. | `31db078` |
 | review | M11, M12, N1, N2, E3 moved to `cc-CR000.002.md`; `cc-CR000.001.md` holds no open finding. | this commit |
+| S6.4 | On `rr-fix`: `0.9.68+lang.4` in `pyproject.toml`, `uv lock`; `pytest tests/ -q` 6305 passed, 14 skipped, 4 xfailed. Annotated tag `v0.9.68+lang.4` pushed to `origin` only; CI on the tag green (test 3.10/3.12/3.13, security-scan, wheel: clean-venv `graphify lang list --check`), and on `rr-fix`. `rm -rf build dist`, `uv build --wheel`, wheel copied to `~/.local/share/graphify-lang/wheels/`, `pipx install --force "graphifyy[mcp,commonlisp] @ file://…/graphifyy-0.9.68+lang.4-py3-none-any.whl"`: `graphify --version` 0.9.68+lang.4; `graphify lang list --check` 9 `ok`, exit 0; `python -m graphify.serve` answers `initialize` as 0.9.68+lang.4 with 10 tools; `yaml` 6.0.3 in the pipx venv. Skill refreshed by `_copy_skill_file('claude')` (`.graphify_version` 0.9.68+lang.4; its `SKILL.md.bak` equalled the committed copy and was removed). Repo `.venv` synced, metadata 0.9.68+lang.4. | `ddefbc7` |
+| S6.5 | 12 graphs rebuilt (backup `graph.pre-plan05.json`, `cache/ast/` deleted, `graphify update`), each exit 0; a second update changed nothing in any. Counts and every difference: `docs/testing/case_008_plan05-remediation.md` §5. Incremental check: bim-chk (6 `.bas`) equal to a clean build; BentleyHelp (8 ecschema, 1 `.mke`) loses 1 bmake `depends_on` edge: **open residual**, H1 does not hold when the target's basename collides (upstream relabels those file nodes; the bmake and cc-kb resolvers index file nodes by bare-basename label). Repro and proposed fix in case_008 §5. | S6.6 commit |
+| S6.6 | Hub and six spokes DONE; `manifest`; T37.4-T37.6 done; learnings: the index-ref contract (1477), the context-field hook (1491) and the purity rule (1498) were already recorded; one new learning for the label residual. | S6.6 commit |
 
 Deviations from §1:
 
@@ -62,4 +65,6 @@ Deviations from §1:
 - **M12 samples.** Only the tests that read a private corpus got a sample. bmake and ecschema already had corpus-shaped fixture trees, so they are reused; autolisp's corpus checks already run on `tests/lang/fixtures/src`; cargo and cc-kb have no corpus test.
 - **S6.2 check scope.** The `git grep` runs over `README.md` and `.claude/CLAUDE.md`. Plans, case files and review files are dated records and keep the old strings. The README's 'The problem' section keeps its `c9f9901` line numbers and says so.
 - **PR drafts differ from the fork's code.** Each draft is the smallest upstream seam, not the fork's hook: `pr-01` is an entry-point group with `SUFFIXES` + `extract` (no sniff, match or augment); `pr-02` puts `context_fields` on `LanguageResolver` and names the path field `_abs_source_file` (the fork: manifest key, `_lang_source_file`); `pr-03` is a predicate list in `watch.py`. Each draft says how the fork would switch to it.
-- **Deferred (owner, this run).** S6.4 to S6.6 wait for a review-fix pass. The version base is settled (see 'Version').
+- **Deferred (owner, S6.0-S6.3 run).** S6.4 to S6.6 waited for a review-fix pass (`rr-fix`, cc-CR000.003); done 2026-09-26.
+- **Release branch (owner, S6.4-S6.6 run).** The release is cut from `rr-fix`, not by fast-forwarding `autolisp`. `autolisp` is not touched (no reset, merge or push); it stays on the old base (`1c13cf4`, upstream 0.9.67) pending an owner decision. `rr-fix` and the tag are pushed with plain pushes; the `rr-*` branches are not pushed. The README release recipe still says `autolisp`.
+- **S6.6 close-out.** `cc-CR000.001.md` / `cc-CR000.002.md` were closed before this run (row `review` above; cc-CR000.003 closed in `ae42745`). The label residual found in S6.5 is a new finding, recorded in case_008 §5 and as a TODO, not added to `cc-CR000.001.md`.

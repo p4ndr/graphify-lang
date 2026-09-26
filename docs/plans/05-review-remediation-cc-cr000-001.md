@@ -2,7 +2,7 @@
 
 A six-stage fix of all 35 defects (4 High, 12 Medium, 13 Low, 6 Nit) and the 9 enhancements in `.claude/docs/cc-CR000.001.md`, released as `v0.9.68+lang.4`.
 
-- Status: ACTIVE
+- Status: DONE (2026-09-26, released as `v0.9.68+lang.4` from `rr-fix` `ddefbc7`; one residual in `05-S006` §3)
 - Created: 2026-09-26
 - Tasks: T32 (S001), T33 (S002), T34 (S003), T35 (S004), T36 (S005), T37 (S006)
 

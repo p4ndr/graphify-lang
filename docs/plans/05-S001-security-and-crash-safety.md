@@ -2,7 +2,7 @@
 
 Stage 1 of plan 05 (hub `05-review-remediation-cc-cr000-001.md`): no input file can hang a build, crash it, or make a whole file vanish from the graph.
 
-- Status: ACTIVE
+- Status: DONE (2026-09-26, `rr-s1`)
 - Task: T32
 - Hub: `05-review-remediation-cc-cr000-001.md`
 - Branch: `rr-s1` from `autolisp`

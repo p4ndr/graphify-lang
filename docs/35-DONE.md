@@ -15,6 +15,15 @@ This document is a LIVE file containing a list of TASKS that have been carried o
 
 ## 3. TASK LIST
 
+### `[x]` T37 | P05-S006 (rr-s6) Tests, docs, release lang.4 — M12 M11 N1 N2 PR drafts
+
+- `[x]` T37.1 | S6.1 M12 corpus marker + checked-in corpus samples
+- `[x]` T37.2 | S6.2 M11 README, N1 CLAUDE.md symbols, N2 plan statuses
+- `[x]` T37.3 | S6.3 Upstream PR drafts (H1/E3, M3, L13, registry lookups)
+- `[x]` T37.4 | S6.4 Release v0.9.67+lang.4 + pipx install (README form)
+- `[x]` T37.5 | S6.5 Rebuild 12 graphs; incremental check on real corpora
+- `[x]` T37.6 | S6.6 Close-out: CR file, DONE statuses, learnings, ask owner then push
+
 ### `[x]` T36 | P05-S005 (rr-s5) Registry robustness — M1 E4 M5 M3 L6 L7 L8 L10 L13 N5
 
 - `[x]` T36.1 | S5.1 Red tests for each finding

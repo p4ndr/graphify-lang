@@ -15,6 +15,15 @@ This document is a LIVE running changelog for all work in the repo.
 
 ## 3. CURRENT SESSION
 
+### 2026-09-26 19:48 (UTC+10)
+
+- T37.4 done: ddefbc7 release 0.9.68+lang.4 on rr-fix; tag v0.9.68+lang.4 pushed to origin, CI green (tag + rr-fix); pipx venv on the lang.4 wheel ([mcp,commonlisp]); lang list --check 9 ok; MCP initialize 0.9.68+lang.4; yaml 6.0.3; skill refreshed; .venv lang.4. Release cut from rr-fix; autolisp untouched.
+- T37.5 done: 12 graphs rebuilt (graph.pre-plan05.json, cache/ast cleared, graphify update), exit 0 each, 2nd update identical; diffs vs plan 04 S16 explained in case_008 §5 (VBA self-loops, M4 PyGeomTest split, ~/.claude tree changes). Incremental: bim-chk equal; BentleyHelp loses 1 bmake edge (duplicate-basename label residual, new TODO).
+- T37.6 done: Plan 05 hub and six spokes DONE; manifest run; learnings 1477 (index-ref), 1491 (context-field hook), 1498 (purity) already recorded; new 1501 (disambiguated file labels on incremental context nodes); residual tracked as T38.
+- T37 done (all steps): P05-S006 (rr-s6) Tests, docs, release lang.4 — M12 M11 N1 N2 PR drafts
+- Plan 05 DONE (S6.4-S6.6): v0.9.68+lang.4 released from rr-fix ddefbc7 (tag on origin, CI green), installed in the pipx venv; 12 graphs rebuilt (case_008 §5); autolisp untouched pending owner decision.
+- Open: T38, the bmake/cc-kb duplicate-basename label residual on incremental builds (learning 1501). Rollback: per repo cp graphify-out/graph.pre-plan05.json graphify-out/graph.json; global pipx install --force the lang.3 wheel (README form).
+
 ### 2026-09-26 17:11 (UTC+10)
 
 - T37.1 done: S6.0: rr-s6 rebased onto upstream/v8 4000de1 (0.9.68), 1 conflict (lang.1 commit: README/pyproject/uv.lock version); S6.1 M12 corpus marker + samples 842a67d; 6238 passed / 14 skipped
@@ -237,22 +246,5 @@ This document is a LIVE running changelog for all work in the repo.
 - T27 done on branch lang-sniff (7 commits 7181bea..a68c964, local tag v0.9.67+lang.2, not pushed): sniff router, [match] detect hook in classify_file, augment kind; pytest 6065 passed / 14 skipped (baseline 6026); git diff upstream/v8 -- graphify/extractors/ empty; upstream_tables.json and lang_baseline.txt unchanged.
 - Open for S10: Cargo.toml and pyproject.toml are already CODE upstream via is_package_manifest_path, and _get_extractor sends them to extract_package_manifest before _DISPATCH, so a [match] cargo plugin on .toml is never called by the router.
 - Phase 0 file: /home/p4ndr/.claude/cache/phase0/graphify-lang/phase0-20260925-130317.md
-
-### 2026-09-25 13:01 (UTC+10)
-
-- bash: rtk ls -d ~/repos/*/ ~/GIT/*/ ~/git/*/ 2>/dev/null; graphify lang list 2>&1 | head -30, cd ~/repos/graphify-lang && .venv/bin/python -c "
-  from graphify import detect as d
-  for n in dir(d):
-  v=getattr(d,n)
-  …, cd ~/repos && for r in */; do r=${r%/}; [ -d "$r/.git" ] || continue; echo "== $r"; git -C "$r" ls-files 2>/dev/null | …, rtk ls ~/repos/llm-linter-tool; git -C ~/repos/llm-linter-tool ls-files '*.yml' | head -5; git -C ~/repos/BentleyHelp l…, cd ~/repos/graphify-lang && ls graphify/extractors/ | tr '\n' ' '; echo; .venv/bin/python -c "
-  import graphify.extract …, cd ~/repos/graphify-lang && f=$(git -C ~/repos/bim-chk ls-files '*.cls' | head -1); .venv/bin/python -c "
-  from pathlib … (+9 more)
-- edit: docs/plans/04-content-sniffing-augment-plugins-and-five-new-languages.md
-- P16 settled: Option 2: repair the regex rules runtime to the S005 emission contract and keep it as a fallback/utility layer; new plu…
-- bash: cd ~/repos/graphify-lang && sed -i 's/^- Status: DRAFT$/- Status: ACTIVE/; s/^- Tasks: <TASK numbers in docs\/30-TODO.m…, cd ~/repos/graphify-lang && pwsh -NoProfile -File ~/.claude/skills/repo-docs/scripts/repo-docs.ps1 manifest 2>&1 | tail…
-- Surveyed 22 local repos for graphify language gaps; measured extract_apex on bim-chk ThisWorkbook.cls (VBA): 1 node, 0 edges
-- Wrote plan 04 (content sniff router, augment kind, VBA/bmake/Cargo/ast-grep/ECSchema plugins, cc-kb augment); owner decisions D1-D8
-- Settled P16 as option 2 (D-008): repair the regex rules runtime as a fallback/utility; plugins use their own extractors
-- Plan 04 ACTIVE; tasks T27-T31 added
 
 ## 5. EARLIER SESSIONS

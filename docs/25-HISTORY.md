@@ -13,6 +13,23 @@ This document is an ARCHIVE of session progress cut-over from `20-PROGRESS.md`.
 
 ## 3. SESSION HISTORY
 
+### 2026-09-25 13:01 (UTC+10)
+
+- bash: rtk ls -d ~/repos/*/ ~/GIT/*/ ~/git/*/ 2>/dev/null; graphify lang list 2>&1 | head -30, cd ~/repos/graphify-lang && .venv/bin/python -c "
+  from graphify import detect as d
+  for n in dir(d):
+  v=getattr(d,n)
+  …, cd ~/repos && for r in */; do r=${r%/}; [ -d "$r/.git" ] || continue; echo "== $r"; git -C "$r" ls-files 2>/dev/null | …, rtk ls ~/repos/llm-linter-tool; git -C ~/repos/llm-linter-tool ls-files '*.yml' | head -5; git -C ~/repos/BentleyHelp l…, cd ~/repos/graphify-lang && ls graphify/extractors/ | tr '\n' ' '; echo; .venv/bin/python -c "
+  import graphify.extract …, cd ~/repos/graphify-lang && f=$(git -C ~/repos/bim-chk ls-files '*.cls' | head -1); .venv/bin/python -c "
+  from pathlib … (+9 more)
+- edit: docs/plans/04-content-sniffing-augment-plugins-and-five-new-languages.md
+- P16 settled: Option 2: repair the regex rules runtime to the S005 emission contract and keep it as a fallback/utility layer; new plu…
+- bash: cd ~/repos/graphify-lang && sed -i 's/^- Status: DRAFT$/- Status: ACTIVE/; s/^- Tasks: <TASK numbers in docs\/30-TODO.m…, cd ~/repos/graphify-lang && pwsh -NoProfile -File ~/.claude/skills/repo-docs/scripts/repo-docs.ps1 manifest 2>&1 | tail…
+- Surveyed 22 local repos for graphify language gaps; measured extract_apex on bim-chk ThisWorkbook.cls (VBA): 1 node, 0 edges
+- Wrote plan 04 (content sniff router, augment kind, VBA/bmake/Cargo/ast-grep/ECSchema plugins, cc-kb augment); owner decisions D1-D8
+- Settled P16 as option 2 (D-008): repair the regex rules runtime as a fallback/utility; plugins use their own extractors
+- Plan 04 ACTIVE; tasks T27-T31 added
+
 ### 2026-09-24 14:42 (UTC+10)
 
 - bash: timeout 1200 .venv/bin/python -m pytest tests/ -q -p no:cacheprovider 2>&1 | tail -1; TMPDIR=/tmp/claude-1000/-home-p4n…, cd ~/repos/autolisp-pvcase && rtk git log -1 --format='%h %ci'; git status --porcelain | head -5; git ls-files '*.lsp' …

@@ -1,4 +1,4 @@
-"""Registry for language packages discovered via entry points or namespace."""
+"""Registry for language packages discovered via entry points."""
 
 from __future__ import annotations
 

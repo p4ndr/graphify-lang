@@ -144,7 +144,12 @@ def test_n3_every_manifest_key_is_read(toml):
     assert sorted(_keys(data) - read) == []
 
 
-@pytest.mark.parametrize("schema, ok", [("1", True), ('"v1"', True), ("2", False)])
+_N2 = pytest.mark.xfail(strict=True, raises=AssertionError, reason="S3-N2: True == 1")
+
+
+@pytest.mark.parametrize("schema, ok", [("1", True), ('"v1"', True), ("2", False),
+                                        pytest.param("true", False, marks=_N2),
+                                        pytest.param("1.0", False, marks=_N2)])
 def test_n3_schema_is_read(tmp_path, schema, ok):
     from graphify_lang.manifest import LanguageManifest
 
@@ -213,3 +218,102 @@ def test_s2_n5_one_tomllib_shim():
                    for p in (root / d).rglob("*.py") if shim.search(p.read_text(encoding="utf-8")))
     assert shims == ["graphify_lang/manifest.py"]
     assert hasattr(manifest, "tomllib") and not hasattr(manifest, "tomli")
+
+
+# --- cc-CR000.003 S003 review fixes -------------------------------------------
+
+def _lsp_results(tmp_path):
+    from graphify_lang.autolisp.extract import extract_autolisp
+
+    (tmp_path / "app").mkdir()
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "app/x.lsp").write_text("(defun go () (libfn))\n")
+    (tmp_path / "sub/lib.lsp").write_text("(defun libfn () 1)\n")
+    return [extract_autolisp(tmp_path / "app/x.lsp"), extract_autolisp(tmp_path / "sub/lib.lsp")]
+
+
+def _calls(per_file):
+    from graphify_lang.autolisp.resolve import resolve
+
+    nodes = [n for r in per_file for n in r["nodes"]]
+    edges: list = []
+    resolve(per_file, nodes, edges)
+    labels = {n["id"]: n["label"] for n in nodes}
+    return {(labels[e["source"]], labels[e["target"]]) for e in edges if e["relation"] == "calls"}
+
+
+@pytest.mark.xfail(strict=True, raises=KeyError, reason="S3-M1: a node-less ref raises")
+def test_s3_m1_stale_cache_ref_degrades(tmp_path):
+    """S3-M1 / S3-E1: a pre-S3 AST cache entry (refs carry ``source``, not
+    ``node``) degrades that file, never the whole resolver pass. The plugin-set
+    fingerprint (E1, ``lang_registry._namespace_ast_cache``) already keeps such
+    entries unread; this pins the resolver side."""
+    from graphify_lang._common import refs_of
+
+    fresh = _lsp_results(tmp_path)
+    assert _calls(fresh) == {("go", "libfn")}
+    stale = [dict(r) for r in fresh]
+    stale[0]["autolisp_refs"] = [{k: v for k, v in ref.items() if k != "node"}
+                                 | {"source": stale[0]["nodes"][ref["node"]]["id"]}
+                                 for ref in fresh[0]["autolisp_refs"]]
+    assert _calls(stale) == {("go", "libfn")}  # pre-S3 ``source`` is still an id of that result
+    gone = [{**stale[0], "autolisp_refs": [{k: v for k, v in r.items() if k != "source"}
+                                           for r in stale[0]["autolisp_refs"]]}, stale[1]]
+    assert _calls(gone) == set() and refs_of(gone, "autolisp_refs") == []
+
+
+def test_s3_e1_pick_by_prefix():
+    from graphify_lang._common import pick_by_prefix
+
+    def n(i, sf):
+        return {"id": i, "source_file": sf}
+    assert pick_by_prefix([], "a/x.lsp") == (None, "EXTRACTED")
+    assert pick_by_prefix([n("t", "z/y.lsp")], "a/x.lsp") == ("t", "EXTRACTED")
+    assert pick_by_prefix([n("far", "old/a/y.lsp"), n("near", "a/y.lsp")], "a/x.lsp") == ("near", "INFERRED")
+    assert pick_by_prefix([n("p", "b/y.lsp"), n("q", "c/y.lsp")], "a/x.lsp") == (None, "EXTRACTED")
+
+
+def test_s3_e1_sink_ref_unique_and_add_salting(tmp_path):
+    from graphify_lang._common import Sink
+
+    s = Sink(tmp_path / "x.lsp")
+    a = s.node("function", "f", 1)
+    b = s.node("function", "f", 7)
+    assert b == f"{a}_l7" and len({n["id"] for n in s.nodes}) == 3
+    s.ref("call", a, 2, unique=True, name="g")
+    s.ref("call", a, 3, unique=True, name="g")
+    s.ref("call", a, 4, name="g")
+    assert [(r["node"], r["line"]) for r in s.refs] == [(1, 2), (1, 4)]
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S3-N4: Out overrides Sink methods")
+def test_s3_n4_rules_out_keeps_the_sink_signatures():
+    import inspect
+
+    from graphify_lang._common import Sink
+    from graphify_lang.rules import Out
+
+    clash = [m for m in vars(Out) if callable(vars(Out)[m]) and hasattr(Sink, m) and not m.startswith("__")
+             and inspect.signature(getattr(Out, m)) != inspect.signature(getattr(Sink, m))]
+    assert clash == []
+
+
+def test_s3_n3_every_read_key_has_a_reader_in_code():
+    """S3-N3: ``_READ`` is kept in this test, so each key's leaf name must also
+    be read somewhere in ``graphify_lang`` (as a string literal), or the list
+    could name a key nothing reads. ``extract.runtime`` is read by the registry
+    for a GRAPHIFY_LANG_PATH plugin (``registry._path_manifest``)."""
+    root = Path(__file__).resolve().parents[2] / "graphify_lang"
+    code = "\n".join(p.read_text(encoding="utf-8") for p in root.rglob("*.py"))
+    missing = sorted(k for k in _READ | _READ_BY_RULES
+                     if f'"{k.split(".")[-1]}"' not in code and f"'{k.split('.')[-1]}'" not in code)
+    assert missing == []
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S3-N2: message omits v1")
+def test_s3_n2_schema_message_names_both_forms(tmp_path):
+    from graphify_lang.manifest import LanguageManifest
+
+    toml = tmp_path / "m.toml"
+    toml.write_text('schema = 2\n[language]\nname = "x"\nsuffixes = [".x"]\n[extract]\nruntime = "m"\n')
+    assert LanguageManifest.from_toml(toml)[1] == ['schema must be 1 or "v1"']

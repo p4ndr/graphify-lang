@@ -274,3 +274,59 @@ def test_programming_template_runs(tmp_path):
 def test_templates_are_package_data():
     pyproject = tomllib.loads((TEMPLATES.parent.parent / "pyproject.toml").read_text())
     assert "templates/*.toml" in pyproject["tool"]["setuptools"]["package-data"]["graphify_lang"]
+
+
+# --- cc-CR000.003 S003 review fixes -------------------------------------------
+
+@pytest.mark.xfail(strict=True, raises=TypeError, reason="S3-L1: build takes no package")
+def test_s3_l1_post_file_from_the_callers_package(monkeypatch):
+    """S3-L1: an out-of-tree plugin that calls ``build`` may name a hook in its
+    own package; any other module stays rejected (plan 05 D1)."""
+    def hook(path, tree, nodes, edges, manifest):
+        return {"nodes": nodes + [{"id": "extra"}]}
+
+    monkeypatch.setitem(sys.modules, "mylang", types.SimpleNamespace())
+    monkeypatch.setitem(sys.modules, "mylang.hooks", types.SimpleNamespace(post=hook))
+    monkeypatch.setitem(sys.modules, "mylangx", types.SimpleNamespace(post=hook))
+    ok = {"extract": {"post_file": "mylang.hooks:post"}}
+    extract, _ = build(FIXTURE_DIR / "m.toml", ok, package="mylang")
+    assert extract(ERR)["nodes"][-1] == {"id": "extra"}
+    for manifest, package in ((ok, None), ({"extract": {"post_file": "mylangx:post"}}, "mylang")):
+        extract, _ = build(FIXTURE_DIR / "m.toml", manifest, package=package)
+        assert "rejected" in extract(ERR)["error"]
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S3-L2: Sink.edge drops self-calls")
+def test_s3_l2_recursive_call_keeps_its_self_loop(tmp_path):
+    """S3-L2: a recursive call is a ``calls`` self-loop, as upstream's built-in
+    extractors emit it (``def f(n): return f(n-1)`` -> ``f calls f``)."""
+    f = tmp_path / "r.lsp"
+    f.write_text("(defun fact (n)\n  (fact (1- n)))\n")
+    stem = _stem(f)
+    assert _edges(_run({"rule": LISP_REGEX}, f), "calls") == {(f"{stem}_fact", f"{stem}_fact")}
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S3-N1: '#' comment drops '#&/'")
+def test_s3_n1_hash_name_is_not_a_comment(tmp_path):
+    """S3-N1: ``#`` starts a comment only when a space or the line end follows,
+    so the AutoLISP builtin ``#&/`` survives the shared loader."""
+    from graphify_lang.autolisp.extract import is_builtin
+
+    assert is_builtin("#&/")
+    (tmp_path / "b.txt").write_text("#\n# comment\n#&/\n")
+    from graphify_lang.builtins import Builtins
+
+    assert Builtins.from_manifest(tmp_path / "m.toml", {"extract": {"builtins_file": "b.txt"}}).names == {"#&/"}
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="int grammar pointer is deprecated")
+def test_int_grammar_pointer_warns_nothing(tmp_path):
+    """``tree_sitter_commonlisp.language()`` returns an int; ``Language(int)``
+    is deprecated in py-tree-sitter 0.25, so the pointer is wrapped in a capsule."""
+    import warnings
+
+    with warnings.catch_warnings(record=True) as seen:
+        warnings.simplefilter("always")
+        r = _run(**_tags_manifest(tmp_path))
+    assert "error" not in r
+    assert [str(w.message) for w in seen if issubclass(w.category, DeprecationWarning)] == []

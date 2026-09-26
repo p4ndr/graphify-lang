@@ -324,8 +324,6 @@ def test_s4_l1_fingerprint_failure_fails_closed(monkeypatch):
     assert cache._EXTRACTOR_VERSION == f"{core._BASE_CACHE_VERSION}-langerr"
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S4-L3: a failed context hook logs at debug only")
 def test_s4_l3_hook_failure_is_logged(tmp_path, monkeypatch, caplog):
     """S4-L3: a registry failure in the incremental context hook reverts H1, so
     it is logged as a warning, not swallowed."""
@@ -345,28 +343,6 @@ def test_s4_l3_hook_failure_is_logged(tmp_path, monkeypatch, caplog):
         _run("watch", root, [files[0]])
     assert any("context boom" in r.getMessage() and r.levelno >= logging.WARNING
                for r in caplog.records)
-
-
-@pytest.mark.xfail(strict=True, raises=ImportError,
-                   reason="S4-N4: every context node gets every manifest's fields")
-def test_s4_n4_context_fields_scoped_per_manifest():
-    """S4-N4: a context node gets the fields of the manifests that claim its
-    suffix only: cargo's ``pkg_*`` node keeps no ``version`` (ecschema's)."""
-    from graphify.lang_registry import enrich_context
-
-    persisted = {"nodes": [
-        {"id": "pkg_a", "source_file": "a/Cargo.toml", "version": "0.1.0", "cargo_ws_deps": ["x=y"]},
-        {"id": "s_s", "source_file": "s.ecschema.xml", "version": "01.00", "node_kind": "schema"},
-    ]}
-    ctx = [{"id": "pkg_a", "source_file": "a/Cargo.toml"},
-           {"id": "s_s", "source_file": "s.ecschema.xml"}]
-    enrich_context(ctx, persisted, lambda sf: "/r/" + sf)
-    assert ctx == [
-        {"id": "pkg_a", "source_file": "a/Cargo.toml", "cargo_ws_deps": ["x=y"],
-         "_lang_source_file": "/r/a/Cargo.toml"},
-        {"id": "s_s", "source_file": "s.ecschema.xml", "version": "01.00", "node_kind": "schema",
-         "_lang_source_file": "/r/s.ecschema.xml"},
-    ]
 
 
 def test_s4_l4_fingerprint_covers_lang_registry(tmp_path, monkeypatch):

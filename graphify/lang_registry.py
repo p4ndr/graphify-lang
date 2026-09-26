@@ -217,6 +217,29 @@ def context_fields() -> tuple[str, ...]:
     return lang_registry.context_fields()
 
 
+def enrich_context(nodes: list[dict], graph: dict, identity: Callable[[str], str | None]) -> None:
+    """Add the plugin resolvers' fields to an incremental build's context
+    nodes, in place (cc-CR000.001 H1, S4-L3). ``graph`` is the persisted graph
+    the nodes were read from; ``identity`` maps a stored ``source_file`` to
+    the absolute form fresh nodes carry (``_lang_source_file``, read by
+    ``graphify_lang._common.source_of``). One call after upstream's context
+    loop in ``watch._rebuild_code`` and the ``graphify extract`` incremental
+    path. A failure is logged and leaves the nodes as upstream built them
+    (pre-H1: changed -> unchanged plugin edges drop)."""
+    try:
+        fields = context_fields()
+        if not fields:
+            return
+        persisted = {n.get("id"): n for n in graph.get("nodes", [])}
+        for ctx in nodes:
+            node = persisted.get(ctx["id"], {})
+            ctx.update((k, node[k]) for k in fields if k in node and k not in ctx)
+            ctx["_lang_source_file"] = identity(ctx.get("source_file"))
+    except Exception as exc:
+        _LOG.warning("incremental context fields failed, cross-file plugin edges "
+                     "from unchanged files may drop: %s", exc)
+
+
 # Expose apply_registry for call sites
 apply_registry: Callable[[], None] = _apply_registry
 

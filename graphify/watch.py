@@ -1724,12 +1724,6 @@ def _rebuild_code(
                 }
                 ctx_live -= deleted_source_identities
                 ctx_live.discard(None)
-                try:  # graphify-lang: plugin resolver fields (cc-CR000.001 H1)
-                    from graphify.lang_registry import context_fields
-                    lang_fields = context_fields()
-                except Exception as exc:  # graphify-lang: log, never break core (cc-CR000.001 L8)
-                    logging.getLogger("graphify.lang_registry").debug("watch context_fields hook failed: %s", exc)
-                    lang_fields = ()
                 for node in ctx_graph.get("nodes", []):
                     if not node.get("id") or not _is_ast_tier(node):
                         continue
@@ -1752,10 +1746,6 @@ def _rebuild_code(
                     ):
                         if node.get(marker):
                             ctx_node[marker] = node[marker]
-                    if lang_fields:
-                        ctx_node.update((k, node[k]) for k in lang_fields
-                                        if k in node and k not in ctx_node)
-                        ctx_node["_lang_source_file"] = ctx_paths.identity(source_file)
                     metadata = node.get("metadata")
                     if isinstance(metadata, dict):
                         fwd_metadata = {
@@ -1781,6 +1771,8 @@ def _rebuild_code(
                         if fwd_metadata:
                             ctx_node["metadata"] = fwd_metadata
                     resolution_context_nodes.append(ctx_node)
+                from graphify.lang_registry import enrich_context  # graphify-lang (H1)
+                enrich_context(resolution_context_nodes, ctx_graph, ctx_paths.identity)
                 # #2437: the member-call resolvers map receiver type -> owning
                 # class -> method through contains/method edges; hand over the
                 # unchanged corpus's, scoped exactly like the nodes above so a

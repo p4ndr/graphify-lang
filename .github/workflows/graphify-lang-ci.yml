@@ -52,7 +52,12 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --frozen
 
-      - name: bandit (static security analysis)
+      # Gate: the fork layer only (0 issues at any severity). Upstream code keeps
+      # 4 High B324 and would turn a gate red on every run (cc-CR000.003 S2-M2).
+      - name: bandit (fork layer, gating)
+        run: uv run --frozen bandit -r graphify_lang -ll
+
+      - name: bandit (upstream and fork, informational)
         continue-on-error: true
         run: uv run --frozen bandit -r graphify graphify_lang -ll
 

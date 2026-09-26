@@ -41,7 +41,6 @@ def test_s2_m1_pip_audit_skips_the_editable_project_and_gates():
     assert not step.get("continue-on-error")
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S2-M2 red")
 def test_s2_m2_bandit_over_the_fork_layer_gates():
     step = _step("security-scan", "bandit -r graphify_lang -ll")
     assert not step.get("continue-on-error")

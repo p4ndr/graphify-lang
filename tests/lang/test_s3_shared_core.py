@@ -310,3 +310,21 @@ def test_s3_n2_schema_message_names_both_forms(tmp_path):
     toml = tmp_path / "m.toml"
     toml.write_text('schema = 2\n[language]\nname = "x"\nsuffixes = [".x"]\n[extract]\nruntime = "m"\n')
     assert LanguageManifest.from_toml(toml)[1] == ['schema must be 1 or "v1"']
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S3-X1: autolisp and vba drop a recursive self-call")
+def test_s3_x1_recursive_calls_kept(tmp_path):
+    """S3-X1: a recursive call is a ``calls`` self-loop, as upstream's built-ins
+    emit it (``def f(): f()`` gives ``r_f -> r_f``). S3-L2 fixed ``rules.Out``
+    only; the AutoLISP and VBA extractors (same-file) and the VBA resolver
+    (``obj.M`` with ``obj As`` its own class) dropped ``src == tgt``."""
+    g = _build(tmp_path, {
+        "r.lsp": "(defun fact (n) (if (> n 1) (* n (fact (1- n))) 1))\n",
+        "M.bas": 'Attribute VB_Name = "M"\nPublic Sub Walk()\n    Walk\nEnd Sub\n',
+        "XC.cls": VBA_CLS + "Public Sub Go()\n    Dim o As XC\n    o.Go\nEnd Sub\n",
+    })
+    label = {n["id"]: n["label"] for n in g["nodes"]}
+    loops = {label[e["source"]] for e in g["edges"]
+             if e["source"] == e["target"] and e["relation"] == "calls"}
+    assert loops == {"fact", "Walk", "Go"}

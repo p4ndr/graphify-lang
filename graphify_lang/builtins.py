@@ -1,6 +1,6 @@
 """Builtins filter for reference names (S005 F9).
 
-``[extract] builtins_file`` (one name per line, ``#`` comments, relative to
+``[extract] builtins_file`` (one name per line, ``#`` or ``;`` comments, relative to
 the manifest) plus ``builtins_prefixes``, case-folded when
 ``case_insensitive = true``. Applied to ``@reference`` captures and regex
 ``edge`` rules inside the plugin only, never to the shared
@@ -33,7 +33,7 @@ class Builtins:
             except OSError as exc:
                 raise RuntimeError(f"builtins_file failed to load: {exc}") from exc
             names = {s for line in text.splitlines()
-                     if (s := line.strip()) and not s.startswith("#")}
+                     if (s := line.strip()) and not s.startswith(("#", ";"))}
         px = cfg.get("builtins_prefixes", ())
         return cls(names, (px,) if isinstance(px, str) else tuple(px), bool(ci))
 

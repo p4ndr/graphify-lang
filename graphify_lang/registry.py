@@ -243,7 +243,8 @@ def _glob_re(glob: str) -> re.Pattern[str]:
 def _path_matches(m: LanguageManifest, path: Path) -> bool:
     if not m.has_match:
         return True
-    if path.name in m.match_filenames:
+    name = path.name.casefold()                # cargo.toml on a case-insensitive FS (N5)
+    if any(name == f.casefold() for f in m.match_filenames):
         return True
     posix = path.as_posix()
     return any(_glob_re(g).search(posix) for g in m.match_globs)

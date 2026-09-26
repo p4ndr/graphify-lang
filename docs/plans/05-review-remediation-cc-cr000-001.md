@@ -22,13 +22,14 @@ Decisions (owner, 2026-09-26):
 | D2 | Findings that need a change in upstream code (H1, M3, L13) are fixed in the fork now, with try-wrapped registry lookups, which the repo rules allow. Each also gets a ready upstream PR draft under plan 01 T10 (E3). |
 | D3 | M9 cleanup: delete `.sidecar-cache/` (and add it to `.gitignore`), the root scratch files `src_core_test.lsp`, `test_dcl.toml` and `test_pattern.toml`, `docs/testing/archive/`, `.claude/docs/cc-T10-COMPLETE.md` and `scripts/install-mcp.sh`. `git-sp.ps1` STAYS. |
 | D4 | M5: implement `GRAPHIFY_LANG_PATH`. Do not delete it. Manifests in those folders are loaded and registered. |
+| D5 | (2026-09-26, after stage 1) Rebase the `rr-*` chain onto `upstream/v8` at the start of S006, before the release. Stages 2 to 5 stay on the current base. |
 
 ## 3. Rules for every stage
 
 - One branch per stage, chained: `rr-s1` from `autolisp`, then `rr-s2` from `rr-s1`, and so on. Commits that change the engine (`graphify/lang_registry.py`, `graphify_lang/registry.py`, `manifest.py`, core registry-lookup lines) contain no plugin code, so they can go upstream.
 - Test first. Each finding gets a test that fails for the stated reason before the fix. The test id names the finding (for example `test_h4_alias_bomb_bounded`).
 - Never edit an existing extractor in `graphify/extractors/`, `engine.py`, `resolution.py` or an upstream test file. Change core tables only through a registry lookup.
-- Every stage ends with: `.venv/bin/python -m pytest tests/ -q` exits 0; `git diff upstream/v8 -- graphify/extractors/` is empty; `tests/lang_baseline.txt` and `tests/upstream_tables.json` are unchanged, or the change has a written cause in the spoke.
+- Every stage ends with: `.venv/bin/python -m pytest tests/ -q` exits 0; `git diff upstream/v8...HEAD -- graphify/extractors/` is empty (three dots: only the fork's side, because `upstream/v8` moves); `tests/lang_baseline.txt` and `tests/upstream_tables.json` are unchanged, or the change has a written cause in the spoke.
 - When a stage is merged, move its findings from `cc-CR000.001.md` to `cc-CR000.002.md` with the commit hash, as the `/code-review` rules require.
 
 ## 4. Stages

@@ -68,7 +68,6 @@ def test_h4_alias_bomb_bounded(tmp_path, levels):
     assert nodes == 2  # file + rule
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S1-H1: str() of an alias list")
 @pytest.mark.parametrize("name,head,nodes", [
     ("rules/b.yml", ("id: *g", "language: python", "rule: {pattern: x}"), 1),
     ("rules/b-test.yml", ("id: *g", "valid: [x]"), 1),

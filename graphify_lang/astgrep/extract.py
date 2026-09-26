@@ -3,7 +3,7 @@
 One file node per file, stamped ``astgrep_role``: ``sgconfig``, ``rule``,
 ``util``, ``test`` or ``snapshot`` (from the keys of its first document; a
 rule-shaped document under a ``utils/`` directory is a util). Each YAML
-document (``---``-separated) with an ``id`` gives:
+document (``---``-separated) with a scalar ``id`` gives:
 
 - a rule: a ``rule`` node (``language``, ``severity`` as attrs), and a ``util``
   node per local ``utils:`` entry, which the rule contains;
@@ -135,7 +135,9 @@ def _document(out: Sink, path: Path, chunk: str, first: int) -> None:
         out.nodes[0]["astgrep_role"] = role
     if role == "sgconfig":
         tests = doc.get("testConfigs") if isinstance(doc.get("testConfigs"), list) else []
-        test_dirs = [str(t["testDir"]) for t in tests if isinstance(t, dict) and t.get("testDir")]
+        test_dirs = [str(t["testDir"]) for t in tests
+                     if isinstance(t, dict) and isinstance(t.get("testDir"), (str, int))
+                     and str(t["testDir"])]
         for key in ("ruleDirs", "utilDirs"):
             for d in _dirs(doc.get(key)):
                 out.ref("dir", out.file_nid, name=d, line=_key_line(chunk, first, rf"^{key}:"))
@@ -143,7 +145,7 @@ def _document(out: Sink, path: Path, chunk: str, first: int) -> None:
                              "util_dirs": _dirs(doc.get("utilDirs")),
                              "test_dirs": test_dirs})
         return
-    if doc.get("id") is None:
+    if not isinstance(doc.get("id"), (str, int)):  # S1-H1: never str() an alias tree
         return
     if role in ("test", "snapshot"):
         out.nodes[0].setdefault("astgrep_id", str(doc["id"]))

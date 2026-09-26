@@ -1,7 +1,9 @@
 """Declarative rules runtime: a manifest dict -> an extract callable.
 
-A fallback and utility layer (plan 04 D7): language plugins have their own
-extractors and may call this; none depends on it. Two tiers feed one sink:
+A fallback and utility layer (plan 04 D7, plan 05 D1): language plugins have
+their own extractors, but share this engine's builtins filter (``builtins.py``)
+and its sink (``graphify_lang._common.Sink``). A ``post_file`` hook is imported
+from ``graphify_lang.*`` only. Two tiers feed one sink:
 
 - query tier (``queries.py``): tree-sitter ``tags.scm`` captures
   ``@definition.<kind>`` / ``@name`` / ``@reference.<relation>``;
@@ -68,6 +70,9 @@ def _hook(manifest: dict[str, Any]) -> Callable | None:
     if not spec:
         return None
     module, _, fn = spec.partition(":")
+    if not module.startswith("graphify_lang."):  # a manifest never names arbitrary code
+        raise RuntimeError(f"post_file hook {spec!r} rejected: only graphify_lang.* modules"
+                           " (failed to load)")
     try:
         return getattr(importlib.import_module(module), fn)
     except (ImportError, AttributeError) as exc:

@@ -69,7 +69,7 @@ runtime = "graphify_lang.rules"
 
 # Optional: Python hook, called after the rules run:
 # fn(path, tree, nodes, edges, manifest) -> None or {"nodes": ..., "edges": ...}
-# post_file = "module:fn"
+# post_file = "graphify_lang.<package>.<module>:fn"  (only graphify_lang.* modules)
 
 # Regex tier - one [[rule]] per pattern; see graphify_lang/regex_rules.py.
 # node = "<kind>" emits a definition; edge = "<relation>" emits a reference

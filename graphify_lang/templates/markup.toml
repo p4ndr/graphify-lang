@@ -38,7 +38,7 @@ runtime = "graphify_lang.rules"
 # builtins_file = "data/builtins.txt"
 
 # Optional: Python hooks
-# post_file = "module:fn"
+# post_file = "graphify_lang.<package>.<module>:fn"  (only graphify_lang.* modules)
 
 # Node kinds and relations are not declared in a table: the query tier takes
 # them from the capture names (@definition.<node_kind>, @reference.<relation>)

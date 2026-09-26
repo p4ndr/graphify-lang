@@ -175,11 +175,22 @@ def test_post_file_hook(monkeypatch):
         seen["tree"] = tree
         return {"nodes": nodes + [{"id": "extra"}]}
 
-    monkeypatch.setitem(sys.modules, "rules_hook_mod", types.SimpleNamespace(hook=hook))
-    r = _run({"rule": LISP_REGEX, "extract": {"post_file": "rules_hook_mod:hook"}})
+    monkeypatch.setitem(sys.modules, "graphify_lang.rules_hook_mod", types.SimpleNamespace(hook=hook))
+    r = _run({"rule": LISP_REGEX, "extract": {"post_file": "graphify_lang.rules_hook_mod:hook"}})
     assert r["nodes"][-1] == {"id": "extra"} and seen["tree"] is None
-    bad = _run({"extract": {"post_file": "rules_hook_mod:nope"}})
+    bad = _run({"extract": {"post_file": "graphify_lang.rules_hook_mod:nope"}})
     assert bad["nodes"] == [] and "failed to load" in bad["error"]
+
+
+def test_m6_post_file_prefix_only(monkeypatch):
+    """cc-CR000.001 M6 / plan 05 D1: a hook outside graphify_lang.* is a manifest
+    error and is never imported."""
+    called = []
+    monkeypatch.setitem(sys.modules, "evil_hook_mod",
+                        types.SimpleNamespace(hook=lambda *a: called.append(a)))
+    r = _run({"extract": {"post_file": "evil_hook_mod:hook"}})
+    assert called == []
+    assert r["nodes"] == [] and "graphify_lang." in r["error"] and "failed to load" in r["error"]
 
 
 # --- loud failures --------------------------------------------------------

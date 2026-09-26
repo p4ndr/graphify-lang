@@ -5,18 +5,15 @@ colliding ids apart, so same-stem files keep their cross-file edges.
 M4: a plugin file-node id is minted like a built-in one (``_make_id(str(path))``),
 so upstream's portable remap applies: the same corpus gives the same ids under
 any scan root, no id carries the root path, and no two nodes share an id.
-M6: the rules engine imports a ``post_file`` hook only from ``graphify_lang.*``.
+M6 (the rules engine's ``post_file`` prefix rule) is pinned in ``test_rules.py``.
 """
 from __future__ import annotations
 
-import sys
-import types
 from pathlib import Path
 
 import pytest
 
 from graphify.extract import extract
-from graphify_lang.rules import build
 
 ECSCHEMA = ('<?xml version="1.0"?>\n<ECSchema schemaName="S" alias="s" version="01.00" '
             'xmlns="http://www.bentley.com/schemas/Bentley.ECXML.3.1">\n'
@@ -106,16 +103,3 @@ def test_m4_file_ids_portable(tmp_path, plugin):
         runs.append(sorted(ids))
     assert runs[0] == runs[1]
 
-
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="cc-CR000.001 M6: post_file imports any module")
-def test_m6_post_file_prefix_only(tmp_path, monkeypatch):
-    called = []
-    monkeypatch.setitem(sys.modules, "evil_hook_mod",
-                        types.SimpleNamespace(hook=lambda *a: called.append(a)))
-    f = tmp_path / "s.ext"
-    f.write_text("x\n")
-    extract_fn, _ = build(tmp_path / "m.toml", {"extract": {"post_file": "evil_hook_mod:hook"}})
-    r = extract_fn(f)
-    assert called == []
-    assert r["nodes"] == [] and "graphify_lang." in r.get("error", "")

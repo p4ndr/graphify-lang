@@ -249,13 +249,27 @@ def test_m3_watch_handler_sees_claimed_xml(tmp_path, monkeypatch):
     calls: list[Path] = []
     monkeypatch.setattr(watch_mod, "_rebuild_code", lambda p, **kw: calls.append(p) or True)
     monkeypatch.setattr(watch_mod, "_notify_only", lambda p: None)
-    threading.Thread(target=watch_mod.watch, args=(root,), kwargs={"debounce": 0.2},
-                     daemon=True).start()
+    deadline = time.monotonic() + 10.0
+
+    class _Clock:
+        """``watch``'s ``time``: its loop sleep raises ``KeyboardInterrupt`` once
+        the rebuild ran or the deadline passed, so ``watch`` stops its observer
+        in its ``finally`` (S5-N2)."""
+        monotonic = staticmethod(time.monotonic)
+
+        @staticmethod
+        def sleep(seconds):
+            if calls or time.monotonic() > deadline:
+                raise KeyboardInterrupt
+            time.sleep(seconds)
+
+    monkeypatch.setattr(watch_mod, "time", _Clock)
+    thread = threading.Thread(target=watch_mod.watch, args=(root,), kwargs={"debounce": 0.2})
+    thread.start()
     time.sleep(0.5)
     shutil.copy(FIXTURES / "ecschema" / "Base.01.00.00.ecschema.xml", root)
-    deadline = time.monotonic() + 5.0
-    while time.monotonic() < deadline and not calls:
-        time.sleep(0.1)
+    thread.join(timeout=15.0)
+    assert not thread.is_alive(), "watch did not stop"
     assert calls, "an ECSchema .xml write should trigger _rebuild_code"
 
 

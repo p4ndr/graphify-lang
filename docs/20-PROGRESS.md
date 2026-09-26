@@ -15,6 +15,22 @@ This document is a LIVE running changelog for all work in the repo.
 
 ## 3. CURRENT SESSION
 
+### 2026-09-26 15:04 (UTC+10)
+
+- T33 (plan 05 S2, branch rr-s2) done: M7, M8, E9, M9, M10, N6 fixed in 711dfc6..57efe47 and moved to cc-CR000.002
+- Fork CI now runs on rr-*; first run failed on 3.10 (tests/lang/test_rules.py bare tomllib), fixed 3d3b99f; run 36219115105 green on 3.10/3.12/3.13
+- pytest 6154 passed, 14 skipped; three-dot extractor diff empty; baseline files unchanged
+
+### 2026-09-26 15:03 (UTC+10)
+
+- T33.1 done: 711dfc6: workflows restored from upstream/v8 plus guard line; all 4 parse
+- T33.2 done: 23735ce: triggers autolisp, lang-*, rr-*, v8, v* tags; bandit graphify_lang 0 issues
+- T33.3 done: 1f8a2e4: 38 junk files removed, .sidecar-cache/ ignored; git-sp.ps1 kept
+- T33.4 done: 1e2e430: install-mcp.sh and 16-MCP-SETUP.md deleted; T9.5 text fixed
+- T33.5 done: pushed rr-s1, rr-s2; CI 36219014956 failed (3.10 tomllib), fixed 3d3b99f; 36219115105 green
+- T33.6 done: 57efe47: pytest 6154 passed/14 skipped; extractor diff empty; findings moved to cc-CR000.002
+- T33 done (all steps): P05-S002 (rr-s2) Repo and CI hygiene — M7 M8 E9 M9 M10 N6
+
 ### 2026-09-26 13:52 (UTC+10)
 
 - bash: grep -n "04" docs/plans/00-INDEX.md | head; pwsh -NoProfile -File ~/.claude/skills/repo-docs/scripts/repo-docs.ps1 mani…, rtk grep -c "| DONE |" docs/plans/00-INDEX.md; grep "04-content" docs/plans/00-INDEX.md | rtk grep -o "| [A-Z]* |$"; rt…, graphify --version; graphify lang list | cut -c1-20 | tr '\n' ' '; echo; cd ~/repos/graphify-lang && git log --oneline …, cd ~/repos/graphify-lang && git remote -v | cat && git push origin autolisp lang-sniff lang-rules lang-vba lang-bmake l…, cd ~/.claude && rtk git add CLAUDE.md && git commit -q -m "docs(CLAUDE): graphify fork now graphs VBA, bmake, Cargo, as…, git fetch -q upstream 2>&1 | tail -2; git diff --stat upstream/v8...autolisp | tail -80; rtk ls .claude/docs/ (+105 more)

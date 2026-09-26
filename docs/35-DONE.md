@@ -15,6 +15,15 @@ This document is a LIVE file containing a list of TASKS that have been carried o
 
 ## 3. TASK LIST
 
+### `[x]` T33 | P05-S002 (rr-s2) Repo and CI hygiene — M7 M8 E9 M9 M10 N6
+
+- `[x]` T33.1 | S2.1 M7 restore publish/release-graph workflows + guard lines
+- `[x]` T33.2 | S2.2 M8/E9 CI triggers (autolisp, lang-*, rr-*, v* tags) + bandit graphify_lang
+- `[x]` T33.3 | S2.3 M9 deletions per D3 (git-sp.ps1 stays) + reference repoint
+- `[x]` T33.4 | S2.4 M10 delete install-mcp.sh; N6 T9.5 text
+- `[x]` T33.5 | S2.5 Ask owner, push rr-s2, read CI
+- `[x]` T33.6 | S2.6 Stage close
+
 ### `[x]` T32 | P05-S001 (rr-s1) Security and crash safety — H4 E6 L1 L2 L4 N4
 
 - `[x]` T32.1 | S1.1 Red tests: alias bomb, self-alias, deep nesting, large schema, bad manifest sections

@@ -84,10 +84,11 @@ def _namespace_ast_cache(lang_registry) -> None:
 def _fingerprint(names: tuple[str, ...], modules: tuple[str, ...],
                  folders: tuple[str, ...] = (), dists: tuple[str, ...] = ()) -> str:
     """Hash of the manifest names, the plugin distributions (``name=version``,
-    from their entry points), and the ``.py`` / ``.toml`` files of
-    ``graphify_lang``, every plugin package and every ``GRAPHIFY_LANG_PATH``
-    folder (cc-CR000.001 M5). A plugin shipped as a top-level module hashes
-    that file only, not its folder (S4-M1)."""
+    from their entry points), this file (the fork's dispatch, S4-L4), and the
+    ``.py`` / ``.toml`` files of ``graphify_lang``, every plugin package and
+    every ``GRAPHIFY_LANG_PATH`` folder (cc-CR000.001 M5). A plugin shipped as
+    a top-level module hashes that file only, not its folder (S4-M1). Other
+    fork edits under ``graphify/`` are covered by the version string only."""
     import hashlib
     import sys
     from pathlib import Path
@@ -96,7 +97,7 @@ def _fingerprint(names: tuple[str, ...], modules: tuple[str, ...],
 
     h = hashlib.sha256("\0".join(names + dists).encode())
     dirs = {Path(graphify_lang.__file__).parent} | {Path(f) for f in folders}
-    files: set[Path] = set()
+    files = {Path(__file__)}
     for top in {m.split(".")[0] for m in modules if m}:
         mod = sys.modules.get(top)
         if getattr(mod, "__path__", None) is not None:

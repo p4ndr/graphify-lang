@@ -7,10 +7,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+# The one tomllib shim in the fork; everything else imports it from here.
 try:
-    import tomllib as tomli  # Python 3.11+; tomli is only a dependency below 3.11
-except ImportError:  # pragma: no cover
-    import tomli
+    import tomllib
+except ImportError:  # pragma: no cover  (Python 3.10: tomli is a dependency below 3.11)
+    import tomli as tomllib
 
 
 _FLAGS = {"i": re.IGNORECASE, "m": re.MULTILINE, "s": re.DOTALL, "x": re.VERBOSE}
@@ -134,10 +135,10 @@ class LanguageManifest:
             return cls._invalid(f"cannot read manifest: {exc}")
 
         try:
-            data = tomli.loads(content)
+            data = tomllib.loads(content)
         except RecursionError:
             return cls._invalid("TOML parse error: nested deeper than the recursion limit")
-        except tomli.TOMLDecodeError as exc:
+        except tomllib.TOMLDecodeError as exc:
             return cls._invalid(f"TOML parse error: {exc}")
 
         # Extract nested values - schema v1 uses sections

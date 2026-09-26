@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Callable
 
 from graphify_lang.builtins import Builtins
-from graphify_lang.manifest import LanguageManifest, tomli
+from graphify_lang.manifest import LanguageManifest, tomllib
 
 
 def _file_stem(path):
@@ -156,4 +156,4 @@ def load_manifest(pkg_file: str, toml: str, **fields) -> LanguageManifest:
 def load_builtins(pkg_file: str, toml: str) -> Builtins:
     """The builtins filter the manifest ``toml`` beside ``pkg_file`` declares."""
     path = Path(pkg_file).parent / toml
-    return Builtins.from_manifest(path, tomli.loads(path.read_text(encoding="utf-8")))
+    return Builtins.from_manifest(path, tomllib.loads(path.read_text(encoding="utf-8")))

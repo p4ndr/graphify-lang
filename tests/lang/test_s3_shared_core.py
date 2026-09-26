@@ -137,9 +137,9 @@ def _keys(data: dict) -> set[str]:
 
 @pytest.mark.parametrize("toml", _SHIPPED, ids=lambda p: f"{p.parent.name}/{p.name}")
 def test_n3_every_manifest_key_is_read(toml):
-    from graphify_lang.manifest import tomli
+    from graphify_lang.manifest import tomllib
 
-    data = tomli.loads(toml.read_text(encoding="utf-8"))
+    data = tomllib.loads(toml.read_text(encoding="utf-8"))
     read = _READ | (_READ_BY_RULES if data["extract"]["runtime"] == "graphify_lang.rules" else set())
     assert sorted(_keys(data) - read) == []
 

@@ -14,8 +14,6 @@ from pathlib import Path
 import pytest
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S6-N4: corpus_ls splits git ls-files on whitespace")
 def test_s6_n4_corpus_ls_keeps_spaced_names(tmp_path, corpus_ls):
     (tmp_path / "a b.cls").write_text("x\n")
     (tmp_path / "c.cls").write_text("x\n")

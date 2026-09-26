@@ -39,13 +39,23 @@ _PARITY = {
     "astgrep": ("astgrep", (".yml", ".yaml")),
     "ecschema": ("ecschema", (".xml",)),
     "cc-kb": ("cc_kb", (".md",)),
+    # T38: two files share a basename, so upstream (#2032) persists a
+    # path-suffix label on both file nodes; an incremental build hands the
+    # resolvers those labels on the unchanged files' context nodes.
+    "bmake-dupname": ("bmake_dupname", (".mki", ".mke")),
+    "cc-kb-dupname": ("cc_kb_dupname", (".md",)),
+    "autolisp-dupname": ("autolisp_dupname", (".lsp", ".mnl", ".dcl")),
 }
 
 
 # Keys that differ between builds by design: provenance and clustering.
 _VOLATILE = {"_origin", "community", "weight"}
 # (plugin, path): the CLI path runs ``--code-only``, which skips ``.md``.
-_PATHS = [(p, how) for p in _PARITY for how in ("watch", "cli") if (p, how) != ("cc-kb", "cli")]
+_T38 = pytest.mark.xfail(strict=True, raises=AssertionError,
+                         reason="T38: resolvers find file nodes by label == basename")
+_PATHS = [pytest.param(p, how, marks=_T38 if p.endswith("-dupname") else ())
+          for p in _PARITY for how in ("watch", "cli")
+          if (p, how) not in {("cc-kb", "cli"), ("cc-kb-dupname", "cli"), ("autolisp-dupname", "cli")}]
 
 
 def _graph(root: Path) -> tuple[dict, list]:

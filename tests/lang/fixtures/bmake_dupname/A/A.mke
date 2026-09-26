@@ -1,0 +1,3 @@
+o = $(out)A/
+
+$(o)vf$(oext) : $(_MakeFilePath)source/vf.cpp

@@ -428,6 +428,12 @@ def claims_file(path: Path) -> bool:
     return any(_sniff_score(m, path, head) is not None for m in candidates)
 
 
+def context_fields() -> tuple[str, ...]:
+    """Every manifest's ``[resolve] context_fields``, sorted: the node fields an
+    incremental build keeps on the context nodes of unchanged files (H1)."""
+    return tuple(sorted({f for m in _init_state().manifests.values() for f in m.context_fields}))
+
+
 def iter_manifests() -> Iterator[LanguageManifest]:
     """Iterate over all registered manifests."""
     state = _init_state()

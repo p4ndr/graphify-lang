@@ -114,6 +114,14 @@ def augment_extractor(path, extractor):
     return lang_registry.augment_extractor(path, extractor)
 
 
+def context_fields() -> tuple[str, ...]:
+    """Node fields the plugin resolvers read on unchanged files' nodes."""
+    if not _REGISTRY_AVAILABLE:
+        return ()
+    from graphify_lang import registry as lang_registry
+    return lang_registry.context_fields()
+
+
 # Expose apply_registry for call sites
 apply_registry: Callable[[], None] = _apply_registry
 

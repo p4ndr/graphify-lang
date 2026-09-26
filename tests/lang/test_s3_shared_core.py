@@ -113,7 +113,7 @@ _READ = {
     "language.priority", "language.kind", "language.augments", "language.overrides",
     "language.case_insensitive", "grammar.module", "grammar.extra",
     "extract.runtime", "extract.resolver", "extract.builtins_file", "extract.builtins_prefixes",
-    "match.globs", "match.filenames", "sniff.rules", "sniff.min_score", "sniff.head_bytes",
+    "match.globs", "match.filenames", "resolve.context_fields", "sniff.rules", "sniff.min_score", "sniff.head_bytes",
 }
 _READ_BY_RULES = {
     "grammar.language_fn", "extract.queries", "extract.comments", "extract.post_file",

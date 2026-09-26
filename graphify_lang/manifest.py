@@ -109,6 +109,9 @@ class LanguageManifest:
     match_globs: tuple[str, ...] = ()
     match_filenames: tuple[str, ...] = ()
     augment: Callable[[Path, dict], dict] | None = None
+    # Node fields the resolver reads on other files' nodes: kept on the
+    # context nodes of unchanged files in an incremental build (H1).
+    context_fields: tuple[str, ...] = ("node_kind",)
 
     @property
     def has_match(self) -> bool:
@@ -134,7 +137,7 @@ class LanguageManifest:
             return cls._invalid(f"TOML parse error: {exc}")
 
         # Extract nested values - schema v1 uses sections
-        for section in ("language", "grammar", "extract", "match"):
+        for section in ("language", "grammar", "extract", "match", "resolve"):
             if not isinstance(data.get(section, {}), dict):
                 return cls._invalid(f"[{section}] must be a table")
         language = data.get("language", {})
@@ -159,6 +162,8 @@ class LanguageManifest:
         match = data.get("match", {})
         match_globs = _str_list(match.get("globs", ()), "match.globs", errors)
         match_filenames = _str_list(match.get("filenames", ()), "match.filenames", errors)
+        context_fields = _str_list(data.get("resolve", {}).get("context_fields", ("node_kind",)),
+                                   "resolve.context_fields", errors)
         if kind == "augment":
             if not augments:
                 errors.append("augment kind needs a non-empty language.augments")
@@ -245,6 +250,7 @@ class LanguageManifest:
             sniff=sniff,
             match_globs=match_globs,
             match_filenames=match_filenames,
+            context_fields=context_fields,
         )
 
         # Additional validation

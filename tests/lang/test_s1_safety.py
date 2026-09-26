@@ -186,3 +186,13 @@ def test_s1_l2_document_error_names_its_type(tmp_path, monkeypatch, caplog):
     assert [n["node_kind"] for n in result["nodes"]] == ["file", "rule", "util"]
     assert "RuntimeError" in caplog.text and "kept" in caplog.text
     assert "skipped" not in caplog.text
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S1-E2: no document size cap")
+def test_s1_e2_oversized_document_skipped(tmp_path, caplog):
+    path = _rule_file(tmp_path, "id: small\nrule: {pattern: x}\n---\nid: big\nrule: {pattern: x}\n"
+                                "note: " + "x" * 1_100_000 + "\n")
+    with caplog.at_level("WARNING", logger="graphify_lang.astgrep.extract"):
+        result = extract_astgrep(path)
+    assert [n["label"] for n in result["nodes"]][1:] == ["small"]
+    assert "size cap" in caplog.text

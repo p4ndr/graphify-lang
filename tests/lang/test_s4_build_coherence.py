@@ -270,8 +270,6 @@ def test_h1_context_fields_union():
 
 # --- plan 05 review-fix, S004 section of cc-CR000.003 ----------------------------
 
-@pytest.mark.xfail(strict=True, raises=RuntimeError,
-                   reason="S4-M1: the fingerprint scans every distribution")
 def test_s4_m1_no_packages_distributions(monkeypatch):
     """S4-M1: the plugin distributions come from their entry points; the
     full-environment ``packages_distributions()`` scan (~130 ms) is not run."""
@@ -294,8 +292,6 @@ def test_s4_m1_no_packages_distributions(monkeypatch):
     assert "-lang" in cache._EXTRACTOR_VERSION
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S4-M1: a single-file plugin hashes its whole folder")
 def test_s4_m1_single_file_plugin_hashes_own_file(tmp_path, monkeypatch):
     """S4-M1: a plugin shipped as a top-level module (``site-packages/x.py``)
     hashes that file, not its folder (all of ``site-packages``)."""
@@ -313,8 +309,6 @@ def test_s4_m1_single_file_plugin_hashes_own_file(tmp_path, monkeypatch):
     assert fp(("x",), ("s4m1_single",)) != first
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S4-L1: a failed fingerprint leaves the plain namespace")
 def test_s4_l1_fingerprint_failure_fails_closed(monkeypatch):
     """S4-L1: a failed fingerprint lands in a ``-langerr`` namespace, never the
     plain ``v<version>-s<schema>`` one a pre-S3 build wrote."""

@@ -41,6 +41,8 @@ class _RegistryState:
     tie_warned: set[str] = field(default_factory=set)
     # entry point name or manifest path -> load error (``graphify lang list --check``)
     load_errors: dict[str, str] = field(default_factory=dict)
+    # ``name=version`` of each loaded entry point's distribution (AST cache fingerprint)
+    distributions: set[str] = field(default_factory=set)
 
 
 # Process-wide cache
@@ -64,6 +66,8 @@ def _init_state() -> _RegistryState:
     for ep in importlib.metadata.entry_points(group=_GROUP):
         try:
             _process_loader_result(ep.load())
+            if ep.dist is not None:
+                state.distributions.add(f"{ep.dist.name}={ep.dist.version}")
         except Exception as exc:
             _failed(state, "entry point", ep.name, exc)
     for entry in os.environ.get(_PATH_VAR, "").split(os.pathsep):
@@ -445,6 +449,11 @@ def context_fields() -> tuple[str, ...]:
 def load_errors() -> dict[str, str]:
     """Plugins that failed to load: entry point name or manifest path -> error."""
     return dict(_init_state().load_errors)
+
+
+def distributions() -> list[str]:
+    """``name=version`` of the distributions whose entry points loaded, sorted."""
+    return sorted(_init_state().distributions)
 
 
 def search_paths() -> list[Path]:

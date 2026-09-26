@@ -72,3 +72,36 @@ deprecated" (7 tests; a grammar binding returns an int; upstream
 | S2-N5 | actioned | `333a33d` test, `b12630a` engine, `76cbe8f` cargo | One shim in `manifest.py`, bound as `tomllib`; kept there, not `_common.py`, because `_common` imports `manifest` (circular otherwise). |
 | S2-E1 | actioned | `89b12ff` test, `3232862` fix | `wheel` job on tags (and `workflow_dispatch`): `uv build --wheel`, clean `uv venv`, `graphify lang list --check`. |
 | S2-E2 | actioned | `89b12ff` | `test_s2_e2_every_workflow_parses` over all 4 workflows. |
+
+## S003
+
+**Tests:** `.venv/bin/python -m pytest tests/ -q`: before 6263 passed, 14 skipped;
+after 6275 passed, 14 skipped (12 new: `test_s3_shared_core.py` 8 incl. two
+`schema` params, `test_rules.py` 4). Red-first as in S001; the S3-E1 unit
+tests and the S3-N3 reader check are green guards. The fork's
+`queries.py` "int argument support is deprecated" warning is gone (only
+upstream `solidity.py:81` keeps it). `git diff upstream/v8...HEAD --
+graphify/extractors/` empty; `tests/lang_baseline.txt` and
+`tests/upstream_tables.json` unchanged.
+
+**Corpus (S3-E2 script):** `.venv/bin/python tools/compare_corpus.py --before
+9d8cda4 --after HEAD autolisp=~/repos/autolithp vba=~/repos/bim-chk`
+(autolithp `d5a2074`, 254 files: 10691 nodes / 10691 ids / 25584 edges / 1
+dangling; bim-chk `d7ba56f`, 33 files: 416 / 416 / 1114 / 0). Before = after,
+node and id-free edge diffs 0 on both; the autolithp row matches case 008's
+"after" row.
+
+| Id | Status | Commit(s) | Note |
+|:--|:--|:--|:--|
+| S3-M1 | actioned | `80f5d33` test, `bf00dbd` fix | `resolve_ref_id` falls back to a pre-S3 ref's `source` id, else None; `refs_of` and the ecschema resolver drop a ref with none. The E1 plugin-set fingerprint already covers the reported scenario: every namespace is `v<version>-lang<fp>-s<schema>` (measured `v0.9.67+lang.3-langccd5d632ef30-s4`), which no pre-E1 build wrote, so a pre-S3 entry is never read. The `+lang.4` bump is left to the release, as instructed. |
+| S3-L1 | actioned | `80f5d33` test, `ab276d1` fix | `rules.build(..., package=)`: a `post_file` hook may name `graphify_lang.*` or the caller's own package, nothing else. D1 kept: a manifest is data (a GRAPHIFY_LANG_PATH folder or a third-party package) and cannot name arbitrary modules; the caller of `build` is code that already runs and vouches only for its own package. Templates and the `rules.py` docstring say so. |
+| S3-L2 | actioned | `80f5d33` test, `8c02786` fix | `rules.Out` keeps a recursive reference's self-loop (`Sink.edge(self_loop=True)`), as upstream's built-ins do; plugin sinks still drop `src == tgt`. `err.lsp` call count unchanged (29). |
+| S3-L3 | rejected (moot) | — | `953efd6` (plan 05 S4.3, H3) deleted the `lru_cache` on `_is_root`: harness roots are derived from the graphed nodes inside each `resolve` call, and `graphify_lang/cc_kb/` holds no process cache. |
+| S3-N1 | actioned | `80f5d33` test, `115e717` fix | `#` starts a builtins comment only before a space or the line end; `is_builtin('#&/')` True again. |
+| S3-N2 | actioned | `80f5d33` test, `a716186` fix | `schema` must be the integer 1 or `"v1"` (`true`, `1.0` rejected); message says `must be 1 or "v1"`. |
+| S3-N3 | actioned | `80f5d33` | `test_s3_n3_every_read_key_has_a_reader_in_code`: each `_READ` key's leaf must be a string literal in `graphify_lang`. `extract.runtime` is now read to import a GRAPHIFY_LANG_PATH plugin (`registry._path_manifest`, S5), so it is not validation-only. |
+| S3-N4 | actioned | `80f5d33` test, `0aaf7f0` fix | `Out.ref` -> `name_ref`, `Out.result` -> `resolved`, `Out.node` takes `**attrs`; test pins no signature clash with `Sink`. |
+| S3-N5 | rejected (done) | — | Both duplications were absorbed by earlier parts: S1-N2 `3782129` (`_common.line_index`, no module cache) and S2-N5 `333a33d`/`b12630a`/`76cbe8f` (one `tomllib` shim in `manifest.py`, re-exported as `tomllib`). |
+| S3-E1 | actioned | `80f5d33` | `test_s3_e1_pick_by_prefix`, `test_s3_e1_sink_ref_unique_and_add_salting`, and the stale-cache regression `test_s3_m1_stale_cache_ref_degrades`. |
+| S3-E2 | actioned | `32c510f` | `tools/compare_corpus.py --before <ref> [--after <ref>] PLUGIN=REPO ...`; exits 1 on any difference. |
+| (S002 warning) | actioned | `80f5d33` test, `880c72c` fix | `queries.py` wraps an int grammar pointer (`tree_sitter_commonlisp` 0.4.1) in a `tree_sitter.Language` capsule. |

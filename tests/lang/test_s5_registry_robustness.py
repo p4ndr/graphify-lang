@@ -213,7 +213,6 @@ def _claimed_files(root: Path) -> dict[str, Path]:
     return out
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="M3: watch checks suffix tables only")
 def test_m3_watch_triggers_on_claimed_xml_yml_toml_md(tmp_path):
     from graphify.watch import _batch_needs_llm_flag, _batch_triggers_rebuild
 
@@ -239,7 +238,6 @@ def _watchdog_available() -> bool:
     return True
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="M3: .xml is not a watched suffix")
 @pytest.mark.skipif(not _watchdog_available(), reason="watchdog not installed")
 def test_m3_watch_handler_sees_claimed_xml(tmp_path, monkeypatch):
     from graphify import watch as watch_mod

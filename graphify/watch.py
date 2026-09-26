@@ -283,6 +283,16 @@ _WATCHED_EXTENSIONS = CODE_EXTENSIONS | DOC_EXTENSIONS | PAPER_EXTENSIONS | IMAG
 _CODE_EXTENSIONS = CODE_EXTENSIONS
 
 
+def _lang_claims(path: Path, augments: bool = True) -> bool:
+    """graphify-lang (cc-CR000.001 M3): a data file a plugin claims is code."""
+    try:
+        from graphify.lang_registry import watch_claims
+        return watch_claims(path, augments)
+    except Exception as exc:
+        logging.getLogger("graphify.lang_registry").debug("watch hook failed on %s: %s", path, exc)
+        return False
+
+
 def _report_root_label(watch_path: Path) -> str:
     if watch_path.is_absolute():
         return watch_path.name or str(watch_path)
@@ -2300,7 +2310,7 @@ def _notify_only(watch_path: Path) -> None:
 
 
 def _has_non_code(changed_paths: list[Path]) -> bool:
-    return any(p.suffix.lower() not in _CODE_EXTENSIONS for p in changed_paths)
+    return any(p.suffix.lower() not in _CODE_EXTENSIONS and not _lang_claims(p, augments=False) for p in changed_paths)
 
 
 def _batch_triggers_rebuild(batch: list[Path]) -> bool:
@@ -2312,7 +2322,7 @@ def _batch_triggers_rebuild(batch: list[Path]) -> bool:
     this, a doc-only deletion batch would sit behind the needs_update flag
     until the next code event or a manual `graphify update` (#2580).
     """
-    has_code = any(p.suffix.lower() in _CODE_EXTENSIONS for p in batch)
+    has_code = any(p.suffix.lower() in _CODE_EXTENSIONS or _lang_claims(p) for p in batch)
     has_deletion = any(not p.exists() for p in batch)
     return has_code or has_deletion
 
@@ -2392,7 +2402,7 @@ def watch(watch_path: Path, debounce: float = 3.0) -> None:
             # relative_to guard, so a stray symlinked event won't raise.
             if ignore_patterns and _is_ignored(path, watch_root_for_ignore, ignore_patterns):
                 return
-            if path.suffix.lower() not in _WATCHED_EXTENSIONS:
+            if path.suffix.lower() not in _WATCHED_EXTENSIONS and not _lang_claims(path):
                 return
             try:
                 filter_parts = path.relative_to(watch_root_for_ignore).parts

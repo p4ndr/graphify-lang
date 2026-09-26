@@ -179,7 +179,7 @@ Findings moved out of `cc-CR000.001.md` once fixed or closed. Each entry keeps t
 - **Where**: `graphify_lang/autolisp/extract.py:150-234` (`_Walker.walk` / `walk_list` recurse per list level), called outside the `try` at `extract.py:275-277`.
 - **Failure scenario (measured)**: a defun with 1200 nested `(list ...)` raises `RecursionError`; upstream skips the whole file. Rare in hand-written code, possible in generated LISP.
 - **Fix**: an explicit stack, or catch `RecursionError` in `extract_autolisp` and fall back to the regex path already used for `root.has_error` (`extract.py:293-304`).
-- **Resolution (2026-09-26, plan 05 S1.3)**: fixed in `10f235b` (fix), test `029c35e`. `extract_autolisp` catches `RecursionError` from the walk and uses the regex fallback (`fallback = root.has_error` or the overflow). Test `test_l1_deep_nesting_falls_back` (1200 levels at recursion limit 1000; `graphify.extract` raises the limit to 10 000 on import, so the pipeline overflows only near 5000 levels).
+- **Resolution (2026-09-26, plan 05 S1.3)**: fixed in `10f235b` (fix), test `029c35e`. `extract_autolisp` catches `RecursionError` from the walk and uses the regex fallback (`fallback = root.has_error` or the overflow). Test `test_l1_deep_nesting_falls_back` (1200 levels at recursion limit 1000; `_raise_recursion_limit()` in `graphify.extract` raises the limit to 10 000 when an extraction runs, not on import, so the pipeline overflows only near 5000 levels).
 
 ### L2 Quadratic edge de-duplication in two sinks
 

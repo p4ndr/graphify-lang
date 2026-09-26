@@ -565,8 +565,6 @@ def test_s5_n1_hook_logging_not_a_local_name():
 _TEMPLATE = Path(registry.__file__).parent / "templates" / "path-plugin"
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S5-E1: no path-plugin template yet")
 def test_s5_e1_path_plugin_template_loads(tmp_path, monkeypatch, _modules_restored):
     assert _TEMPLATE.is_dir()
     monkeypatch.setenv("GRAPHIFY_LANG_PATH", str(_TEMPLATE))

@@ -1,0 +1,27 @@
+# GRAPHIFY_LANG_PATH plugin template: this folder is a working plugin.
+#
+#   export GRAPHIFY_LANG_PATH=/abs/path/to/this/folder   # absolute; ~ is expanded
+#   graphify lang list --check
+#
+# Rules for a path-plugin folder (README, "GRAPHIFY_LANG_PATH"):
+# - The entry is an absolute folder; a relative one is rejected.
+# - The folder holds manifests (*.toml with a [language] table) and their
+#   code. Other *.toml files (pyproject.toml, ruff.toml) are skipped.
+# - The runtime is imported as graphify_lang_path._<hash>.<runtime>, never as
+#   a top-level module: give it a distinctive name anyway (a name another
+#   folder or an installed module has is a --check warning), and import the
+#   plugin's own modules relatively (`from . import helper`), at module top
+#   or inside extract().
+# - The AST cache fingerprint hashes the folder's .py / .toml files only; a
+#   data file extract() reads (queries, JSON tables) does not move it.
+schema = 1
+
+[language]
+name = "example"
+suffixes = [".example"]
+
+[extract]
+# Module beside this file (example_lang.py) exposing extract(path) -> dict,
+# optional RESOLVER (graphify.resolver_registry.LanguageResolver), and, for a
+# kind = "augment" manifest, augment(path, base) and optional WATCH(path).
+runtime = "example_lang"

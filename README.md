@@ -229,13 +229,17 @@ settles open question 3 below. The code is `graphify_lang/registry.py`
   name prefix, and no base node or attribute is replaced.
 - `graphify lang list` shows a `sniff` column, `*` after a shared suffix and
   `+` before an augmented one. `graphify lang list --check` prints one row
-  per plugin, `ok` or its load error, and exits 1 when any plugin failed.
+  per plugin, `ok` or its load error, warning rows, and exits 1 when any plugin failed.
 - **Discovery.** The `graphify_lang_plugins` entry points, then every
-  `*.toml` manifest in each `GRAPHIFY_LANG_PATH` folder (`os.pathsep`
-  separated). A path manifest's `[extract] runtime` module is imported with
-  its folder first on `sys.path` and exposes `extract` (or `augment`) and
-  an optional `RESOLVER`. A plugin that fails to load is logged and skipped;
-  `GRAPHIFY_LANG_DISABLE=1` turns discovery off.
+  manifest in each `GRAPHIFY_LANG_PATH` folder (`os.pathsep` separated,
+  absolute). A path manifest's `[extract] runtime` module is imported under
+  a private package per folder and exposes `extract` (or `augment`) and
+  optional `RESOLVER` and `WATCH`. A plugin that fails to load is logged and
+  skipped; `GRAPHIFY_LANG_DISABLE=1` turns discovery off.
+- **`graphify watch` and augments.** An edit of a file an augment claims
+  rebuilds the graph when the augment's `watch` predicate says so (cc-kb: the
+  page mentions another cc id, or names a file under its harness root); an
+  augment with no predicate rebuilds whenever it adds anything to the file.
 
 The three design questions the first version of this README left open are
 settled:
@@ -282,13 +286,33 @@ a plugin breaks one.
   `graphify_lang._common.source_of(node)`, never `node["source_file"]`
   directly, so fresh and context nodes compare alike.
   [`tests/lang/test_s4_build_coherence.py::test_e5_incremental_parity`]
-- **`GRAPHIFY_LANG_PATH`.** Folders (`os.pathsep` separated) whose `*.toml`
-  manifests are loaded after the entry points. A manifest's `[extract]
-  runtime` module is imported with its folder first on `sys.path` and exposes
-  `extract` (or `augment`) and an optional `RESOLVER`. A name already
-  registered is rejected and logged.
+- **`GRAPHIFY_LANG_PATH`.** Folders (`os.pathsep` separated) whose manifests
+  are loaded after the entry points. Working example:
+  `graphify_lang/templates/path-plugin/`. Rules:
+  - An entry is an absolute folder after `~` expansion. A relative entry
+    (`.`, `plugins`) is rejected, because it would run code from whatever
+    folder graphify starts in; so is one that cannot be expanded. Each bad
+    entry is a load error; the other folders still load.
+  - A `*.toml` is a manifest only with a `[language]` table; `pyproject.toml`
+    or `ruff.toml` beside the plugin is skipped.
+  - The `[extract] runtime` module is imported as
+    `graphify_lang_path._<hash>.<runtime>`, one package per folder, and
+    `sys.path` is never changed, so two folders never share a module and no
+    installed or stdlib module is shadowed. It exposes `extract` (or
+    `augment`), and optionally `RESOLVER` and, for an augment, `WATCH`.
+  - Import the plugin's own modules relatively (`from . import helper`), at
+    module top or inside `extract`; an absolute `import helper` is not found.
+    A runtime whose top-level name another folder's runtime or an importable
+    module also has still loads, with a `--check` warning.
+  - A language name already registered (by an entry point or an earlier
+    manifest) is rejected: the first wins, the second is a load error. A
+    folder listed twice loads once.
+  - The AST cache fingerprint hashes the folder's `.py` / `.toml` files only;
+    a data file a plugin reads (queries, JSON tables) does not move the cache
+    namespace, as for entry-point plugins.
 - **`graphify lang list --check`** prints one row per plugin, `ok` or its
-  load error, and exits 1 when any plugin failed to load. A failing plugin
+  load error, plus `warning:` rows (a runtime name clash), and exits 1 when
+  any plugin failed to load or the core tables did not take the registry. A failing plugin
   is logged and skipped; the others still load.
 
 Known limits:

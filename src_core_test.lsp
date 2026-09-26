@@ -1,1 +1,0 @@
-(defun foo () (print "foo"))

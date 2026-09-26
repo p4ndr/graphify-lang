@@ -275,7 +275,7 @@ This document is a LIVE file containing a list of TASKS that have been carried o
 - `[x]` T9.2 | One test that resolves the manifest and its data files through `importlib.resources` (TODO: write test)
 - `[x]` T9.3 | SC12 in-process half: `_run_hook_guard('read')` — not gated, needs no install (TODO: implement)
 - `[x]` T9.4 | The shipped `[project.entry-points."graphify_lang.plugins"]` stanza (one line)
-- `[x]` T9.5 | The MCP registration install script (scripts/install-mcp.sh) and manual run (TODO: run manually)
+- `[x]` T9.5 | The MCP registration install script (scripts/install-mcp.sh); deleted in plan 05 S2.4 (M10): it wrote a config key nothing reads, so no manual run is needed
 - `[x]` T9.6 | Take the SRS §1.3 tier-2 recorded measurements and write them into the documents (TODO: add to docs)
 
 ---

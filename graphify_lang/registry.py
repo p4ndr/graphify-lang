@@ -1,14 +1,18 @@
-"""Registry for language packages discovered via entry points."""
+"""Registry of language plugins: the ``graphify_lang_plugins`` entry points,
+then the manifests in each ``GRAPHIFY_LANG_PATH`` folder."""
 
 from __future__ import annotations
 
 import codecs
 import functools
+import importlib
+import importlib.metadata
 import logging
 import os
 import re
+import sys
 from collections.abc import Callable, Iterator, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -19,20 +23,24 @@ _LOG = logging.getLogger(__name__)
 # Environment variable to disable the registry entirely
 _DISABLE_VAR = "GRAPHIFY_LANG_DISABLE"
 
-# Environment variable for additional search paths
+# os.pathsep-separated folders of plugin manifests, loaded after the entry points
 _PATH_VAR = "GRAPHIFY_LANG_PATH"
+
+# The one entry-point group pyproject.toml ships (cc-CR000.001 L7)
+_GROUP = "graphify_lang_plugins"
 
 
 @dataclass
 class _RegistryState:
     """Internal registry state, cached per process."""
 
-    enabled: bool = True
+    # GRAPHIFY_LANG_PATH folders that exist; part of the AST cache fingerprint
     search_paths: list[Path] = field(default_factory=list)
     manifests: dict[str, LanguageManifest] = field(default_factory=dict)
     suffix_to_manifest: dict[str, LanguageManifest] = field(default_factory=dict)
-    warned_builtins: set[str] = field(default_factory=set)
     tie_warned: set[str] = field(default_factory=set)
+    # entry point name or manifest path -> load error (``graphify lang list --check``)
+    load_errors: dict[str, str] = field(default_factory=dict)
 
 
 # Process-wide cache
@@ -40,110 +48,103 @@ _STATE: _RegistryState | None = None
 
 
 def _init_state() -> _RegistryState:
-    """Initialize or return the cached registry state."""
+    """Initialize or return the cached registry state.
+
+    Each plugin loads inside its own ``try``: a failure is logged and recorded,
+    and the other plugins still register (cc-CR000.001 M1).
+    """
     global _STATE
     if _STATE is not None:
         return _STATE
-
-    # Check environment
-    disabled = os.environ.get(_DISABLE_VAR, "").strip().lower()
-    enabled = disabled not in ("1", "true", "yes", "on")
-
-    # Build search paths
-    search_paths: list[Path] = []
-    if enabled:
-        # Entry points first (importlib.metadata)
+    # Set before loading, so a plugin that calls back into the registry while
+    # it loads sees the partial state instead of starting a second discovery.
+    state = _STATE = _RegistryState()
+    if os.environ.get(_DISABLE_VAR, "").strip().lower() in ("1", "true", "yes", "on"):
+        return state
+    for ep in importlib.metadata.entry_points(group=_GROUP):
         try:
-            import importlib.metadata as importlib_metadata
-        except ImportError:
-            import importlib_metadata
-
-        try:
-            eps = importlib_metadata.entry_points(group="graphify_lang.plugins")
-        except TypeError:
-            eps = importlib_metadata.entry_points().get("graphify_lang.plugins", [])
-
-        for ep in eps:
-            try:
-                loader = ep.load
-            except AttributeError:
-                continue
-            try:
-                result = loader()
-            except Exception as exc:
-                _LOG.warning("failed to load entry point %s: %s", ep.name, exc)
-                continue
-            _process_loader_result(ep.name, result)
-
-        # Also try graphify_lang_plugins (underscore variant)
-        try:
-            eps2 = importlib_metadata.entry_points(group="graphify_lang_plugins")
-        except TypeError:
-            eps2 = importlib_metadata.entry_points().get("graphify_lang_plugins", [])
-
-        for ep in eps2:
-            try:
-                loader = ep.load
-            except AttributeError:
-                continue
-            try:
-                result = loader()
-            except Exception as exc:
-                _LOG.warning("failed to load entry point %s: %s", ep.name, exc)
-                continue
-            _process_loader_result(ep.name, result)
-
-        # Then GRAPHIFY_LANG_PATH
-        path_env = os.environ.get(_PATH_VAR, "")
-        if path_env:
-            for p in path_env.split(os.pathsep):
-                if p:
-                    search_paths.append(Path(p).resolve())
-
-    # Only create new state if _STATE is still None
-    # This allows _register_manifest to set _STATE first
-    if _STATE is None:
-        _STATE = _RegistryState(
-            enabled=enabled, search_paths=search_paths
-        )
-    return _STATE
+            _process_loader_result(ep.load())
+        except Exception as exc:
+            _failed(state, "entry point", ep.name, exc)
+    for entry in os.environ.get(_PATH_VAR, "").split(os.pathsep):
+        if entry:
+            _load_folder(state, Path(entry).expanduser().resolve())
+    return state
 
 
-def _process_loader_result(name: str, result: Any) -> None:
-    """Process a loader result into a manifest."""
-    if result is None:
+def _failed(state: _RegistryState, kind: str, source: str, exc: Exception | str) -> None:
+    _LOG.warning("failed to load %s %s: %s", kind, source, exc)
+    state.load_errors[source] = str(exc)
+
+
+def _load_folder(state: _RegistryState, folder: Path) -> None:
+    """Register every ``*.toml`` manifest in a ``GRAPHIFY_LANG_PATH`` folder (M5)."""
+    if not folder.is_dir():
+        _failed(state, "plugin folder", str(folder), "not a directory")
         return
-    # Call result if it's a callable (like _get_manifest returning a function)
+    state.search_paths.append(folder)
+    for toml in sorted(folder.glob("*.toml")):
+        try:
+            manifest = _path_manifest(folder, toml)
+            if manifest.name in state.manifests:
+                raise ValueError(f"language {manifest.name!r} is already registered")
+            _register_manifest(manifest)
+        except Exception as exc:
+            _failed(state, "manifest", str(toml), exc)
+
+
+def _path_manifest(folder: Path, toml: Path) -> LanguageManifest:
+    """The manifest ``toml`` with the callables of its ``[extract] runtime``
+    module: ``extract`` (or ``augment`` for an augment) and an optional
+    ``RESOLVER``, as an entry-point package sets them. The module is imported
+    with ``folder`` first on ``sys.path`` for that import only."""
+    manifest, errors = LanguageManifest.from_toml(toml)
+    if errors:
+        raise ValueError("; ".join(errors))
+    sys.path.insert(0, str(folder))
+    try:
+        module = importlib.import_module(manifest.runtime)
+    finally:
+        sys.path.remove(str(folder))
+    attr = "augment" if manifest.kind == "augment" else "extract"
+    func = getattr(module, attr, None)
+    if not callable(func):
+        raise ValueError(f"{manifest.runtime} has no callable {attr!r}")
+    return replace(manifest, **{attr: func}, resolver=getattr(module, "RESOLVER", None))
+
+
+def _process_loader_result(result: Any) -> None:
+    """Register what an entry point loaded: a manifest, a callable returning
+    one (``_get_manifest``), or a list of either."""
     if callable(result):
         result = result()
     if isinstance(result, LanguageManifest):
         _register_manifest(result)
     elif isinstance(result, (list, tuple)):
         for item in result:
-            _process_loader_result(name, item)
+            _process_loader_result(item)
     # Ignore other types silently - the loader may return metadata
 
 
 def _register_manifest(manifest: LanguageManifest) -> None:
-    """Register a manifest into the registry."""
+    """Register a manifest into the registry.
+
+    A manifest registered before discovery ran (tests do this) makes a registry
+    of its own: discovery then never runs in this process until ``reset()``.
+    """
     global _STATE
-    state = _STATE if _STATE is not None else _RegistryState(enabled=True, search_paths=[])
-    
+    if _STATE is None:
+        _STATE = _RegistryState()
     if not manifest.name:
         _LOG.warning("manifest with empty name ignored")
         return
-
-    state.manifests[manifest.name] = manifest
+    _STATE.manifests[manifest.name] = manifest
     for suffix in manifest.suffixes:
         # First claimant is the suffix's manifest for metadata (extras). Who
         # extracts a shared suffix is decided by dispatch_table (plan 04 §3.1).
-        state.suffix_to_manifest.setdefault(suffix, manifest)
+        _STATE.suffix_to_manifest.setdefault(suffix, manifest)
 
     _register_resolver(manifest.resolver)
-
-    # Update _STATE if it was None
-    if _STATE is None:
-        _STATE = state
 
 
 def _register_resolver(resolver: Any) -> None:
@@ -432,6 +433,16 @@ def context_fields() -> tuple[str, ...]:
     """Every manifest's ``[resolve] context_fields``, sorted: the node fields an
     incremental build keeps on the context nodes of unchanged files (H1)."""
     return tuple(sorted({f for m in _init_state().manifests.values() for f in m.context_fields}))
+
+
+def load_errors() -> dict[str, str]:
+    """Plugins that failed to load: entry point name or manifest path -> error."""
+    return dict(_init_state().load_errors)
+
+
+def search_paths() -> list[Path]:
+    """The ``GRAPHIFY_LANG_PATH`` folders that were loaded."""
+    return list(_init_state().search_paths)
 
 
 def iter_manifests() -> Iterator[LanguageManifest]:

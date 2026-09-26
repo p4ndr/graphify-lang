@@ -82,7 +82,6 @@ def _bad() -> LanguageManifest:
 
 # --- M1, L7 --------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, raises=ValueError, reason="M1: a raising manifest callable escapes the per-entry-point try")
 def test_m1_bad_entry_point_isolated(monkeypatch, caplog):
     monkeypatch.setattr(importlib.metadata, "entry_points",
                         lambda group=None: [_EP("bad", _bad), _EP("good", _good)]
@@ -92,7 +91,6 @@ def test_m1_bad_entry_point_isolated(monkeypatch, caplog):
     assert "failed to load entry point bad" in caplog.text
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="L7: two entry-point groups are scanned")
 def test_l7_single_group(monkeypatch):
     groups: list[str] = []
     monkeypatch.setattr(importlib.metadata, "entry_points",
@@ -105,7 +103,6 @@ def test_l7_single_group(monkeypatch):
 
 # --- M5 ------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="M5: GRAPHIFY_LANG_PATH is collected and never loaded")
 def test_m5_lang_path_loads_plugin(tmp_path, monkeypatch):
     folder = _toy_folder(tmp_path / "plugins")
     monkeypatch.setenv("GRAPHIFY_LANG_PATH", os.pathsep.join([str(folder), ""]))
@@ -118,7 +115,6 @@ def test_m5_lang_path_loads_plugin(tmp_path, monkeypatch):
     assert registry.get_manifest_for_suffix(".toy").extract(src)["nodes"][0]["id"] == "toy_a"
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="M5: a missing path folder is not reported")
 def test_m5_missing_dir_warns(tmp_path, monkeypatch, caplog):
     missing = tmp_path / "nope"
     monkeypatch.setenv("GRAPHIFY_LANG_PATH", str(missing))
@@ -128,7 +124,6 @@ def test_m5_missing_dir_warns(tmp_path, monkeypatch, caplog):
     assert str(missing) in caplog.text
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="M5: path manifests are never loaded")
 def test_m5_bad_path_manifest_isolated(tmp_path, monkeypatch, caplog):
     folder = _toy_folder(tmp_path / "plugins")
     (folder / "broken.toml").write_text("[language\n")
@@ -142,7 +137,6 @@ def test_m5_bad_path_manifest_isolated(tmp_path, monkeypatch, caplog):
     assert "broken.toml" in caplog.text and "nocall.toml" in caplog.text
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="M5/E1: path plugins are not loaded, so not fingerprinted")
 def test_m5_path_plugin_in_cache_fingerprint(tmp_path, monkeypatch):
     """E1 covers path plugins: editing a path plugin's manifest or code moves
     the AST cache namespace."""

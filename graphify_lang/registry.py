@@ -200,6 +200,11 @@ def match_suffixes() -> set[str]:
     return {s for m in _languages() if m.has_match for s in m.suffixes} - registered_suffixes()
 
 
+def augment_suffixes() -> set[str]:
+    """Suffixes an augment adds to (``language.augments``)."""
+    return {s for m in _init_state().manifests.values() if m.kind == "augment" for s in m.augments}
+
+
 def claimants(suffix: str) -> list[LanguageManifest]:
     """Plugins that list ``suffix``, in registration order."""
     return [m for m in _languages() if suffix in m.suffixes]
@@ -369,6 +374,7 @@ def _augmented(suffix: str, inner: Callable[[Path], dict],
             result = _merge(m, result, extra)
         return result
     augmented.__name__ = augmented.__qualname__ = f"augmented[{suffix}]"
+    augmented.__wrapped__ = inner
     return augmented
 
 

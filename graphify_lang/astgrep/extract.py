@@ -22,13 +22,11 @@ from __future__ import annotations
 
 import logging
 import re
-from bisect import bisect_left
-from functools import lru_cache
 from pathlib import Path
 
 import yaml
 
-from graphify_lang._common import Sink, _make_id
+from graphify_lang._common import Sink, _make_id, line_index
 
 _LOG = logging.getLogger(__name__)
 _DOC_SPLIT_RE = re.compile(r"^---[ \t]*(?:#.*)?$", re.MULTILINE)
@@ -65,20 +63,9 @@ def _documents(text: str) -> list[tuple[int, str]]:
     return [(ln, t) for ln, t in docs if t.strip()]
 
 
-@lru_cache(maxsize=4)
-def _newlines(text: str) -> tuple[int, ...]:
-    return tuple(m.start() for m in re.finditer("\n", text))
-
-
-def _line_of(text: str, pos: int) -> int:
-    """1-based line of offset ``pos``: a bisect over newline offsets built once
-    per text, not a count from the start per match (cc-CR000.001 N4)."""
-    return bisect_left(_newlines(text), pos) + 1
-
-
-def _key_line(text: str, first: int, pattern: str) -> int:
+def _key_line(line_of, text: str, first: int, pattern: str) -> int:
     m = re.search(pattern, text, re.MULTILINE)
-    return first + _line_of(text, m.start()) - 1 if m else first
+    return first + line_of(m.start()) - 1 if m else first
 
 
 def _role(doc: dict, path: Path) -> str:
@@ -98,9 +85,9 @@ def _dirs(value) -> list[str]:
     return [str(v) for v in items if isinstance(v, (str, int)) and str(v)]
 
 
-def _rule_doc(out: Sink, doc: dict, text: str, first: int, role: str) -> None:
+def _rule_doc(out: Sink, doc: dict, text: str, first: int, role: str, line_of) -> None:
     rid = str(doc["id"])
-    line = _key_line(text, first, r"^id:")
+    line = _key_line(line_of, text, first, r"^id:")
     attrs = {k: str(doc[k]) for k in ("language", "severity") if isinstance(doc.get(k), (str, int))}
     if role == "util":
         owner = out.add(_make_id(out.stem, "util", rid), rid, "util", line,
@@ -111,7 +98,7 @@ def _rule_doc(out: Sink, doc: dict, text: str, first: int, role: str) -> None:
     local: dict[str, str] = {}
     utils = doc.get("utils") if isinstance(doc.get("utils"), dict) else {}
     for uid in map(str, utils):
-        uline = _key_line(text, first, rf"^[ \t]+{re.escape(uid)}:")
+        uline = _key_line(line_of, text, first, rf"^[ \t]+{re.escape(uid)}:")
         local[uid] = out.add(_make_id(owner, "util", uid), uid, "util", uline,
                              astgrep_scope="local")
         out.edge(owner, local[uid], "contains", uline)
@@ -131,6 +118,7 @@ def _document(out: Sink, path: Path, chunk: str, first: int) -> None:
     if not isinstance(doc, dict):
         return
     role = _role(doc, path)
+    line_of = line_index(chunk)
     if "astgrep_role" not in out.nodes[0]:
         out.nodes[0]["astgrep_role"] = role
     if role == "sgconfig":
@@ -140,7 +128,7 @@ def _document(out: Sink, path: Path, chunk: str, first: int) -> None:
                      and str(t["testDir"])]
         for key in ("ruleDirs", "utilDirs"):
             for d in _dirs(doc.get(key)):
-                out.ref("dir", out.file_nid, name=d, line=_key_line(chunk, first, rf"^{key}:"))
+                out.ref("dir", out.file_nid, name=d, line=_key_line(line_of, chunk, first, rf"^{key}:"))
         out.nodes[0].update({"rule_dirs": _dirs(doc.get("ruleDirs")),
                              "util_dirs": _dirs(doc.get("utilDirs")),
                              "test_dirs": test_dirs})
@@ -149,9 +137,9 @@ def _document(out: Sink, path: Path, chunk: str, first: int) -> None:
         return
     if role in ("test", "snapshot"):
         out.nodes[0].setdefault("astgrep_id", str(doc["id"]))
-        out.ref(role, out.file_nid, name=str(doc["id"]), line=_key_line(chunk, first, r"^id:"))
+        out.ref(role, out.file_nid, name=str(doc["id"]), line=_key_line(line_of, chunk, first, r"^id:"))
         return
-    _rule_doc(out, doc, chunk, first, role)
+    _rule_doc(out, doc, chunk, first, role, line_of)
 
 
 def extract_astgrep(path: Path) -> dict:

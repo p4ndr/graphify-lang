@@ -12,11 +12,10 @@ from __future__ import annotations
 import os
 import re
 import warnings
-from bisect import bisect_left
 from functools import lru_cache
 from pathlib import Path
 
-from graphify_lang._common import Sink, load_builtins
+from graphify_lang._common import Sink, line_index, load_builtins
 
 _DEFUN_RE = re.compile(r"^[ \t]*\(defun[ \t]+([^\s()]+)", re.M | re.I)
 _HEADER_RE = re.compile(r"^[ \t]*;+[ \t]*@(module|depends|sidecar)[ \t]+(.+?)[ \t]*$", re.M)
@@ -54,17 +53,6 @@ def _parser():
 
 def _line(node) -> int:
     return node.start_point[0] + 1
-
-
-@lru_cache(maxsize=4)
-def _newlines(text: str) -> tuple[int, ...]:
-    return tuple(m.start() for m in re.finditer("\n", text))
-
-
-def _line_of(text: str, pos: int) -> int:
-    """1-based line of offset ``pos``: a bisect over newline offsets built once
-    per text, not a count from the start per match (cc-CR000.001 N4)."""
-    return bisect_left(_newlines(text), pos) + 1
 
 
 def _kids(node) -> list:
@@ -198,12 +186,12 @@ def action_callees(action: str) -> list[str]:
     return [name for _, name, _ in walker.calls]
 
 
-def _headers(out: Sink, text: str, path: Path) -> None:
+def _headers(out: Sink, text: str, path: Path, line_of) -> None:
     module_nid = None
     depends: list[tuple[str, int]] = []
     for m in _HEADER_RE.finditer(text):
         tag, value = m.group(1), m.group(2)
-        line = _line_of(text, m.start())
+        line = line_of(m.start())
         if tag == "module" and module_nid is None:
             module_nid = out.node("module", value.split()[0], line)
         elif tag == "depends":
@@ -224,7 +212,8 @@ def extract_autolisp(path: Path) -> dict:
         return {"nodes": [], "edges": [], "error": str(exc)}
     text = source.decode("utf-8", errors="replace")
     out = Sink(path, _builtins())
-    _headers(out, text, path)
+    line_of = line_index(text)
+    _headers(out, text, path, line_of)
 
     walker = _Walker(source)
     fallback = root.has_error
@@ -253,13 +242,13 @@ def extract_autolisp(path: Path) -> dict:
             name = m.group(1)
             if name.casefold() not in local:
                 kind = "command" if name.casefold().startswith("c:") else "function"
-                line = _line_of(text, m.start())
+                line = line_of(m.start())
                 local[name.casefold()] = [out.node(kind, name, line, confidence="INFERRED")]
         for m in _TOP_SETQ_RE.finditer(text):
             name = m.group(1)
             if name.casefold() not in seen_globals:
                 seen_globals.add(name.casefold())
-                out.node("global", name, _line_of(text, m.start()), confidence="INFERRED")
+                out.node("global", name, line_of(m.start()), confidence="INFERRED")
 
     for owner, name, line in walker.calls:
         caller = nids[owner]
@@ -285,6 +274,7 @@ def extract_dcl(path: Path) -> dict:
     # Blank comments but keep their newlines so line numbers hold.
     text = _DCL_COMMENT_RE.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)
     out = Sink(path, _builtins("dcl.toml"))
+    line_of = line_index(text)
     for m in _DIALOG_RE.finditer(text):
-        out.node("dialog", m.group(1), _line_of(text, m.start()))
+        out.node("dialog", m.group(1), line_of(m.start()))
     return out.result("autolisp_refs")

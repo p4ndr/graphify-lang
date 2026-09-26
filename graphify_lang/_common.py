@@ -17,11 +17,15 @@ contracts every plugin follows, in one place.
   prefix with the source (INFERRED); a tie resolves to nothing.
 - ``load_manifest`` / ``load_builtins``: a package's TOML manifest and its
   ``builtins_file`` / ``builtins_prefixes`` / ``case_insensitive`` filter.
+- ``line_index``: offset -> line for one text, built once per extraction.
 """
 from __future__ import annotations
 
+import re
+from bisect import bisect_left
 from dataclasses import replace
 from pathlib import Path
+from typing import Callable
 
 from graphify_lang.builtins import Builtins
 from graphify_lang.manifest import LanguageManifest, tomli
@@ -35,6 +39,14 @@ def _file_stem(path):
 def _make_id(*parts):
     from graphify.extractors.base import _make_id as f
     return f(*parts)
+
+
+def line_index(text: str) -> Callable[[int], int]:
+    """1-based line of an offset in ``text``: newline offsets built once, then a
+    bisect per lookup, not a count from the start (cc-CR000.001 N4). The caller
+    holds it for one extraction, so no module cache keeps the text alive (S1-N2)."""
+    newlines = [m.start() for m in re.finditer("\n", text)]
+    return lambda pos: bisect_left(newlines, pos) + 1
 
 
 class Sink:

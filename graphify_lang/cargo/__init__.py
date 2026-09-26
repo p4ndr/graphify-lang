@@ -5,19 +5,14 @@
 """
 from __future__ import annotations
 
-from dataclasses import replace
-from pathlib import Path
-
+from graphify_lang._common import load_manifest
 from graphify_lang.cargo.augment import augment_cargo
 from graphify_lang.manifest import LanguageManifest
 
 
 def _get_manifest() -> LanguageManifest:
     """Entry point: the cargo augment manifest."""
-    manifest, errors = LanguageManifest.from_toml(Path(__file__).parent / "graphify-lang.toml")
-    if errors:
-        raise ValueError(f"graphify-lang.toml: {errors}")
-    return replace(manifest, augment=augment_cargo)
+    return load_manifest(__file__, "graphify-lang.toml", augment=augment_cargo)
 
 
 __all__ = ["augment_cargo", "_get_manifest"]

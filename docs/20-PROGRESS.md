@@ -15,6 +15,14 @@ This document is a LIVE running changelog for all work in the repo.
 
 ## 3. CURRENT SESSION
 
+### 2026-09-26 17:11 (UTC+10)
+
+- T37.1 done: S6.0: rr-s6 rebased onto upstream/v8 4000de1 (0.9.68), 1 conflict (lang.1 commit: README/pyproject/uv.lock version); S6.1 M12 corpus marker + samples 842a67d; 6238 passed / 14 skipped
+- T37.2 done: M11 README, N1, N2 in acdac5f; S6.2 git grep check clean on README.md and .claude/CLAUDE.md
+- T37.3 done: 4 drafts in docs/upstream/ (31db078), each verified on an upstream/v8 scratch worktree; E3 closed
+- Plan 05 S6.0-S6.3 on rr-s6 (T37.1-T37.3 done; T37.4-T37.6 deferred by owner until after a review-fix pass): rebased onto upstream/v8 4000de1 (0.9.68), one conflict in the lang.1 commit (README kept, version lines kept); M12 corpus marker + samples; M11 README, N1, N2; four upstream PR drafts in docs/upstream/, each verified on upstream/v8.
+- pytest 6238 passed / 14 skipped; extractor three-dot diff empty; no upstream test edited; M11, M12, N1, N2, E3 moved to cc-CR000.002 (cc-CR000.001 has no open finding). rr-s6 pushed to origin, CI run 36225724044 green (3.10/3.12/3.13, security).
+
 ### 2026-09-26 16:27 (UTC+10)
 
 - T36.1 done: 14 tests, 12 strict xfail red, L10/L13 pinned (ef2012a)

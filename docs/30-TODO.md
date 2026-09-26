@@ -53,11 +53,11 @@ This document is a LIVE file containing a list of TASKS to be carried out.
 - `[ ]` T10.4 | Include the `run_language_resolvers` casefold as a separate small fix
 - `[ ]` T10.5 | Expect to carry the registry indefinitely; plan accordingly
 
-### `[ ]` T37 | P05-S006 (rr-s6) Tests, docs, release lang.4 — M12 M11 N1 N2 PR drafts
+### `[~]` T37 | P05-S006 (rr-s6) Tests, docs, release lang.4 — M12 M11 N1 N2 PR drafts
 
-- `[ ]` T37.1 | S6.1 M12 corpus marker + checked-in corpus samples
-- `[ ]` T37.2 | S6.2 M11 README, N1 CLAUDE.md symbols, N2 plan statuses
-- `[ ]` T37.3 | S6.3 Upstream PR drafts (H1/E3, M3, L13, registry lookups)
+- `[x]` T37.1 | S6.1 M12 corpus marker + checked-in corpus samples
+- `[x]` T37.2 | S6.2 M11 README, N1 CLAUDE.md symbols, N2 plan statuses
+- `[x]` T37.3 | S6.3 Upstream PR drafts (H1/E3, M3, L13, registry lookups)
 - `[ ]` T37.4 | S6.4 Release v0.9.67+lang.4 + pipx install (README form)
 - `[ ]` T37.5 | S6.5 Rebuild 12 graphs; incremental check on real corpora
 - `[ ]` T37.6 | S6.6 Close-out: CR file, DONE statuses, learnings, ask owner then push

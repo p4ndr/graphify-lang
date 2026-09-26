@@ -96,9 +96,13 @@ _M4 = {
 }
 
 
+_M4_OPEN = {"autolisp", "vba", "ecschema", "astgrep"}  # each plugin move closes its own
+
+
 @pytest.mark.parametrize("plugin", [
     pytest.param(p, marks=pytest.mark.xfail(strict=True, raises=AssertionError,
-                 reason=f"cc-CR000.001 M4: {p} file ids drop the suffix")) for p in _M4])
+                 reason=f"cc-CR000.001 M4: {p} file ids drop the suffix")) if p in _M4_OPEN
+    else p for p in _M4])
 def test_m4_file_ids_portable(tmp_path, plugin):
     # A same-stem .py file beside the plugin files: its file node id is the
     # built-in form every plugin file must collide with and be salted from.

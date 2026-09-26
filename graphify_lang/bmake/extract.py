@@ -20,17 +20,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-
-def _file_stem(path):
-    # Lazy: graphify.extractors at plugin load re-enters graphify.detect (see autolisp).
-    from graphify.extractors.base import _file_stem as f
-    return f(path)
-
-
-def _make_id(*parts):
-    from graphify.extractors.base import _make_id as f
-    return f(*parts)
-
+from graphify_lang._common import Sink, _make_id
 
 _COMMENT_RE = re.compile(r"(^|\s)#.*$")
 _DIRECTIVE_RE = re.compile(r"^%(\w+)\s*(.*)$")
@@ -89,52 +79,6 @@ def include_name(path: str, values: dict[str, list[tuple[int, str]]], line: int,
     return include_name(before[-1], values, line, depth + 1)
 
 
-class _Out:
-    """Node / edge / ref sink for one file."""
-
-    def __init__(self, path: Path) -> None:
-        self.sf = str(path)
-        self.stem = _make_id(_file_stem(path))
-        # Child ids carry the suffix (x.mki and x.mke share a file stem), but not
-        # right after the stem: upstream reads <stem>_mki as a legacy id form of
-        # the file and repoints cross-file edge endpoints that start with it.
-        self.suffix = path.suffix.lstrip(".").lower()
-        self.nodes: list[dict] = []
-        self.edges: list[dict] = []
-        self.refs: list[dict] = []
-        self._ids: set[str] = set()
-        self._order: dict[str, int] = {}
-        self._edge_keys: set[tuple] = set()
-        self.file_nid = self.add(self.stem, path.name, "file", 1)
-
-    def add(self, nid: str, label: str, kind: str, line: int) -> str:
-        if nid in self._ids:
-            nid = f"{nid}_l{line}"
-        self._ids.add(nid)
-        self._order[nid] = len(self.nodes)
-        self.nodes.append({"id": nid, "label": label, "file_type": "code", "node_kind": kind,
-                           "source_file": self.sf, "source_location": f"L{line}"})
-        return nid
-
-    def edge(self, src: str, tgt: str, relation: str, line: int) -> None:
-        if src == tgt or (src, tgt, relation) in self._edge_keys:
-            return
-        self._edge_keys.add((src, tgt, relation))
-        self.edges.append({"source": src, "target": tgt, "relation": relation,
-                           "confidence": "EXTRACTED", "source_file": self.sf,
-                           "source_location": f"L{line}", "weight": 1.0})
-
-    def ref(self, kind: str, source: str, name: str | None, line: int, **extra) -> None:
-        if kind != "include":  # one ref per %include directive; the rest deduplicated
-            if (kind, source, name) in self._edge_keys:
-                return
-            self._edge_keys.add((kind, source, name))
-        # The resolver reads the source id back through the node index: a file id
-        # shared by x.mki and x.mke is salted apart before resolvers run.
-        self.refs.append({"kind": kind, "source": source, "node": self._order[source],
-                          "name": name, "line": line, "source_file": self.sf, **extra})
-
-
 def extract_bmake(path: Path) -> dict:
     """Extract one bmake makefile (plan 04 §3.4)."""
     path = Path(path)
@@ -143,7 +87,11 @@ def extract_bmake(path: Path) -> dict:
     except OSError as exc:
         return {"nodes": [], "edges": [], "error": str(exc)}
     lines = logical_lines(text)
-    out = _Out(path)
+    out = Sink(path)
+    # Child ids carry the suffix (x.mki and x.mke share a file stem), but not
+    # right after the stem: upstream reads <stem>_mki as a legacy id form of
+    # the file and repoints cross-file edge endpoints that start with it.
+    suffix = path.suffix.lstrip(".").lower()
 
     # Pass 1: classify lines; macro nodes at their first definition, targets.
     values: dict[str, list[tuple[int, str]]] = {}  # macro -> [(line, value)]
@@ -169,14 +117,14 @@ def extract_bmake(path: Path) -> dict:
             name, _, value = m.groups()
             values.setdefault(name, []).append((line, value))
             if name not in macros:
-                macros[name] = out.add(_make_id(out.stem, "macro", out.suffix, name), name, "macro", line)
+                macros[name] = out.add(_make_id(out.stem, "macro", suffix, name), name, "macro", line)
                 out.edge(out.file_nid, macros[name], "contains", line)
             work.append(("use", line, value, [macros[name]]))
         elif m := _TARGET_RE.match(s):
             ids = []
             for t in m.group(1).split():
                 if t not in targets:
-                    targets[t] = out.add(_make_id(out.stem, "target", out.suffix, t), t, "target", line)
+                    targets[t] = out.add(_make_id(out.stem, "target", suffix, t), t, "target", line)
                     out.edge(out.file_nid, targets[t], "contains", line)
                 ids.append(targets[t])
             work.append(("deps", line, m.group(2), ids))
@@ -190,17 +138,17 @@ def extract_bmake(path: Path) -> dict:
             d = _DIRECTIVE_RE.match(s)
             if d and d.group(1).lower() == "include":
                 name, expanded = include_name(d.group(2), values, line)
-                out.ref("include", out.file_nid, name, line, raw=d.group(2).strip(),
+                out.ref("include", out.file_nid, line, name=name, raw=d.group(2).strip(),
                         expanded=expanded)
         if kind == "deps":
             for token in s.split():
                 if (name := file_name(token)) and "." in name.strip("."):
                     for src in sources:
-                        out.ref("depends", src, name, line)
+                        out.ref("depends", src, line, unique=True, name=name)
         for use in _USE_RE.finditer(s):
             for src in sources:
                 if use.group(1) in macros:
                     out.edge(src, macros[use.group(1)], "references", line)
                 else:
-                    out.ref("macro", src, use.group(1), line)
-    return {"nodes": out.nodes, "edges": out.edges, "bmake_refs": out.refs}
+                    out.ref("macro", src, line, unique=True, name=use.group(1))
+    return out.result("bmake_refs")

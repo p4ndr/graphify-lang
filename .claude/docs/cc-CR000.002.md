@@ -26,6 +26,13 @@ Findings moved out of `cc-CR000.001.md` once fixed or closed. Each entry keeps t
 | E2 | Enhancement | Done | `2c3e6e9` | plan 05 S3 |
 | E7 | Enhancement | Closed: rejected per D-008 | - | plan 05 S3 |
 | E8 | Enhancement | Done (with L3) | `a5a899c` | plan 05 S3 |
+| H1 | High | Fixed | `2adf7bc`, `cd55efb` | plan 05 S4 (`rr-s4`) |
+| H3 | High | Fixed | `22855e9` | plan 05 S4 |
+| M2 | Medium | Fixed | `2e2cba1` | plan 05 S4 (engine commit) |
+| L9 | Low | Fixed (with H3) | `22855e9` | plan 05 S4 |
+| L11 | Low | Fixed | `dc8a8ec` | plan 05 S4 |
+| E1 | Enhancement | Done (with M2) | `2e2cba1` | plan 05 S4 |
+| E5 | Enhancement | Done | `a5961fe`, `cd55efb` | plan 05 S4 |
 
 ## High
 
@@ -44,6 +51,22 @@ Findings moved out of `cc-CR000.001.md` once fixed or closed. Each entry keeps t
 - **Failure scenario (measured)**: `app.lsp` with `(defun helper () (libfn))`, `app.mnl` with its own `helper`, `sub/lib.lsp` with `libfn`: `extract()` emits `app_helper calls sub_lib_libfn` where `app_helper` no longer exists (nodes are `app_lsp_app_helper`, `app_mnl_app_helper`). Sidecar refs from a colliding file node dangle the same way.
 - **Fix**: adopt the bmake pattern in both plugins: store `node` (index into the result's `nodes`) in each ref and read `res["nodes"][ref["node"]]["id"]` in the resolver; keep `dialogs_of` keyed by the current id. Add a same-stem fixture test (`x.lsp` + `x.mnl` + `x.dcl` with cross-file calls and a sidecar).
 - **Resolution (2026-09-26, plan 05 S3)**: fixed in `bbf0a1f` (vba) and `67a582c` (autolisp) on the shared core of `2c3e6e9`; tests `542f417`. Every plugin ref stores `node`, the index of its source node in the result, and the resolver reads the current (salted) id back through `graphify_lang._common.refs_of` / `resolve_ref_id`; `dialogs_of` is keyed by that id. The wrong comment at `autolisp/resolve.py:79-80` is deleted with its `continue`, so a `.lsp` and its same-stem `.md` sidecar get their `sidecar_doc` edge. Tests `tests/lang/test_s3_shared_core.py::test_h2_same_stem_lsp_mnl_dcl` (x.lsp + x.mnl + x.dcl + x.md, cross-file calls, dialog, action, sidecar) and `test_h2_vba_same_stem`: dangling `calls` edges before, none after. Corpus: `docs/testing/case_008_plan05-remediation.md`.
+
+### H1 Incremental rebuild drops every cross-file plugin edge into unchanged files
+
+- **Where**: all plugin resolvers index targets by `node_kind`: `graphify_lang/autolisp/resolve.py:26`, `graphify_lang/vba/resolve.py:59`, `graphify_lang/bmake/resolve.py:68`, `graphify_lang/astgrep/resolve.py:51-55`, `graphify_lang/cc_kb/resolve.py:60`. Upstream dependency: `graphify/watch.py:1723-1729` builds the resolution-context node for unchanged files from `id`, `label`, `source_file`, `file_type`, `type` plus a fixed marker list; `node_kind` (and `astgrep_scope`, `visibility`, `accessor`) is not forwarded.
+- **Problem**: on an incremental rebuild (`_rebuild_code(changed_paths=...)`, used by the git post-commit hook, the Claude hook flow and `graphify watch`), the resolvers see unchanged files' nodes without `node_kind`, so no target in an unchanged file is found. The changed file's old edges were removed with its re-extraction, so the edges disappear.
+- **Failure scenario (measured)**: corpus `src/app.lsp` `(defun c:go () (libfn))` + `src/lib.lsp` `(defun libfn ...)`. Full build: `src_app_c_go calls src_lib_libfn`. Edit `app.lsp` only, run `graphify.watch._rebuild_code(root, changed_paths=[app.lsp])`: the `calls` edge is gone. Same mechanism for VBA calls, bmake includes/macros, ast-grep util/test links, cc-kb `cites`, ECSchema cross-schema refs.
+- **Fix**: **upstream PR** (generic, small): forward `node_kind` (or a plugin-declared marker list) in the `ctx_node` at `watch.py:1723`. Until then, a plugin-side mitigation: resolvers fall back to classifying context nodes without `node_kind` by id shape or by a marker upstream already forwards (for example the node `type` field, but check `_disambiguate_colliding_node_ids` exempts `type in ("module","namespace")`). Add a test that compares a full build with full-then-incremental for every plugin fixture (E5).
+- **Resolution (2026-09-26, plan 05 S4.2)**: fixed in `2adf7bc` (engine: `watch._rebuild_code` and the `graphify extract` incremental path copy each manifest's new `[resolve] context_fields` (default `["node_kind"]`) and `_lang_source_file`, the absolute source path, onto the context nodes through a try-wrapped `graphify.lang_registry.context_fields()` lookup) and `cd55efb` (plugins: astgrep, vba, ecschema, bmake (`bmake_includes`), cc-kb (`cc_kb_links`) declare their fields; resolvers compare paths through `_common.source_of`). Red test `a5961fe`. `tests/lang/test_s4_build_coherence.py::test_e5_incremental_parity` passes on all 8 fixture trees (7 of 8 failed before). The upstream PR draft is E3 (S006).
+
+### H3 Augment output depends on other files but is cached by this file's content hash
+
+- **Where**: `graphify_lang/cargo/augment.py:46-68` (`_members` globs member dirs and reads their `Cargo.toml`; `_workspace_deps` reads parent manifests); `graphify_lang/cc_kb/augment.py:64-82,85-102` (`_is_root` scans `docs/`, `_code_ref` calls `is_file()` on the referenced path). Upstream dependency: `graphify/cache.py:965` keys AST entries by file content + package version only.
+- **Problem**: the extractor contract behind the AST cache is "output is a function of the file's bytes". These augments break it, so a cached result survives changes elsewhere.
+- **Failure scenario (measured)**: workspace `members = ["crates/*"]` with crate `a`: `has_member -> pkg_a`. Add `crates/b/Cargo.toml` (root manifest unchanged) and rebuild with the same cache: still only `pkg_a`; a fresh cache gives `pkg_a, pkg_b`. For cc-kb: a doc that mentions `` `scripts/new.ps1` `` before the script exists never gains its `cites` edge until the cache is cleared.
+- **Fix**: keep augments pure. Emit the raw payload (member globs and `exclude` relative to the manifest dir; renamed/workspace deps by key; every path-like code span) and let the resolver, which runs every build over the whole corpus, match against graphed nodes (`pkg_*` nodes by their `source_file` dir; file nodes by normalised path). This also removes the filesystem reads from extraction.
+- **Resolution (2026-09-26, plan 05 S4.3)**: fixed in `22855e9`. The cargo augment emits the workspace node (with `cargo_ws_deps`) and a `cargo_refs` payload; a new cargo resolver matches member globs, `exclude` and workspace deps against graphed `pkg_*` nodes. The cc-kb augment emits every path-like span and the candidate roots; the resolver takes the first root whose `docs/` holds a graphed `cc-*.md` and drops ungraphed paths (`_is_root` deleted). Tests `test_h3_new_member_crate_appears`, `test_h3_new_code_ref_target_appears`. Clean-build counts unchanged (case 008 §3): has_member moxide 16, oa-graph 5, oag-dev 5; claude-config hub_spoke 235, cc_ref 8995, code_ref 3182, cc_id 632.
 
 ## Medium
 
@@ -90,6 +113,14 @@ Findings moved out of `cc-CR000.001.md` once fixed or closed. Each entry keeps t
 - **Fix**: delete the engine, its tests and the templates (git keeps them), or move them to the `lang-rules` branch until a plugin needs them.
 - **Resolution (2026-09-26, plan 05 S3)**: closed per hub D1 (D-008 wins): the engine stays and has users. The plugins use its builtins filter (`builtins.py`, `;` comments `1d2eb29`; autolisp and vba read `builtins_file` / `builtins_prefixes` / `case_insensitive` through `load_builtins`, `bbf0a1f`, `67a582c`) and `rules.Out` is built on the shared `Sink` (`67a582c`). The import-by-string hook is fixed in `3fa02c2`: `post_file` accepts only `graphify_lang.*` modules; any other string is a manifest error (`failed to load`) and is never imported. Test `tests/lang/test_rules.py::test_m6_post_file_prefix_only` (red in `542f417`).
 
+### M2 AST cache is shared across different plugin sets
+
+- **Where**: `graphify/cache.py:957` (`v{_EXTRACTOR_VERSION}-s{schema}` namespace); registry state in `graphify_lang/registry.py:49-50`.
+- **Problem**: the extractor chosen for a file depends on the active plugin set (`GRAPHIFY_LANG_DISABLE`, a third-party plugin installed or removed), but the cache key does not. Known (ltm learning 1480) but unmitigated.
+- **Failure scenario (measured)**: run `extract()` on `app.lsp` with `GRAPHIFY_LANG_DISABLE=1`, then without it, same cache dir: the second run returns the stock Common Lisp result (2 nodes, no `node_kind`); a fresh cache gives the AutoLISP result (file, command, function, module). Same for `.cls` (Apex vs VBA) and `.md` (cc-kb augment).
+- **Fix**: E1: in `_apply_registry`, append a fingerprint of the registered manifests (names, plugin distribution versions, maybe a hash of plugin module files) to `graphify.cache._EXTRACTOR_VERSION` (a runtime attribute set, no source edit), so each plugin set gets its own namespace.
+- **Resolution (2026-09-26, plan 05 S4.5)**: fixed in `2e2cba1` with E1. Test `test_m2_disable_toggle_uses_own_cache` (the disabled run no longer poisons the enabled one) and `test_m2_same_plugin_set_shares_cache`. ltm learnings 1480 / 1484 superseded by 1490.
+
 ## Low
 
 ### L1 AutoLISP walker recursion overflows on deep nesting
@@ -130,6 +161,20 @@ Findings moved out of `cc-CR000.001.md` once fixed or closed. Each entry keeps t
 - **Fix**: correct or delete; delete the flat YAML parser.
 - **Resolution (2026-09-26, plan 05 S3)**: fixed in `4618429` (`manifest.py` schema path and the `runtime.build` comments, `registry.py:1`), `e837ed2` (`astgrep/extract.py` docstring; the flat YAML parser, the regex `matches` scan and every `_yaml is None` branch deleted with their test) and `67a582c` (`autolisp/resolve.py:79`).
 
+### L9 Cargo augment reads outside the scan root
+
+- **Where**: `graphify_lang/cargo/augment.py:62-68` (walks every parent directory up to `/`), `:51-55` (`root.glob(pattern)` accepts `../` patterns).
+- **Problem**: a repo graphed inside another Cargo workspace inherits that outer workspace's dependency table; member globs can reach outside the repo.
+- **Fix**: stop at the scan root (or move to the resolver per H3, where only graphed nodes are visible).
+- **Resolution (2026-09-26, plan 05 S4.3)**: fixed in `22855e9` with H3: the cargo resolver sees only graphed nodes, so an outer workspace outside the scan root is never read. Test `test_l9_outer_workspace_ignored`.
+
+### L11 ast-grep `ruleDirs` with `..` never match
+
+- **Where**: `graphify_lang/astgrep/resolve.py:80-83`.
+- **Problem**: `Path.is_relative_to` is lexical; `ruleDirs: ["../shared/rules"]` yields no `loads` edges.
+- **Fix**: `posixpath.normpath` both sides first.
+- **Resolution (2026-09-26, plan 05 S4.4)**: fixed in `dc8a8ec` (`os.path.normpath` on both sides). Test `test_l11_dotdot_ruledirs`.
+
 ## Nit
 
 - **N4** `text.count("\n", 0, m.start())` per match is quadratic (`autolisp/extract.py:252,298,304,331`, `astgrep/extract.py:132`); use a `bisect` over newline offsets if a large file shows up.
@@ -152,3 +197,7 @@ Findings moved out of `cc-CR000.001.md` once fixed or closed. Each entry keeps t
 - **Resolution (2026-09-26, plan 05 S3)**: closed: rejected per D-008 (plan 05 hub D1); the engine stays and gained users (M6).
 - **E8** `lru_cache` on `cc_kb.augment._is_root` and one `by_id` map in the cc-kb resolver (L3). — Effort: TRIVIAL | Benefit: MINOR
 - **Resolution (2026-09-26, plan 05 S3)**: done in `a5a899c` (`functools.lru_cache` on `cc_kb.augment._is_root`; test `test_e8_cc_kb_is_root_cached`, 6 augment scans for 6 docs before, 1 after). Stage 4 (H3) moves the scan into the resolver.
+- **E1** Plugin-set fingerprint in the AST cache namespace (fixes M2), set from `_apply_registry`. — Effort: LOW | Benefit: HIGH
+- **Resolution (2026-09-26, plan 05 S4.5)**: done in `2e2cba1`: `-lang<fingerprint>` (manifest names, plugin distribution versions, a hash of every `graphify_lang` and plugin package `.py` / `.toml`) is appended to `graphify.cache._EXTRACTOR_VERSION` from `_apply_registry`. Pre-stage-3 entries (refs without `node`) sit in the plain namespace and are never read (`test_e1_pre_stage3_entries_unreachable`).
+- **E5** One parity test: for each plugin fixture, full build == full build then touch-one-file incremental build (edges and ids). — Effort: LOW | Benefit: HIGH
+- **Resolution (2026-09-26, plan 05 S4.1-S4.2)**: done: `test_e5_incremental_parity` over autolisp (2 trees), vba, bmake, cargo, astgrep, ecschema, cc-kb, every plugin file touched in turn; red `a5961fe`, green `cd55efb`.

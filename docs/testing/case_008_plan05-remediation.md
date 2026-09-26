@@ -82,3 +82,62 @@ edge is kept, with these causes:
   `.lsp` / `.mnl` defuns calling another file (`test_h2_same_stem_lsp_mnl_dcl`)
   and same-stem `.bas` / `.cls` procedures (`test_h2_vba_same_stem`), which
   dangled before.
+
+## 3. Stage 4: clean-build counts after H3 (cargo, cc-kb)
+
+**Branch:** `rr-s4` (base `rr-s3` `b6426db`); H3 commit `22855e9`.
+**Instrument:** as §2 (`git archive HEAD` copy, fresh `cache_root`, `extract()`
+over the plugin's files), run on `b6426db` (before) and `22855e9` (after).
+cargo: every `Cargo.toml` outside `target/`. cc-kb on claude-config: the `.md`
+files, and a second run with `.md` plus every `CODE_EXTENSIONS` file (so code
+paths have targets). Edges compared id-free as in §2.
+
+| Corpus | Files | Nodes | Edges | `has_member` | Workspaces | `external_deps` names | `depends_on` |
+|:--|--:|--:|--:|--:|--:|--:|--:|
+| moxide | 17 | 17 | 80 | 16 | 1 | 45 | 64 |
+| oa-graph | 6 | 6 | 35 | 5 | 1 | 23 | 30 |
+| oag-dev | 6 | 6 | 35 | 5 | 1 | 23 | 30 |
+| tmllm | 1 | 1 | 14 | 0 | 0 | 14 | 14 |
+
+| claude-config | Files | Nodes | Edges | `hub_spoke` | `cc_ref` | `code_ref` | `cc_id` docs | Dangling cc ids |
+|:--|--:|--:|--:|--:|--:|--:|--:|--:|
+| `.md` only | 871 | 40164 | 51198 | 235 | 8995 | 1141 | 632 | 235 |
+| `.md` + code | 1391 | 49106 | 71125 | 235 | 8995 | 3182 | 632 | 235 |
+
+Before and after are equal in every cell, and every id-free edge is kept. The
+89 differing edge keys per claude-config run are upstream's dangling Markdown
+`references` whose target id carries the random scan-copy path, the same 89 in
+both runs. The has_member counts equal plan 04 case 007 (moxide 16, oa-graph 5,
+oag-dev 5) and `cargo metadata` `workspace_members`.
+
+New node fields (attributes only; ids and edges unchanged): `cargo_ws_deps` on
+a cargo workspace node, `bmake_includes` on a bmake file node that includes
+something, `cc_kb_links` on a Markdown page node that links to another `.md`
+file. They are declared as `[resolve] context_fields`, so an incremental build
+keeps them on the context nodes of unchanged files (H1).
+
+## 4. Stage 4: incremental parity (E5, H1)
+
+`tests/lang/test_s4_build_coherence.py::test_e5_incremental_parity`: per fixture
+tree, a clean `_rebuild_code(root)`, then for each plugin file in turn an
+incremental `_rebuild_code(root, changed_paths=[f])`; node ids and
+`(source, target, relation)` edges between graphed nodes must equal the clean
+build.
+
+| Fixture | Plugin files | Differing files before (`a5961fe`) | After (`cd55efb`) |
+|:--|--:|--:|--:|
+| autolisp `plan02` | 4 | 1 | 0 |
+| autolisp `src` | 3 | 1 | 0 |
+| vba | 5 | 4 | 0 |
+| bmake | 4 | 2 | 0 |
+| cargo | 5 | 0 | 0 |
+| astgrep | 11 | 5 | 0 |
+| ecschema | 7 | 2 | 0 |
+| cc-kb | 10 | 8 | 0 |
+
+Two upstream behaviours are outside the test, with or without plugins
+(measured with `GRAPHIFY_LANG_DISABLE=1`): the incremental merge drops an
+unchanged file's dangling edges (cargo `depends_on` to external crates), and
+re-extracting one of a same-stem pair (`src/foo.cpp`, `src/foo.h`) alone
+un-salts its id. The test compares only edges between graphed nodes and
+touches only plugin files.

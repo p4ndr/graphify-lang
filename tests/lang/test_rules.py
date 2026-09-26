@@ -304,7 +304,6 @@ def test_s3_l2_recursive_call_keeps_its_self_loop(tmp_path):
     assert _edges(_run({"rule": LISP_REGEX}, f), "calls") == {(f"{stem}_fact", f"{stem}_fact")}
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S3-N1: '#' comment drops '#&/'")
 def test_s3_n1_hash_name_is_not_a_comment(tmp_path):
     """S3-N1: ``#`` starts a comment only when a space or the line end follows,
     so the AutoLISP builtin ``#&/`` survives the shared loader."""

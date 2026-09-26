@@ -1,7 +1,8 @@
 """Builtins filter for reference names (S005 F9).
 
-``[extract] builtins_file`` (one name per line, ``#`` or ``;`` comments, relative to
-the manifest) plus ``builtins_prefixes``, case-folded when
+``[extract] builtins_file`` (one name per line, relative to the manifest; a
+line starting with ``;``, or with ``#`` then a space or the line end, is a
+comment, so a name such as AutoLISP's ``#&/`` is kept: S3-N1) plus ``builtins_prefixes``, case-folded when
 ``case_insensitive = true``. Applied to ``@reference`` captures and regex
 ``edge`` rules inside the plugin only, never to the shared
 ``_LANGUAGE_BUILTIN_GLOBALS``.
@@ -11,6 +12,10 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+
+
+def _comment(line: str) -> bool:
+    return line.startswith(";") or line == "#" or line.startswith(("# ", "#\t"))
 
 
 class Builtins:
@@ -33,7 +38,7 @@ class Builtins:
             except OSError as exc:
                 raise RuntimeError(f"builtins_file failed to load: {exc}") from exc
             names = {s for line in text.splitlines()
-                     if (s := line.strip()) and not s.startswith(("#", ";"))}
+                     if (s := line.strip()) and not _comment(s)}
         px = cfg.get("builtins_prefixes", ())
         return cls(names, (px,) if isinstance(px, str) else tuple(px), bool(ci))
 

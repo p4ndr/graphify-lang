@@ -34,6 +34,7 @@ Stage 6 of plan 05: the test suite shows what CI really covers, the docs describ
 
 | Step | Action | Check |
 |:-----|:-------|:------|
+| S6.0 | Hub D5: `git fetch upstream`; rebase the `rr-s1`..`rr-s6` chain onto `upstream/v8` (rebase, never merge; resolve conflicts only in fork-owned code and registry-lookup lines). | Full pytest exits 0 with no upstream test file edited; `git diff upstream/v8...HEAD -- graphify/extractors/` is empty. |
 | S6.1 | M12 marker and corpus samples. | `pytest -m "not corpus" tests/ -q` exits 0, and the skip reasons read "corpus". |
 | S6.2 | M11, N1, N2 docs. | `git grep -n "No code yet\|0.9.55\|~/.venvs/graphify-lang\|extract.py:5630"` finds nothing in the fork's docs. |
 | S6.3 | PR drafts. | Each draft's test passes when its diff is applied to a scratch `upstream/v8` worktree. |

@@ -6716,8 +6716,9 @@ try:
     import graphify.lang_registry
     graphify.lang_registry.apply_registry()
     graphify.lang_registry.apply_dispatch()
-except Exception:
-    pass
+except Exception as exc:  # graphify-lang: log, never break core (cc-CR000.001 L8)
+    import logging
+    logging.getLogger("graphify.lang_registry").debug("_DISPATCH hook failed: %s", exc)
 
 
 # Extensions whose extractor depends on an optional-dependency extra
@@ -6755,8 +6756,9 @@ try:
         manifest = get_registry_manifest(suffix)
         if manifest and manifest.extra:
             _EXTRA_FOR_EXTENSION[suffix] = manifest.extra
-except Exception:
-    pass
+except Exception as exc:  # graphify-lang: log, never break core (cc-CR000.001 L8)
+    import logging
+    logging.getLogger("graphify.lang_registry").debug("_EXTRA_FOR_EXTENSION hook failed: %s", exc)
 
 # Substrings an extractor's error carries to classify why a dependency-backed
 # file contributed nothing, used by the #1745 warning in extract(). A grammar
@@ -6880,8 +6882,9 @@ def _get_extractor(path: Path) -> Any | None:
         try:
             import graphify.lang_registry
             return graphify.lang_registry.augment_extractor(path, extract_package_manifest)
-        except Exception:
-            pass
+        except Exception as exc:  # graphify-lang: log, never break core (cc-CR000.001 L8)
+            import logging
+            logging.getLogger("graphify.lang_registry").debug("package-manifest augment hook failed: %s", exc)
         return extract_package_manifest
     # `.h` is C/C++/ObjC-ambiguous; route Objective-C headers to extract_objc
     # (the suffix map sends `.h` to extract_c, which can't read @interface etc.).
@@ -6917,8 +6920,9 @@ def _get_extractor(path: Path) -> Any | None:
         try:
             import graphify.lang_registry
             return graphify.lang_registry.augment_extractor(path, extractor)
-        except Exception:
-            pass
+        except Exception as exc:  # graphify-lang: log, never break core (cc-CR000.001 L8)
+            import logging
+            logging.getLogger("graphify.lang_registry").debug("augment hook failed: %s", exc)
     return extractor
 
 

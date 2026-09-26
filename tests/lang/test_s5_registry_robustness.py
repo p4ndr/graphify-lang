@@ -273,7 +273,6 @@ def test_l6_no_upper_variants(tmp_path):
     assert "c:go" in labels                                     # upstream lower-cases the suffix
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="L8: core hook sites swallow errors silently")
 def test_l8_hook_error_logged(tmp_path, monkeypatch, caplog):
     from graphify.detect import classify_file
     from graphify.extract import _get_extractor

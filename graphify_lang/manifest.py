@@ -130,11 +130,13 @@ class LanguageManifest:
 
         try:
             content = path.read_text(encoding="utf-8")
-        except OSError as exc:
+        except (OSError, UnicodeDecodeError) as exc:
             return cls._invalid(f"cannot read manifest: {exc}")
 
         try:
             data = tomli.loads(content)
+        except RecursionError:
+            return cls._invalid("TOML parse error: nested deeper than the recursion limit")
         except tomli.TOMLDecodeError as exc:
             return cls._invalid(f"TOML parse error: {exc}")
 

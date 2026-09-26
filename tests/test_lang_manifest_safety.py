@@ -58,12 +58,8 @@ def py_default_recursion_limit():
 
 
 @pytest.mark.parametrize("data", [
-    pytest.param(b'[language]\nname = "caf\xe9"\nsuffixes = [".x"]\n',
-                 marks=pytest.mark.xfail(strict=True, raises=UnicodeDecodeError,
-                                         reason="S1-L4: non-UTF-8 manifest"), id="latin-1"),
-    pytest.param(b"x = " + b"[" * 5000 + b"]" * 5000 + b"\n",
-                 marks=pytest.mark.xfail(strict=True, raises=RecursionError,
-                                         reason="S1-L4: deep TOML arrays"), id="deep-arrays"),
+    pytest.param(b'[language]\nname = "caf\xe9"\nsuffixes = [".x"]\n', id="latin-1"),
+    pytest.param(b"x = " + b"[" * 5000 + b"]" * 5000 + b"\n", id="deep-arrays"),
 ])
 def test_s1_l4_undecodable_or_deep_manifest_never_raises(tmp_path, data, py_default_recursion_limit):
     path = tmp_path / "m.toml"

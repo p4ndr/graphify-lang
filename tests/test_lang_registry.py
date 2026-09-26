@@ -271,6 +271,7 @@ class TestRegistryEnvironment:
                 os.environ.pop("GRAPHIFY_LANG_DISABLE", None)
             else:
                 os.environ["GRAPHIFY_LANG_DISABLE"] = original
+            registry.reset()  # later in-process tests see the plugins again
 
 
 def test_sc2_no_plugin_tables_match_upstream_snapshot() -> None:

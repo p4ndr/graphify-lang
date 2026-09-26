@@ -33,6 +33,7 @@ from __future__ import annotations
 import os
 import re
 from bisect import bisect_right
+from functools import lru_cache
 from pathlib import Path
 
 CC_ID = re.compile(r"cc-([A-Z]{2})(\d{3})\.(\d{3})(?:-S(\d{3}))?")
@@ -61,8 +62,10 @@ def parse_cc_id(name: str) -> dict | None:
     return attrs
 
 
+@lru_cache(maxsize=256)
 def _is_root(folder: Path) -> bool:
-    """A harness root: ``folder/docs`` holds a ``cc-*.md`` file."""
+    """A harness root: ``folder/docs`` holds a ``cc-*.md`` file (cached per
+    process; plan 05 S004 H3 moves this scan into the resolver)."""
     try:
         return any(_NAME.fullmatch(e.name) for e in os.scandir(folder / "docs"))
     except OSError:

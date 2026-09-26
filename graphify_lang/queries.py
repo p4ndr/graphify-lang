@@ -14,6 +14,7 @@ or a query that does not compile raises at build time, which
 
 from __future__ import annotations
 
+import ctypes
 import importlib
 import json
 import re
@@ -21,6 +22,15 @@ from pathlib import Path
 from typing import Any
 
 from tree_sitter import Language, Parser, Query
+
+_PyCapsule_New = ctypes.PYFUNCTYPE(ctypes.py_object, ctypes.c_void_p, ctypes.c_char_p,
+                                   ctypes.c_void_p)(("PyCapsule_New", ctypes.pythonapi))
+
+
+def _capsule(ptr: Any) -> Any:
+    """An older grammar binding returns the ``TSLanguage *`` as an int, which
+    ``Language(int)`` deprecates; wrap it in the capsule newer bindings return."""
+    return _PyCapsule_New(ptr, b"tree_sitter.Language", None) if type(ptr) is int else ptr
 
 try:  # py-tree-sitter 0.25
     from tree_sitter import QueryCursor
@@ -93,7 +103,7 @@ class QueryRules:
             raise RuntimeError(f"grammar {module_name} not installed: {exc}") from exc
         fn_name = grammar.get("language_fn", "language").removesuffix("()")
         try:
-            language = Language(getattr(module, fn_name)())
+            language = Language(_capsule(getattr(module, fn_name)()))
         except Exception as exc:
             raise RuntimeError(f"grammar {module_name}.{fn_name} failed to load: {exc}") from exc
         queries = []

@@ -316,7 +316,6 @@ def test_s3_n1_hash_name_is_not_a_comment(tmp_path):
     assert Builtins.from_manifest(tmp_path / "m.toml", {"extract": {"builtins_file": "b.txt"}}).names == {"#&/"}
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="int grammar pointer is deprecated")
 def test_int_grammar_pointer_warns_nothing(tmp_path):
     """``tree_sitter_commonlisp.language()`` returns an int; ``Language(int)``
     is deprecated in py-tree-sitter 0.25, so the pointer is wrapped in a capsule."""

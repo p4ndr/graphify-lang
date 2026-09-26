@@ -278,7 +278,6 @@ def test_templates_are_package_data():
 
 # --- cc-CR000.003 S003 review fixes -------------------------------------------
 
-@pytest.mark.xfail(strict=True, raises=TypeError, reason="S3-L1: build takes no package")
 def test_s3_l1_post_file_from_the_callers_package(monkeypatch):
     """S3-L1: an out-of-tree plugin that calls ``build`` may name a hook in its
     own package; any other module stays rejected (plan 05 D1)."""

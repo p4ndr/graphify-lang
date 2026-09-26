@@ -3,7 +3,11 @@
 A fallback and utility layer (plan 04 D7, plan 05 D1): language plugins have
 their own extractors, but share this engine's builtins filter (``builtins.py``)
 and its sink (``graphify_lang._common.Sink``). A ``post_file`` hook is imported
-from ``graphify_lang.*`` only. Two tiers feed one sink:
+from ``graphify_lang.*`` or from the ``package`` the caller of ``build`` names
+(its own package), never from another module a manifest names (S3-L1). The
+threat model: a manifest is data that may sit in a GRAPHIFY_LANG_PATH folder
+or a third-party package; the caller of ``build`` is code that already runs,
+so it vouches for its own package and nothing else. Two tiers feed one sink:
 
 - query tier (``queries.py``): tree-sitter ``tags.scm`` captures
   ``@definition.<kind>`` / ``@name`` / ``@reference.<relation>``;
@@ -64,28 +68,32 @@ class Out(Sink):
         return {"nodes": self.nodes, "edges": self.edges}
 
 
-def _hook(manifest: dict[str, Any]) -> Callable | None:
+def _hook(manifest: dict[str, Any], package: str | None = None) -> Callable | None:
     extract_cfg = manifest.get("extract", {})
     spec = extract_cfg.get("post_file") or extract_cfg.get("python", {}).get("post_file")
     if not spec:
         return None
     module, _, fn = spec.partition(":")
-    if not module.startswith("graphify_lang."):  # a manifest never names arbitrary code
-        raise RuntimeError(f"post_file hook {spec!r} rejected: only graphify_lang.* modules"
-                           " (failed to load)")
+    allowed = ("graphify_lang.",) + ((f"{package}.",) if package else ())
+    if not (module + ".").startswith(allowed):  # a manifest never names arbitrary code
+        raise RuntimeError(f"post_file hook {spec!r} rejected: only modules under "
+                           f"{', '.join(p + '*' for p in allowed)} (failed to load)")
     try:
         return getattr(importlib.import_module(module), fn)
     except (ImportError, AttributeError) as exc:
         raise RuntimeError(f"post_file hook {spec!r} failed to load: {exc}") from exc
 
 
-def build(manifest_path: Path, manifest: dict[str, Any]) -> tuple[Callable[[Path], dict], None]:
-    """Return ``(extract, resolver)`` for a parsed manifest; the resolver is always None."""
+def build(manifest_path: Path, manifest: dict[str, Any], *,
+          package: str | None = None) -> tuple[Callable[[Path], dict], None]:
+    """Return ``(extract, resolver)`` for a parsed manifest; the resolver is always None.
+    ``package``: the caller's own top-level package, whose modules a
+    ``post_file`` hook may also name (``__package__`` of the calling plugin)."""
     try:
         queries = QueryRules.from_manifest(manifest_path, manifest)
         regex = RegexRules.from_manifest(manifest_path, manifest)
         builtins = Builtins.from_manifest(manifest_path, manifest)
-        hook = _hook(manifest)
+        hook = _hook(manifest, package)
     except Exception as exc:  # every manifest fault ends here, loudly
         reason = f"graphify_lang.rules: {manifest_path}: {exc}"
         if "not installed" not in reason:

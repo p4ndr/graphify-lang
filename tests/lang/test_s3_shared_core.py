@@ -151,3 +151,50 @@ def test_n3_schema_is_read(tmp_path, schema, ok):
     toml.write_text(f'schema = {schema}\n[language]\nname = "x"\nsuffixes = [".x"]\n'
                     '[extract]\nruntime = "m"\n')
     assert (LanguageManifest.from_toml(toml)[1] == []) is ok
+
+
+_CC_KB = Path(__file__).parent / "fixtures" / "cc_kb"
+
+
+class _CountingList(list):
+    iterations = 0
+
+    def __iter__(self):
+        type(self).iterations += 1
+        return super().__iter__()
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="cc-CR000.001 L3: one all_nodes scan per cc-kb payload")
+def test_l3_cc_kb_resolver_scans_nodes_once():
+    from graphify_lang.cc_kb.resolve import resolve
+
+    docs = sorted((_CC_KB / "docs").glob("cc-*.md"))
+    per_file = [r for r in (_get_extractor_result(d) for d in docs) if r.get("cc_kb_refs")]
+    assert len(per_file) >= 3
+    nodes = _CountingList(n for r in per_file for n in r["nodes"])
+    _CountingList.iterations = 0
+    resolve(per_file, nodes, [])
+    assert _CountingList.iterations == 1
+
+
+def _get_extractor_result(path: Path) -> dict:
+    from graphify.extract import _get_extractor
+
+    return _get_extractor(path)(path)
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="cc-CR000.001 E8: _is_root re-scans docs/ for every .md")
+def test_e8_cc_kb_is_root_cached(monkeypatch):
+    import os
+
+    from graphify_lang.cc_kb import augment
+
+    getattr(augment._is_root, "cache_clear", lambda: None)()
+    calls = []
+    real = os.scandir
+    monkeypatch.setattr(augment.os, "scandir", lambda p: calls.append(p) or real(p))
+    for doc in sorted((_CC_KB / "docs").glob("cc-*.md")):
+        _get_extractor_result(doc)
+    assert len(calls) == 1

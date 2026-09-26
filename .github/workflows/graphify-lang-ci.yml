@@ -70,3 +70,27 @@ jobs:
       # with --strict that skip was fatal, so the audit never ran (cc-CR000.003 S2-M1)
       - name: pip-audit (dependency vulnerabilities)
         run: uv run --frozen pip-audit --skip-editable
+
+  # A release tag builds the wheel and loads every plugin from a clean install,
+  # so missing package data fails here and not after release (cc-CR000.003 S2-E1).
+  # workflow_dispatch runs it by hand on a branch.
+  wheel:
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Build the wheel
+        run: uv build --wheel --out-dir "$RUNNER_TEMP/dist"
+
+      - name: Install it into a clean venv and load every plugin
+        working-directory: ${{ runner.temp }}
+        run: |
+          uv venv clean
+          uv pip install --python clean/bin/python dist/*.whl
+          clean/bin/graphify lang list --check

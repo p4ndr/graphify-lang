@@ -58,7 +58,6 @@ def test_s2_n2_tag_filter_matches_fork_tags_only():
     assert _load(FORK_CI)[True]["push"]["tags"] == ["v*\\+lang.*"]
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S2-E1 red")
 def test_s2_e1_tag_run_installs_the_wheel_and_loads_every_plugin():
     jobs = _load(FORK_CI)["jobs"]
     assert "wheel" in jobs

@@ -295,7 +295,6 @@ def test_s3_l1_post_file_from_the_callers_package(monkeypatch):
         assert "rejected" in extract(ERR)["error"]
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S3-L2: Sink.edge drops self-calls")
 def test_s3_l2_recursive_call_keeps_its_self_loop(tmp_path):
     """S3-L2: a recursive call is a ``calls`` self-loop, as upstream's built-in
     extractors emit it (``def f(n): return f(n-1)`` -> ``f calls f``)."""

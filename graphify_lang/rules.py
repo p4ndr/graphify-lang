@@ -18,7 +18,8 @@ Emission contract (plan 01 S005, ``.claude/docs/cc-IP000.001.md``; the shared
 ``file_type = "code"`` and ``node_kind``; symbol ids ``_make_id(stem, label)``
 with the definition line appended on a clash (the ``extract_markdown``
 recipe); a ``contains`` edge per symbol; reference edges resolved within the
-file after the builtins filter. A configuration fault never yields a silent
+file after the builtins filter; a recursive reference keeps its self-loop
+(``f calls f``), as upstream's built-in extractors emit it. A configuration fault never yields a silent
 empty result: every call returns ``error`` carrying ``not installed`` or
 ``failed to load`` so the core #1745 warning fires.
 """
@@ -64,7 +65,7 @@ class Out(Sink):
         for src, name, relation, line in self._names:
             tgt = self._by_label.get(self.builtins.fold(name))
             if tgt:
-                self.edge(src, tgt, relation, line)
+                self.edge(src, tgt, relation, line, self_loop=True)  # recursion, as upstream
         return {"nodes": self.nodes, "edges": self.edges}
 
 

@@ -82,8 +82,9 @@ class Sink:
         return nid
 
     def edge(self, src: str, tgt: str, relation: str, line: int,
-             confidence: str = "EXTRACTED") -> None:
-        if src == tgt or (src, tgt, relation) in self._edge_keys:
+             confidence: str = "EXTRACTED", *, self_loop: bool = False) -> None:
+        """One edge per (src, tgt, relation); ``src == tgt`` only with ``self_loop``."""
+        if (src == tgt and not self_loop) or (src, tgt, relation) in self._edge_keys:
             return
         self._edge_keys.add((src, tgt, relation))
         self.edges.append({"source": src, "target": tgt, "relation": relation,

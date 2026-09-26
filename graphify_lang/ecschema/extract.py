@@ -113,6 +113,7 @@ class _Out:
         self.refs: list[dict] = []
         self._ids: set[str] = set()
         self._order: dict[str, int] = {}
+        self._edge_keys: set[tuple[str, str, str]] = set()
         self.file_nid = self.add(self.stem, path.name, "file", 1)
 
     def add(self, nid: str, label: str, kind: str, line: int, **attrs) -> str:
@@ -125,11 +126,12 @@ class _Out:
         return nid
 
     def edge(self, src: str, tgt: str, relation: str, line: int) -> None:
-        if src != tgt and not any(e["source"] == src and e["target"] == tgt
-                                  and e["relation"] == relation for e in self.edges):
-            self.edges.append({"source": src, "target": tgt, "relation": relation,
-                               "confidence": "EXTRACTED", "source_file": self.sf,
-                               "source_location": f"L{line}", "weight": 1.0})
+        if src == tgt or (src, tgt, relation) in self._edge_keys:
+            return
+        self._edge_keys.add((src, tgt, relation))
+        self.edges.append({"source": src, "target": tgt, "relation": relation,
+                           "confidence": "EXTRACTED", "source_file": self.sf,
+                           "source_location": f"L{line}", "weight": 1.0})
 
     def ref(self, kind: str, source: str, schema: str, line: int, **extra) -> None:
         # The resolver reads the source id back through the node index (ids may be

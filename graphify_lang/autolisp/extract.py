@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import re
 import warnings
+from bisect import bisect_left
 from functools import lru_cache
 from pathlib import Path
 
@@ -111,6 +112,17 @@ class _Out:
 
 def _line(node) -> int:
     return node.start_point[0] + 1
+
+
+@lru_cache(maxsize=4)
+def _newlines(text: str) -> tuple[int, ...]:
+    return tuple(m.start() for m in re.finditer("\n", text))
+
+
+def _line_of(text: str, pos: int) -> int:
+    """1-based line of offset ``pos``: a bisect over newline offsets built once
+    per text, not a count from the start per match (cc-CR000.001 N4)."""
+    return bisect_left(_newlines(text), pos) + 1
 
 
 def _kids(node) -> list:
@@ -249,7 +261,7 @@ def _headers(out: _Out, text: str, path: Path) -> None:
     depends: list[tuple[str, int]] = []
     for m in _HEADER_RE.finditer(text):
         tag, value = m.group(1), m.group(2)
-        line = text.count("\n", 0, m.start()) + 1
+        line = _line_of(text, m.start())
         if tag == "module" and module_nid is None:
             module_nid = out.node("module", value.split()[0], line)
         elif tag == "depends":
@@ -273,8 +285,12 @@ def extract_autolisp(path: Path) -> dict:
     _headers(out, text, path)
 
     walker = _Walker(source)
-    for child in _kids(root):
-        walker.walk(child, None, top=True)
+    fallback = root.has_error
+    try:
+        for child in _kids(root):
+            walker.walk(child, None, top=True)
+    except RecursionError:  # L1: nesting deeper than the stack; use the regex path
+        walker, fallback = _Walker(source), True
 
     seen_globals: set[str] = set()
     for name, line in walker.globals:
@@ -290,18 +306,18 @@ def extract_autolisp(path: Path) -> dict:
         nids.append(nid)
         local.setdefault(name.casefold(), []).append(nid)
 
-    if root.has_error:  # A2: defuns tree-sitter lost after an ERROR node
+    if fallback:  # A2: defuns tree-sitter lost after an ERROR node, or L1
         for m in _DEFUN_RE.finditer(text):
             name = m.group(1)
             if name.casefold() not in local:
                 kind = "command" if name.casefold().startswith("c:") else "function"
-                line = text.count("\n", 0, m.start()) + 1
+                line = _line_of(text, m.start())
                 local[name.casefold()] = [out.node(kind, name, line, confidence="INFERRED")]
         for m in _TOP_SETQ_RE.finditer(text):
             name = m.group(1)
             if name.casefold() not in seen_globals:
                 seen_globals.add(name.casefold())
-                out.node("global", name, text.count("\n", 0, m.start()) + 1, confidence="INFERRED")
+                out.node("global", name, _line_of(text, m.start()), confidence="INFERRED")
 
     for owner, name, line in walker.calls:
         caller = nids[owner]
@@ -328,5 +344,5 @@ def extract_dcl(path: Path) -> dict:
     text = _DCL_COMMENT_RE.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)
     out = _Out(path)
     for m in _DIALOG_RE.finditer(text):
-        out.node("dialog", m.group(1), text.count("\n", 0, m.start()) + 1)
+        out.node("dialog", m.group(1), _line_of(text, m.start()))
     return out.result()

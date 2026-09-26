@@ -30,6 +30,7 @@ from graphify_lang._common import Sink, _make_id, line_index
 
 _LOG = logging.getLogger(__name__)
 _DOC_SPLIT_RE = re.compile(r"^---[ \t]*(?:#.*)?$", re.MULTILINE)
+_INDENTED_KEY_RE = re.compile(r"^[ \t]+([^:\n]*):", re.MULTILINE)
 
 
 def _matches(obj, seen: set[int] | None = None) -> list[str]:
@@ -97,8 +98,18 @@ def _rule_doc(out: Sink, doc: dict, text: str, first: int, role: str, line_of) -
     out.edge(out.file_nid, owner, "contains", line)
     local: dict[str, str] = {}
     utils = doc.get("utils") if isinstance(doc.get("utils"), dict) else {}
+    # S1-M1: every indented key's first offset in one pass (what a re.search per
+    # util returned), not a scan from the document start per util.
+    keys: dict[str, int] = {}
+    for m in _INDENTED_KEY_RE.finditer(text):
+        keys.setdefault(m.group(1), m.start())
     for uid in map(str, utils):
-        uline = _key_line(line_of, text, first, rf"^[ \t]+{re.escape(uid)}:")
+        if uid in keys:
+            uline = first + line_of(keys[uid]) - 1
+        elif ":" in uid or uid != uid.lstrip():  # a key the one-pass capture cannot hold
+            uline = _key_line(line_of, text, first, rf"^[ \t]+{re.escape(uid)}:")
+        else:
+            uline = first
         local[uid] = out.add(_make_id(owner, "util", uid), uid, "util", uline,
                              astgrep_scope="local")
         out.edge(owner, local[uid], "contains", uline)

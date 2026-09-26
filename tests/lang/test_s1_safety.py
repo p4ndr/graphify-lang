@@ -152,7 +152,6 @@ def test_l2_large_schema_linear(tmp_path):
     assert (nodes, edges) == (n + 4, 2 * n + 3)
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S1-M1: _key_line rescans per util")
 def test_s1_m1_many_utils_linear(tmp_path):
     n = 20_000
     path = _rule_file(tmp_path, "id: r\nlanguage: python\nrule: {pattern: x}\nutils:\n"

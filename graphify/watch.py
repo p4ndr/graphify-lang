@@ -1727,7 +1727,8 @@ def _rebuild_code(
                 try:  # graphify-lang: plugin resolver fields (cc-CR000.001 H1)
                     from graphify.lang_registry import context_fields
                     lang_fields = context_fields()
-                except Exception:
+                except Exception as exc:  # graphify-lang: log, never break core (cc-CR000.001 L8)
+                    logging.getLogger("graphify.lang_registry").debug("watch context_fields hook failed: %s", exc)
                     lang_fields = ()
                 for node in ctx_graph.get("nodes", []):
                     if not node.get("id") or not _is_ast_tier(node):

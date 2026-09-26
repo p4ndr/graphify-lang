@@ -79,8 +79,9 @@ try:
     # Merge registry suffixes into HOOK_SOURCE_EXTS
     for suffix in graphify.lang_registry.get_registry_suffixes():
         _HOOK_SOURCE_EXTS += (suffix,)
-except Exception:
-    pass
+except Exception as exc:  # graphify-lang: log, never break core (cc-CR000.001 L8)
+    import logging
+    logging.getLogger("graphify.lang_registry").debug("_HOOK_SOURCE_EXTS hook failed: %s", exc)
 _GEMINI_NUDGE_TEXT = (
     'graphify: knowledge graph at graphify-out/. For focused questions, run '
     '`graphify query "<question>"` (scoped subgraph, usually much smaller than '
@@ -3875,7 +3876,9 @@ def dispatch_command(cmd: str) -> None:
                     try:  # graphify-lang: plugin resolver fields (cc-CR000.001 H1)
                         from graphify.lang_registry import context_fields
                         _lang_fields = context_fields()
-                    except Exception:
+                    except Exception as exc:  # graphify-lang: log, never break core (cc-CR000.001 L8)
+                        import logging
+                        logging.getLogger("graphify.lang_registry").debug("extract context_fields hook failed: %s", exc)
                         _lang_fields = ()
                     for _node in _ctx_graph.get("nodes", []):
                         if not _node.get("id") or not _ctx_is_ast_tier(_node):

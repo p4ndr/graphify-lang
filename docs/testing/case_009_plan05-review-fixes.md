@@ -177,3 +177,44 @@ tracked `.md` 349 -> 43 of 436; `~/.claude/docs/*.md` 648 -> 640 of 648;
 | S5-N2 | actioned | `f4a4cc8` | `watch`'s `time` replaced by a clock whose loop sleep raises `KeyboardInterrupt` once the rebuild ran (10 s deadline), so `watch` stops its observer; the thread is joined and asserted dead. |
 | S5-N3 | rejected (no change) | — | As the review advises: moving `_lang_claims` below the dotfile / `graphify-out` filters edits a second upstream line; no profile shows a cost. |
 | S5-E1 | actioned | `61d8388` | `graphify_lang/templates/path-plugin/` (`example.toml`, `example_lang.py`), shipped as package data and loaded by `test_s5_e1_path_plugin_template_loads`; README rules for absolute entries, manifests only, private package, relative imports, first name wins, fingerprint `.py`/`.toml` only, watch predicate. |
+
+## S006
+
+**Tests:** `.venv/bin/python -m pytest tests/ -q`: before 6302 passed, 14
+skipped, 4 xfailed; after 6305 passed, 14 skipped, 4 xfailed (+3 in
+`tests/lang/test_s6_review_fixes.py`: red-first strict xfails, `raises=`
+pinned, each removed by its fix commit). `git diff upstream/v8...HEAD --
+graphify/extractors/ tests/test_watch.py` empty; `tests/lang_baseline.txt` and
+`tests/upstream_tables.json` unchanged.
+
+**Refs:** local `v8` and `origin/v8` fast-forwarded `4c73561` -> `4000de1`
+(`upstream/v8`); `git rev-list --left-right --count v8...upstream/v8` = `0 0`.
+
+**Watch claim (owner rule on S5-M2):** `watch_cc_kb` also claims every
+`docs/cc-*.md` by name. `graphify.lang_registry.watch_claims`, S5 rule ->
+S6 rule: this repo's tracked `.md` 43 -> 46 of 436; `~/.claude/docs/*.md`
+640 -> 646 of 648; `~/repos/claude-config` `**/*.md` (no `.git` /
+`graphify-out`) 841 -> 847 of 871. Claim check for 648 files: 0.6 s -> 0.01 s.
+
+**PR drafts:** in scratch worktrees of `upstream/v8` `4000de1` (removed after):
+pr-01 3 passed (cache test red without the `cache.py` hunk), full suite 5991
+passed, 14 skipped; pr-03 3 passed (handler test red with the claim at the
+suffix filter), full suite 5991 passed, 14 skipped. Each re-applied from the
+draft text before commit.
+
+| Id | Status | Commit(s) | Note |
+|:--|:--|:--|:--|
+| S6-M1 | actioned | `0c5c58f` | Hub and spoke say `0.9.68+lang.4` (owner-confirmed); spoke 'Version' deviation settled; S6.4 bumps `pyproject.toml` and runs `uv lock`. No version bump here. |
+| S6-M2 | actioned | `961b970` | pr-01 adds `language_plugins.fingerprint()` (loaded plugin dist names + versions) and `cache_dir` appends `-p<hash>` (no plugin: unchanged); test: two plugin versions, two cache dirs. |
+| S6-L1 | actioned | `961b970` | Fork side names the plugins that can move (`.mnl`, `.dcl`, `.bas`, `.frm`, `.mki`, `.mke`) and those that cannot; `overrides`, sniff, `[match]`, augments listed as follow-up seams. |
+| S6-L2 | actioned | `6dc7ff6` | pr-03 claim runs after the ignore / dot / `graphify-out` filters; handler test adds a `.git/objects` write that must not reach the claim. Fork side text follows the S5-M2 rule. |
+| S6-L3 | actioned | `c0135a0` (+ ref push) | `v8` and `origin/v8` fast-forwarded to `4000de1`; README and `.claude/CLAUDE.md` give the two-way instrument and the fast-forward steps. |
+| S6-L4 | actioned | `fc1a803` test, `5a8fecc` fix | README table keyed by TOML key, with `schema`, `case_insensitive`, `builtins_file` / `builtins_prefixes`, `[extract] runtime` required; `fixture` row and `LanguageManifest.fixture` removed. |
+| S6-L5 | actioned | `c0135a0` | Goal 1: entry points or `GRAPHIFY_LANG_PATH`; goal 4: `GRAPHIFY_LANG_DISABLE=1` gives upstream behaviour. |
+| S6-N1 | actioned | `6dc7ff6`, `82bd683` | pr-02 cites `03dfe51`, `cc0e296`; pr-03 cites `f8219a1`, `ae768d4` (all on `rr-s6`/`rr-fix`). |
+| S6-N2 | actioned | `3e02a91` | `tests/lang/fixtures/corpus/vba/.gitattributes` `*.cls -text` (fork-only file, upstream `.gitattributes` untouched); the sample case asserts CRLF. |
+| S6-N3 | actioned | `c0135a0` | README runs CI's own `-m 'not perf'`. |
+| S6-N4 | actioned | `fc1a803` test, `88a1b43` fix | `corpus_ls` reads `git ls-files -z`. |
+| S6-E1 | actioned | `a737cdf` | S6.0 check column records the range-diff plus per-file upstream-delta instrument. |
+| S5-M2 (owner) | actioned | `fc1a803` test, `4fd2a60` fix | `docs/cc-*.md` claimed by name; S5 test row and spoke 05-S005 known limit updated. |
+| S5-H1 (owner) | no change | — | A name clash stays a `--check` warning (private module names make it harmless). |

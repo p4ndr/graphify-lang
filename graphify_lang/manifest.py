@@ -79,6 +79,12 @@ def _str_list(value: Any, field: str, errors: list[str]) -> tuple[str, ...]:
     return tuple(value)
 
 
+def _lower(values) -> tuple[str, ...]:
+    """Suffixes lower-cased, order kept, duplicates dropped: the registry compares a
+    lower-cased path suffix, so ``.LSP`` would never match (cc-CR000.001 L4)."""
+    return tuple(dict.fromkeys(v.lower() for v in values))
+
+
 @dataclass(frozen=True)
 class LanguageManifest:
     """A language package manifest.
@@ -128,6 +134,9 @@ class LanguageManifest:
             return cls._invalid(f"TOML parse error: {exc}")
 
         # Extract nested values - schema v1 uses sections
+        for section in ("language", "grammar", "extract", "match"):
+            if not isinstance(data.get(section, {}), dict):
+                return cls._invalid(f"[{section}] must be a table")
         language = data.get("language", {})
         grammar = data.get("grammar", {})
         extract = data.get("extract", {})
@@ -135,8 +144,8 @@ class LanguageManifest:
         kind = language.get("kind", "language")
         if kind not in _KINDS:
             errors.append(f"language.kind must be one of {', '.join(_KINDS)}")
-        augments = _str_list(language.get("augments", ()), "augments", errors)
-        overrides = _str_list(language.get("overrides", ()), "overrides", errors)
+        augments = _lower(_str_list(language.get("augments", ()), "augments", errors))
+        overrides = _lower(_str_list(language.get("overrides", ()), "overrides", errors))
         priority = language.get("priority", 0)
         if not isinstance(priority, int) or isinstance(priority, bool):
             errors.append("priority must be an integer")
@@ -146,9 +155,6 @@ class LanguageManifest:
             sniff, sniff_errors = _parse_sniff(data["sniff"])
             errors.extend(sniff_errors)
         match = data.get("match", {})
-        if not isinstance(match, dict):
-            errors.append("[match] must be a table")
-            match = {}
         match_globs = _str_list(match.get("globs", ()), "match.globs", errors)
         match_filenames = _str_list(match.get("filenames", ()), "match.filenames", errors)
         if kind == "augment":
@@ -162,7 +168,10 @@ class LanguageManifest:
             name = ""
         else:
             name = language.get("name")
-            if not name:
+            if not isinstance(name, str):
+                errors.append("name must be a string")
+                name = ""
+            elif not name:
                 errors.append("name must be non-empty")
         
         if "suffixes" not in language:
@@ -180,6 +189,7 @@ class LanguageManifest:
         elif suffixes and not all(isinstance(s, str) for s in suffixes):
             errors.append("suffixes must contain only strings")
             suffixes = []
+        suffixes = _lower(suffixes or ())
         
         # Validate hook_suffixes if present
         hook_suffixes = language.get("hook_suffixes", ())
@@ -190,7 +200,7 @@ class LanguageManifest:
             errors.append("hook_suffixes must contain only strings")
             hook_suffixes = ()
         else:
-            hook_suffixes = tuple(hook_suffixes)
+            hook_suffixes = _lower(hook_suffixes)
         
         # Validate extra if present
         extra = grammar.get("extra")

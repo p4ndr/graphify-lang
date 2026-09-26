@@ -16,8 +16,6 @@ import graphify_lang.astgrep.extract as astgrep_extract
 from graphify_lang.astgrep.extract import extract_astgrep
 from graphify_lang.autolisp.extract import extract_autolisp
 
-pytestmark = pytest.mark.skipif(astgrep_extract._yaml is None, reason="PyYAML absent")
-
 _CHILD = """
 import sys, time
 from importlib import import_module

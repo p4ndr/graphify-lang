@@ -15,6 +15,20 @@ This document is a LIVE running changelog for all work in the repo.
 
 ## 3. CURRENT SESSION
 
+### 2026-09-26 15:31 (UTC+10)
+
+- T34 done (plan 05 S3, rr-s3 542f417..70fc7fe): graphify_lang/_common.py shared plugin core; H2, M4, M6 (D1), L3, L5, L12, N3, E2, E8 fixed, E7 closed per D-008; pytest 6178 passed / 14 skipped; CI 36220807200 green (3.10/3.12/3.13, security); corpus counts in docs/testing/case_008 (only change: autolithp .lsp/.md sidecar pairs split, sidecar_doc 1 -> 63).
+
+### 2026-09-26 15:30 (UTC+10)
+
+- T34.1 done: 542f417: 8 strict-xfail red tests (H2 x2, M4 x5, M6)
+- T34.2 done: 2c3e6e9: _common.py (Sink, refs_of, pick_by_prefix, load_manifest, load_builtins); bmake counts unchanged
+- T34.3 done: 05ddbef..b244901: ecschema, astgrep, vba, autolisp, cc-kb, cargo moved one commit each
+- T34.4 done: afa4015: case_008 id form and corpus counts; H2/M4 tests pass
+- T34.5 done: 3fa02c2..e837ed2: M6 prefix rule, N3 keys, L3/E8, L12; lang list 9
+- T34.6 done: 70fc7fe: pytest 6178 passed/14 skipped; extractors diff empty; CI 36220807200 green; findings moved, E7 closed per D1
+- T34 done (all steps): P05-S003 (rr-s3) Shared plugin core — E2 L5 H2 M4 M6 E7 L3 E8 N3 L12
+
 ### 2026-09-26 15:04 (UTC+10)
 
 - T33 (plan 05 S2, branch rr-s2) done: M7, M8, E9, M9, M10, N6 fixed in 711dfc6..57efe47 and moved to cc-CR000.002

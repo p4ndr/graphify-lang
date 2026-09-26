@@ -24,12 +24,13 @@ mod, fn, path = sys.argv[1:4]
 f = getattr(import_module(mod), fn)
 t = time.perf_counter()
 r = f(Path(path))
-print(time.perf_counter() - t, len(r["nodes"]), len(r["edges"]))
+print(time.perf_counter() - t, len(r["nodes"]), len(r["edges"]),
+      max(len(repr(n)) for n in r["nodes"]))
 """
 
 
-def _timed(mod: str, fn: str, path: Path, timeout: float = 30) -> tuple[float, int, int]:
-    """(seconds, nodes, edges) of ``mod.fn(path)`` in a child process."""
+def _timed(mod: str, fn: str, path: Path, timeout: float = 30) -> tuple[float, int, int, int]:
+    """(seconds, nodes, edges, largest node repr) of ``mod.fn(path)`` in a child process."""
     try:
         proc = subprocess.run([sys.executable, "-c", _CHILD, mod, fn, str(path)],
                               capture_output=True, text=True, timeout=timeout)
@@ -37,20 +38,22 @@ def _timed(mod: str, fn: str, path: Path, timeout: float = 30) -> tuple[float, i
         pytest.fail(f"{fn}({path.name}) still running after {timeout} s")
     if proc.returncode:
         pytest.fail(f"{fn}({path.name}) exited {proc.returncode}:\n{proc.stderr}")
-    secs, nodes, edges = proc.stdout.split()
-    return float(secs), int(nodes), int(edges)
+    secs, nodes, edges, size = proc.stdout.split()
+    return float(secs), int(nodes), int(edges), int(size)
 
 
-def _bomb(levels: int) -> str:
-    """ast-grep rule whose alias levels each repeat the previous one 10 times."""
+def _bomb(levels: int, head: tuple[str, ...] = ("id: bomb", "language: python",
+                                                 "rule: {pattern: x}")) -> str:
+    """ast-grep YAML whose alias levels each repeat the previous one 10 times;
+    ``head`` may name the last level (``*<letter>``)."""
     a = "abcdefghijk"
-    lines = ["id: bomb", "language: python", "rule: {pattern: x}", "a: &a {matches: u}"]
+    lines = ["a: &a {matches: u}"]
     lines += [f"{a[i]}: &{a[i]} [{','.join([f'*{a[i - 1]}'] * 10)}]" for i in range(1, levels + 1)]
-    return "\n".join(lines) + "\n"
+    return "\n".join(lines + list(head)) + "\n"
 
 
-def _rule_file(tmp_path: Path, text: str) -> Path:
-    path = tmp_path / "rules" / "bomb.yml"
+def _rule_file(tmp_path: Path, text: str, name: str = "rules/bomb.yml") -> Path:
+    path = tmp_path / name
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
     return path
@@ -60,9 +63,40 @@ def _rule_file(tmp_path: Path, text: str) -> Path:
 def test_h4_alias_bomb_bounded(tmp_path, levels):
     path = _rule_file(tmp_path, _bomb(levels))
     assert len(_bomb(levels).encode()) < 500
-    secs, nodes, _ = _timed("graphify_lang.astgrep.extract", "extract_astgrep", path)
+    secs, nodes, _, _ = _timed("graphify_lang.astgrep.extract", "extract_astgrep", path)
     assert secs < 1, f"{levels} alias levels took {secs:.2f} s"
     assert nodes == 2  # file + rule
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S1-H1: str() of an alias list")
+@pytest.mark.parametrize("name,head,nodes", [
+    ("rules/b.yml", ("id: *g", "language: python", "rule: {pattern: x}"), 1),
+    ("rules/b-test.yml", ("id: *g", "valid: [x]"), 1),
+    ("sgconfig.yml", ("ruleDirs: [rules]", "testConfigs: [{testDir: *g}]"), 1),
+])
+def test_s1_h1_alias_bomb_at_id_and_test_dir(tmp_path, name, head, nodes):
+    """7 levels of 10 aliases at ``id`` or ``testDir``: a 90 MB string if
+    ``str()`` expands it; a scalar-only sink skips the value."""
+    path = _rule_file(tmp_path, _bomb(7, head), name)
+    assert len(path.read_bytes()) < 400
+    secs, n, _, size = _timed("graphify_lang.astgrep.extract", "extract_astgrep", path)
+    assert size < 1000, f"a node is {size} characters"
+    assert secs < 1, f"took {secs:.2f} s"
+    assert n == nodes
+
+
+def test_s1_e1_shared_matches_credited_once(tmp_path):
+    """The memoised ``_matches`` still finds ``matches:`` under a shared alias,
+    once per user: one ``references`` edge to the local util."""
+    path = _rule_file(tmp_path, "id: r\nlanguage: python\nm: &m {matches: helper}\n"
+                                "rule: {all: [*m, *m, {not: *m}]}\n"
+                                "utils:\n  helper: {pattern: y}\n")
+    result = extract_astgrep(path)
+    refs = [(e["source"], e["target"]) for e in result["edges"] if e["relation"] == "references"]
+    helper = next(n["id"] for n in result["nodes"] if n["label"] == "helper")
+    rule = next(n["id"] for n in result["nodes"] if n["node_kind"] == "rule")
+    assert refs == [(rule, helper)]
+    assert result["astgrep_refs"] == []
 
 
 def test_h4_self_alias_keeps_file_node(tmp_path):
@@ -114,6 +148,6 @@ def test_l2_large_schema_linear(tmp_path):
         '  <ECEnumeration typeName="Status" backingTypeName="int"/>\n'
         f'  <ECEntityClass typeName="Thing">\n{props}\n  </ECEntityClass>\n'
         '</ECSchema>\n', encoding="utf-8")
-    secs, nodes, edges = _timed("graphify_lang.ecschema.extract", "extract_ecschema", path)
+    secs, nodes, edges, _ = _timed("graphify_lang.ecschema.extract", "extract_ecschema", path)
     assert secs < 2, f"{n} properties took {secs:.2f} s"
     assert (nodes, edges) == (n + 4, 2 * n + 3)

@@ -5,8 +5,11 @@ from __future__ import annotations
 
 import codecs
 import functools
+import hashlib
 import importlib
+import importlib.machinery
 import importlib.metadata
+import importlib.util
 import logging
 import os
 import re
@@ -16,7 +19,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
-from graphify_lang.manifest import LanguageManifest
+from graphify_lang.manifest import LanguageManifest, tomllib
 
 _LOG = logging.getLogger(__name__)
 
@@ -28,6 +31,9 @@ _PATH_VAR = "GRAPHIFY_LANG_PATH"
 
 # The one entry-point group pyproject.toml ships (cc-CR000.001 L7)
 _GROUP = "graphify_lang_plugins"
+
+# Parent package of the per-folder packages path plugins import under (S5-H1)
+_PATH_PACKAGE = "graphify_lang_path"
 
 
 @dataclass
@@ -41,6 +47,10 @@ class _RegistryState:
     tie_warned: set[str] = field(default_factory=set)
     # entry point name or manifest path -> load error (``graphify lang list --check``)
     load_errors: dict[str, str] = field(default_factory=dict)
+    # manifest path -> a loaded plugin's warning, e.g. a runtime name clash (S5-H1)
+    load_warnings: dict[str, str] = field(default_factory=dict)
+    # top-level runtime name -> the path folder that first used it (S5-H1)
+    runtimes: dict[str, Path] = field(default_factory=dict)
     # ``name=version`` of each loaded entry point's distribution (AST cache fingerprint)
     distributions: set[str] = field(default_factory=set)
 
@@ -63,7 +73,12 @@ def _init_state() -> _RegistryState:
     state = _STATE = _RegistryState()
     if os.environ.get(_DISABLE_VAR, "").strip().lower() in ("1", "true", "yes", "on"):
         return state
-    for ep in importlib.metadata.entry_points(group=_GROUP):
+    try:
+        eps = list(importlib.metadata.entry_points(group=_GROUP))
+    except Exception as exc:  # corrupt distribution metadata (S5-M1)
+        _failed(state, "entry points", "entry points", exc)
+        eps = []
+    for ep in eps:
         try:
             _process_loader_result(ep.load())
             if ep.dist is not None:
@@ -72,7 +87,7 @@ def _init_state() -> _RegistryState:
             _failed(state, "entry point", ep.name, exc)
     for entry in os.environ.get(_PATH_VAR, "").split(os.pathsep):
         if entry:
-            _load_folder(state, Path(entry).expanduser().resolve())
+            _load_folder(state, entry)
     return state
 
 
@@ -81,39 +96,98 @@ def _failed(state: _RegistryState, kind: str, source: str, exc: Exception | str)
     state.load_errors[source] = str(exc)
 
 
-def _load_folder(state: _RegistryState, folder: Path) -> None:
-    """Register every ``*.toml`` manifest in a ``GRAPHIFY_LANG_PATH`` folder (M5)."""
+def _load_folder(state: _RegistryState, entry: str) -> None:
+    """Register every manifest in a ``GRAPHIFY_LANG_PATH`` folder (M5).
+
+    The entry must be absolute after ``~`` expansion: a relative one would run
+    code from whatever folder graphify starts in (S5-M3). A bad entry is a load
+    error of its own and the later folders still load (S5-M1); a folder listed
+    twice loads once (S5-L2).
+    """
+    try:
+        folder = Path(entry).expanduser()
+        if not folder.is_absolute():
+            raise ValueError("must be an absolute path")
+        folder = folder.resolve()
+    except Exception as exc:
+        _failed(state, "plugin folder", entry, exc)
+        return
+    if folder in state.search_paths:
+        return
     if not folder.is_dir():
         _failed(state, "plugin folder", str(folder), "not a directory")
         return
     state.search_paths.append(folder)
     for toml in sorted(folder.glob("*.toml")):
         try:
-            manifest = _path_manifest(folder, toml)
-            if manifest.name in state.manifests:
-                raise ValueError(f"language {manifest.name!r} is already registered")
-            _register_manifest(manifest)
+            if _is_manifest(toml):
+                _register_new(_path_manifest(state, folder, toml))
+            else:
+                _LOG.debug("%s has no [language] table: not a manifest", toml)
         except Exception as exc:
             _failed(state, "manifest", str(toml), exc)
 
 
-def _path_manifest(folder: Path, toml: Path) -> LanguageManifest:
+def _is_manifest(toml: Path) -> bool:
+    """False for a ``*.toml`` that parses and has no ``[language]`` table
+    (``pyproject.toml``, ``ruff.toml``; S5-L3). One that does not parse is a
+    manifest, so ``from_toml`` reports the error."""
+    try:
+        return "language" in tomllib.loads(toml.read_text(encoding="utf-8"))
+    except Exception:
+        return True
+
+
+def _folder_package(folder: Path) -> str:
+    """``graphify_lang_path._<hash>``: an empty package whose ``__path__`` is
+    ``folder``. A path plugin's runtime and its own modules import under it,
+    never as top-level names, so two folders cannot share a module and no
+    installed or stdlib module is shadowed (S5-H1, S5-L1). ``sys.path`` is
+    never changed."""
+    name = f"{_PATH_PACKAGE}._{hashlib.sha256(str(folder).encode()).hexdigest()[:16]}"
+    for package, where in ((_PATH_PACKAGE, []), (name, [str(folder)])):
+        if package not in sys.modules:
+            spec = importlib.machinery.ModuleSpec(package, None, is_package=True)
+            spec.submodule_search_locations = where
+            sys.modules[package] = importlib.util.module_from_spec(spec)
+    return name
+
+
+def _importable(name: str) -> bool:
+    if name in sys.modules:
+        return True
+    try:
+        return importlib.util.find_spec(name) is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def _path_manifest(state: _RegistryState, folder: Path, toml: Path) -> LanguageManifest:
     """The manifest ``toml`` with the callables of its ``[extract] runtime``
     module: ``extract`` (or ``augment`` for an augment) and an optional
-    ``RESOLVER``, as an entry-point package sets them. The module is imported
-    with ``folder`` first on ``sys.path`` for that import only."""
+    ``RESOLVER``, as an entry-point package sets them. The
+    module is imported as ``<_folder_package(folder)>.<runtime>``. A runtime
+    whose top-level name another folder's runtime or an importable module
+    also has still loads, with a clash warning: an absolute ``import`` of that
+    name inside the plugin gets the other module."""
     manifest, errors = LanguageManifest.from_toml(toml)
     if errors:
         raise ValueError("; ".join(errors))
-    sys.path.insert(0, str(folder))
-    try:
-        module = importlib.import_module(manifest.runtime)
-    finally:
-        sys.path.remove(str(folder))
+    top = manifest.runtime.split(".")[0]
+    other = state.runtimes.get(top)
+    clash = (f"the runtime of {other}" if other not in (None, folder)
+             else "an importable module" if _importable(top) else None)
+    module = importlib.import_module(f"{_folder_package(folder)}.{manifest.runtime}")
     attr = "augment" if manifest.kind == "augment" else "extract"
     func = getattr(module, attr, None)
     if not callable(func):
         raise ValueError(f"{manifest.runtime} has no callable {attr!r}")
+    state.runtimes.setdefault(top, folder)
+    if clash:
+        state.load_warnings[str(toml)] = (
+            f"runtime name {top!r} clashes with {clash}; loaded from {folder} "
+            f"under a private package, so use relative imports inside it")
+        _LOG.warning("manifest %s: %s", toml, state.load_warnings[str(toml)])
     return replace(manifest, **{attr: func}, resolver=getattr(module, "RESOLVER", None))
 
 
@@ -123,11 +197,20 @@ def _process_loader_result(result: Any) -> None:
     if callable(result):
         result = result()
     if isinstance(result, LanguageManifest):
-        _register_manifest(result)
+        _register_new(result)
     elif isinstance(result, (list, tuple)):
         for item in result:
             _process_loader_result(item)
     # Ignore other types silently - the loader may return metadata
+
+
+def _register_new(manifest: LanguageManifest) -> None:
+    """Register a discovered manifest. A name already registered raises, for an
+    entry point and a path manifest alike: the first one wins and the second
+    is a load error (S5-L2)."""
+    if _STATE is not None and manifest.name in _STATE.manifests:
+        raise ValueError(f"language {manifest.name!r} is already registered")
+    _register_manifest(manifest)
 
 
 def _register_manifest(manifest: LanguageManifest) -> None:
@@ -135,6 +218,8 @@ def _register_manifest(manifest: LanguageManifest) -> None:
 
     A manifest registered before discovery ran (tests do this) makes a registry
     of its own: discovery then never runs in this process until ``reset()``.
+    A later manifest of the same name replaces it (tests rely on that);
+    discovery goes through ``_register_new`` instead.
     """
     global _STATE
     if _STATE is None:
@@ -449,6 +534,11 @@ def context_fields() -> tuple[str, ...]:
 def load_errors() -> dict[str, str]:
     """Plugins that failed to load: entry point name or manifest path -> error."""
     return dict(_init_state().load_errors)
+
+
+def load_warnings() -> dict[str, str]:
+    """Plugins that loaded with a warning (a runtime name clash): manifest path -> text."""
+    return dict(_init_state().load_warnings)
 
 
 def distributions() -> list[str]:

@@ -279,13 +279,20 @@ def format_languages() -> str:
 
 def check_languages() -> tuple[str, bool]:
     """``graphify lang list --check`` (cc-CR000.001 E4): one row per plugin,
-    ``ok`` or the load error, and whether every plugin loaded."""
+    ``ok`` or the load error, one ``warning:`` row per load warning (a path
+    plugin's runtime name clash, S5-H1), and whether every plugin loaded and
+    the core tables took the registry (S5-M1). A warning does not fail it."""
     from graphify_lang import registry as lang_registry
 
+    apply_registry()
     rows = [(m.name, "ok") for m in lang_registry.iter_manifests()]
     errors = lang_registry.load_errors()
     rows += [(source, f"error: {err}") for source, err in errors.items()]
+    rows += [(source, f"warning: {text}") for source, text in lang_registry.load_warnings().items()]
+    if not _REGISTRY_AVAILABLE:
+        rows.append(("registry", "error: merge into the core tables failed (see the log)"))
     if not rows:
         return "No plugin languages registered.", True
     width = max(len(name) for name, _ in rows)
-    return "\n".join(f"{name.ljust(width)}  {status}" for name, status in rows), not errors
+    table = "\n".join(f"{name.ljust(width)}  {status}" for name, status in rows)
+    return table, not errors and _REGISTRY_AVAILABLE

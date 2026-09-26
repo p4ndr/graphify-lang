@@ -65,6 +65,8 @@ def _toy_folder(root: Path) -> Path:
 
 
 class _EP:
+    dist = None
+
     def __init__(self, name, target):
         self.name, self._target = name, target
 
@@ -354,8 +356,6 @@ def _modules_restored():
     sys.modules.update(saved)
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S5-H1: path plugins share sys.modules")
 def test_s5_h1_path_plugins_namespaced(tmp_path, monkeypatch, _modules_restored):
     a = _path_plugin(tmp_path / "a", "alpha", "plugin", _ret("from-a"))
     b = _path_plugin(tmp_path / "b", "beta", "plugin", _ret("from-b"))
@@ -378,8 +378,6 @@ def test_s5_h1_path_plugins_namespaced(tmp_path, monkeypatch, _modules_restored)
     assert any("clash" in r and "wave" in r for r in rows), check.stdout
 
 
-@pytest.mark.xfail(strict=True, raises=RuntimeError,
-                   reason="S5-M1: a bad GRAPHIFY_LANG_PATH entry escapes isolation")
 def test_s5_m1_bad_path_entry_isolated(tmp_path, monkeypatch):
     folder = _toy_folder(tmp_path / "plugins")
     bad = "~nosuchuser_zz/plugins"
@@ -389,8 +387,6 @@ def test_s5_m1_bad_path_entry_isolated(tmp_path, monkeypatch):
     assert bad in registry.load_errors()
 
 
-@pytest.mark.xfail(strict=True, raises=RuntimeError,
-                   reason="S5-M1: entry_points() runs outside every try")
 def test_s5_m1_entry_points_failure_isolated(tmp_path, monkeypatch):
     def broken(group=None):
         raise RuntimeError("corrupt distribution metadata")
@@ -401,8 +397,6 @@ def test_s5_m1_entry_points_failure_isolated(tmp_path, monkeypatch):
     assert "corrupt distribution metadata" in registry.load_errors()["entry points"]
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S5-M1: --check exits 0 after a bad path entry")
 def test_s5_m1_check_fails_and_suffixes_kept():
     check = _lang_check("~nosuchuser_zz/plugins")
     assert check.returncode == 1, check.stdout
@@ -414,8 +408,6 @@ def test_s5_m1_check_fails_and_suffixes_kept():
     assert out.stdout.strip() == "True", out.stderr
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S5-M1: check_languages ignores a failed registry merge")
 def test_s5_m1_check_fails_when_registry_unavailable(monkeypatch):
     import graphify.lang_registry as core
 
@@ -426,8 +418,6 @@ def test_s5_m1_check_fails_when_registry_unavailable(monkeypatch):
     assert not ok and "registry" in table
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S5-M3: a relative GRAPHIFY_LANG_PATH entry runs code from CWD")
 def test_s5_m3_relative_entry_rejected(tmp_path, monkeypatch, caplog):
     _toy_folder(tmp_path / "plugins")
     monkeypatch.chdir(tmp_path / "plugins")
@@ -439,8 +429,6 @@ def test_s5_m3_relative_entry_rejected(tmp_path, monkeypatch, caplog):
     assert "absolute" in caplog.text
 
 
-@pytest.mark.xfail(strict=True, raises=ImportError,
-                   reason="S5-L1: a plugin's lazy sibling import fails at extraction")
 def test_s5_l1_lazy_sibling_import(tmp_path, monkeypatch, _modules_restored):
     body = ("def extract(path):\n"
             "    from . import s5l1_helper\n"
@@ -454,8 +442,6 @@ def test_s5_l1_lazy_sibling_import(tmp_path, monkeypatch, _modules_restored):
     assert sys.path == before and "s5l1_helper" not in sys.modules
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S5-L2: an entry point with a taken name overwrites silently")
 def test_s5_l2_duplicate_names_first_wins(tmp_path, monkeypatch):
     first = LanguageManifest(name="good", suffixes=frozenset({".good"}), extract=lambda p: {})
     second = LanguageManifest(name="good", suffixes=frozenset({".other"}), extract=lambda p: {})
@@ -472,8 +458,6 @@ def test_s5_l2_duplicate_names_first_wins(tmp_path, monkeypatch):
     assert list(errors) == ["two"]                             # the repeated folder loads once
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S5-L3: a pyproject.toml counts as a failed plugin")
 def test_s5_l3_non_manifest_toml_skipped(tmp_path, monkeypatch):
     folder = _toy_folder(tmp_path / "plugins")
     (folder / "pyproject.toml").write_text("[project]\nname = 'x'\n")

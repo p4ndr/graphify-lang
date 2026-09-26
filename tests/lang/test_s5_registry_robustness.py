@@ -318,7 +318,6 @@ def test_l13_upper_suffix_activates_resolver():
     assert ran == [True]
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="N5: [match] filenames compare case-sensitively")
 def test_n5_cargo_toml_casefold(tmp_path):
     inner = lambda p: {"nodes": [], "edges": []}               # noqa: E731
     lower = tmp_path / "cargo.toml"

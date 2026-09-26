@@ -131,7 +131,7 @@ def test_id_clash_gets_the_line_number(tmp_path):
 
 
 def test_builtins_filter_names_prefixes_and_case(tmp_path):
-    (tmp_path / "b.txt").write_text("# comment\nERR:_TRAP\n")
+    (tmp_path / "b.txt").write_text("# comment\n; comment\nERR:_TRAP\n")
     base = {"rule": LISP_REGEX, "language": {"case_insensitive": True}}
     full = _edges(_run({"rule": LISP_REGEX}), "calls")
     named = _edges(_run({**base, "extract": {"builtins_file": "b.txt"}},

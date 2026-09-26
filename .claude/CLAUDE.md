@@ -36,8 +36,8 @@ at `docs/UPSTREAM-README.md`.
   merge.
 - Never edit an existing language extractor, `graphify/extractors/engine.py`,
   or `graphify/extractors/resolution.py`. Never add a suffix by hand to
-  `_DISPATCH` (`graphify/extract.py:5630`), `CODE_EXTENSIONS`
-  (`graphify/detect.py:44`), or `_HOOK_SOURCE_EXTS` (`graphify/cli.py:71`);
+  `_DISPATCH` (in `graphify/extract.py`), `CODE_EXTENSIONS` (in
+  `graphify/detect.py`), or `_HOOK_SOURCE_EXTS` (in `graphify/cli.py`);
   the registry lookup is the only permitted change to those tables.
 - Generic registry work is meant to go upstream; keep it in commits separate
   from AutoLISP-specific work.

@@ -2,7 +2,7 @@
 
 A registry that lets a language be registered from outside `graphify/extract.py`, plus an AutoLISP/DCL plugin built on it.
 
-- Status: ACTIVE
+- Status: ACTIVE (open only for T10, the upstream PRs; drafts in `docs/upstream/`)
 - Created: 2026-09-21
 - Tasks: T1-T10 in `docs/30-TODO.md`
 - Full documents: requirements `.claude/docs/cc-RS000.001.md` (SRS v2, 1,006 lines); plan `.claude/docs/cc-IP000.001.md` (882 lines, sections S001-S010); squad review `.claude/docs/cc-RS000.001.squad-check.md` (68 comments, all actioned)

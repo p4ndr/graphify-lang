@@ -2,7 +2,7 @@
 
 Fix defects D1-D12 from `docs/testing/case_003_local-autolisp-repos.md` and add the edges agreed on 2026-09-24, so that an AutoLISP repo gives a graph of files, functions, commands, globals and dialogs linked by real edges.
 
-- Status: ACTIVE
+- Status: DONE
 - Created: 2026-09-24
 - Tasks: T19-T25 in `docs/30-TODO.md`
 - Input: `docs/testing/case_003_local-autolisp-repos.md` (measurements, defects D1-D12)

@@ -12,10 +12,10 @@ is and how to use it. This file covers only what the fork changes and why.
 ## What this fork is and is not
 
 This is not a general-purpose graphify fork. It tracks upstream `v8` (the
-upstream default branch, tag `v0.9.55` at the fork point) and carries one
-change: a way to register a language from outside `graphify/extract.py`. The
-core pipeline, the output schema, the CLI, the MCP server, and every existing
-language extractor are upstream's and stay upstream's. Anything in the
+upstream default branch) by rebase, and carries one change: a way to register
+a language from outside `graphify/extract.py`, plus the language packages
+built on it. The core pipeline, the output schema, the CLI, the MCP server,
+and every existing language extractor are upstream's and stay upstream's. Anything in the
 extension layer that is not AutoLISP-specific is intended to go back upstream
 as a pull request, following the seams upstream has already opened for it
 (see [Design goals](#design-goals-for-the-extension-layer)). The AutoLISP
@@ -24,15 +24,17 @@ answer works.
 
 ## The problem
 
-Two measurements, taken on 7 September 2026 against the fork at `c9f9901`
-with the `graphifyy 0.9.55` pipx venv (`tree-sitter 0.25.2`,
-`tree-sitter-commonlisp 0.4.1`, Python 3.12.3) and the
-[AutoLITHP](https://github.com/p4ndr/autolithp) repository as the corpus.
+Two measurements that motivated the fork, taken on 7 September 2026 against
+the fork point `c9f9901` with the stock graphify then installed by pipx
+(`tree-sitter 0.25.2`, `tree-sitter-commonlisp 0.4.1`, Python 3.12.3) and the
+[AutoLITHP](https://github.com/p4ndr/autolithp) repository as the corpus. Line
+numbers in this section are those of `c9f9901`; the section is a record, not
+the current state (see [Status](#status)).
 
 ### AutoLISP files produce a file node and nothing else
 
-graphify routes `.lsp` to the Common Lisp extractor
-(`graphify/extract.py:5691`, `".lsp": extract_commonlisp`). Running that
+graphify routes `.lsp` to the Common Lisp extractor (the `_DISPATCH` entry
+`".lsp": extract_commonlisp` in `graphify/extract.py`). Running that
 extractor on AutoLITHP's `src/core/err.lsp`, which contains 27 `(defun` forms
 (`grep -o '(defun' src/core/err.lsp | wc -l`), returns:
 
@@ -90,19 +92,19 @@ Symbols with a module prefix are the norm in AutoLISP, not the exception
 Upstream's own procedure (`ARCHITECTURE.md`, 'Adding a new language
 extractor') and the code it points at:
 
-| Step | File and line | What you edit |
-|:-----|:--------------|:--------------|
+| Step | File and symbol | What you edit |
+|:-----|:----------------|:--------------|
 | 1 | `graphify/extractors/<lang>.py` | new `extract_<lang>(path) -> dict` |
-| 2 | `graphify/extract.py:5630` (`_DISPATCH`) | suffix → extractor |
-| 2 | `graphify/extract.py:7578` (`collect_files`, reads `_DISPATCH.keys()`) | same table, so one edit, but it must exist |
-| 2 | `graphify/extract.py:5740` (`_EXTRA_FOR_EXTENSION`) | suffix → pip extra, used for the install hint at `extract.py:6371` |
-| 3 | `graphify/detect.py:44` (`CODE_EXTENSIONS`) | suffix |
-| 3 | `graphify/watch.py:278` (`_WATCHED_EXTENSIONS`, derived from `CODE_EXTENSIONS`) | follows step 3 |
+| 2 | `graphify/extract.py`, `_DISPATCH` | suffix → extractor |
+| 2 | `graphify/extract.py`, `collect_files` (reads `_DISPATCH.keys()`) | same table, so one edit, but it must exist |
+| 2 | `graphify/extract.py`, `_EXTRA_FOR_EXTENSION` | suffix → pip extra, used for the missing-grammar install hint in `extract` |
+| 3 | `graphify/detect.py`, `CODE_EXTENSIONS` | suffix |
+| 3 | `graphify/watch.py`, `_WATCHED_EXTENSIONS` (derived from `CODE_EXTENSIONS`) | follows step 3 |
 | 4 | `pyproject.toml` | grammar dependency or optional extra |
 | 5 | `tests/fixtures/`, `tests/test_languages.py` (4,432 lines) | fixture and tests |
 
-`extract.py` is 7,645 lines and `cli.py` is 4,734. A seventh list,
-`_HOOK_SOURCE_EXTS` (`graphify/cli.py:71-75`, consumed at `cli.py:881`),
+`extract.py` was 7,645 lines and `cli.py` 4,734. A seventh list,
+`_HOOK_SOURCE_EXTS` (`graphify/cli.py`, read by the editor-hook handler),
 decides which file suffixes trigger the 'run `graphify query` first' nudge in
 the editor hook. It is a fixed tuple with no `.lsp` and no override, so an
 AutoLISP file never nudges even when it is in the graph.
@@ -138,19 +140,18 @@ the next rebase harder.
 
 | Seam | What it gives an extension author |
 |:-----|:----------------------------------|
-| `graphify/extractors/__init__.py:34` `LANGUAGE_EXTRACTORS` | a `dict[str, Callable[[Path], dict]]` keyed by language name. Its docstring (`__init__.py:5-6`) calls it 'the registry seed; wiring dispatch through it is a later, separate step'. |
-| `graphify/resolver_registry.py:48` `register(LanguageResolver)` | a cross-file resolution pass. `LanguageResolver` (`resolver_registry.py:28-42`) is `name`, `suffixes`, `resolve(per_file, all_nodes, all_edges) -> None`. `run_language_resolvers` (`resolver_registry.py:59-85`) runs each registered pass only when one of its suffixes is present in the corpus, in registration order, catching and logging any exception. `extract.py:21` imports `register` as `register_language_resolver` and uses it at `extract.py:4542` and `4545` for C#. |
-| `graphify/extractors/base.py` | `_LANGUAGE_BUILTIN_GLOBALS` (`base.py:13`), the denylist that stops constructor-like built-ins becoming god nodes; `_make_id` (`base.py:54`); `_file_stem` (`base.py:58`), which derives the path-qualified id prefix so same-named files in different directories do not collide; `_read_text` (`base.py:84`). The header comment (`base.py:1`) fixes the import direction: `extract.py` → `extractors/`, never back. |
-| `graphify/extractors/models.py` | `LanguageConfig` (`models.py:14-57`), the dataclass that drives the shared `_extract_generic` core in `engine.py` for tree-sitter grammars with conventional class/function/import/call node types, plus the `_Symbol*Fact` records (`models.py:59-131`) that the cross-file resolution in `resolution.py` consumes. |
+| `graphify/extractors/__init__.py`, `LANGUAGE_EXTRACTORS` | a `dict[str, Callable[[Path], dict]]` keyed by language name. Its module docstring calls it 'the registry seed; wiring dispatch through it is a later, separate step'. |
+| `graphify/resolver_registry.py`, `register(LanguageResolver)` | a cross-file resolution pass. `LanguageResolver` is `name`, `suffixes`, `resolve(per_file, all_nodes, all_edges) -> None`. `run_language_resolvers` runs each registered pass only when one of its suffixes is present in the corpus, in registration order, catching and logging any exception. `extract.py` imports `register` as `register_language_resolver` and uses it for C#. |
+| `graphify/extractors/base.py` | `_LANGUAGE_BUILTIN_GLOBALS`, the denylist that stops constructor-like built-ins becoming god nodes; `_make_id`; `_file_stem`, which derives the path-qualified id prefix so same-named files in different directories do not collide; `_read_text`. The header comment fixes the import direction: `extract.py` → `extractors/`, never back. |
+| `graphify/extractors/models.py` | `LanguageConfig`, the dataclass that drives the shared `_extract_generic` core in `engine.py` for tree-sitter grammars with conventional class/function/import/call node types, plus the `_Symbol*Fact` records that the cross-file resolution in `resolution.py` consumes. |
 
-`engine.py` (6,303 lines) is the config-driven extractor core and
-`resolution.py` (3,309 lines) the cross-file symbol resolution; both are
-imported by `extract.py:149`. A language whose grammar fits `LanguageConfig`
+`engine.py` is the config-driven extractor core and `resolution.py` the
+cross-file symbol resolution; `extract.py` imports both. A language whose grammar fits `LanguageConfig`
 can reuse `engine.py` wholesale. AutoLISP does not fit it (its names are
 `package_lit`, its definer is a dedicated node type), which is why the
 manifest must allow a bespoke extractor as well as a config.
 
-## Proposed architecture
+## Architecture
 
 The core keeps its tables; each table gains a lookup into one registry, and
 the registry is populated from language packages the core never imports by
@@ -184,13 +185,14 @@ the existing table each field feeds.
 
 | Field | Required | Type | Where the core reads it |
 |:------|:---------|:-----|:------------------------|
-| `name` | yes | `str` | registry key, same role as the `LANGUAGE_EXTRACTORS` key (`graphify/extractors/__init__.py:34`) |
-| `suffixes` | yes | `frozenset[str]` | `_DISPATCH` (`extract.py:5630`), `collect_files` (`extract.py:7578`), `CODE_EXTENSIONS` (`graphify/detect.py:44`), `_WATCHED_EXTENSIONS` (`graphify/watch.py:278`) |
+| `name` | yes | `str` | registry key, same role as the `LANGUAGE_EXTRACTORS` key (`graphify/extractors/__init__.py`) |
+| `suffixes` | yes | `frozenset[str]` | `_DISPATCH` and `collect_files` (`extract.py`), `CODE_EXTENSIONS` (`detect.py`), `_WATCHED_EXTENSIONS` (`watch.py`) |
 | `extract` | yes | `Callable[[Path], dict]` | `_DISPATCH` value; must return the schema in `ARCHITECTURE.md` ('Extraction output schema'), enforced by `validate.py` |
-| `grammar` | no | tree-sitter module name, or `None` for a hand parser | the package's own import. The core sees only the `error` key convention when the grammar is absent (`commonlisp.py:66`) |
-| `extra` | no | `str` | `_EXTRA_FOR_EXTENSION` (`extract.py:5740`), so the missing-grammar hint at `extract.py:6371` names the right `pip install "graphifyy[...]"` |
-| `resolver` | no | `LanguageResolver` | `register_language_resolver` (`extract.py:21`, `resolver_registry.py:48`) |
-| `hook_suffixes` | no | `tuple[str, ...]` | `_HOOK_SOURCE_EXTS` (`cli.py:71`), consumed at `cli.py:881` |
+| `grammar` | no | tree-sitter module name, or `None` for a hand parser | the package's own import. The core sees only the `error` key convention when the grammar is absent (as `extract_commonlisp` returns it) |
+| `extra` | no | `str` | `_EXTRA_FOR_EXTENSION` (`extract.py`), so the missing-grammar hint names the right `pip install "graphifyy[...]"` |
+| `resolver` | no | `LanguageResolver` | `register` in `resolver_registry.py` (`register_language_resolver` in `extract.py`) |
+| `hook_suffixes` | no | `tuple[str, ...]` | `_HOOK_SOURCE_EXTS` (`cli.py`) |
+| `[resolve] context_fields` | no | `list[str]`, default `["node_kind"]` | the incremental context nodes in `watch._rebuild_code` and the `graphify extract` incremental path (`cli.py`); see [Plugin contract](#plugin-contract) |
 | `fixture` | no | path | the package's own tests; the core's `tests/test_languages.py` is not edited |
 | `overrides` | no | suffixes | wins that suffix from the built-in with no sniff (`.lsp`) |
 | `priority` | no | `int` | breaks a sniff tie between plugins (higher wins) |
@@ -235,29 +237,91 @@ settles open question 3 below. The code is `graphify_lang/registry.py`
   an optional `RESOLVER`. A plugin that fails to load is logged and skipped;
   `GRAPHIFY_LANG_DISABLE=1` turns discovery off.
 
-Open questions the design has to settle before code, each with the options
-on the table:
+The three design questions the first version of this README left open are
+settled:
 
-1. Discovery: entry point only, namespace package only, or both. Entry
-   points work for installed packages; a namespace package also works for a
-   checked-out directory on `sys.path`.
-2. Registration time: at `graphify.extract` import, or lazily on first
-   `_DISPATCH` miss. Import-time is simpler and matches how the C# resolvers
-   register (`extract.py:4542`); lazy avoids paying for packages that are
-   never used.
-3. Precedence: whether a package may claim a suffix the core already owns
-   (`.lsp` is the case in point, `extract.py:5691`). The AutoLISP package
-   needs to.
+1. **Discovery**: the `graphify_lang_plugins` entry points, plus manifest
+   folders on `GRAPHIFY_LANG_PATH`. There is no namespace-package scan.
+2. **Registration time**: at import of the core module that owns each table
+   (`detect.py`, `extract.py`, `cli.py`), through `apply_registry()`, which
+   loads the registry once.
+3. **Precedence**: a plugin may take a built-in suffix with `overrides`
+   (AutoLISP takes `.lsp`), or share it through `[sniff]` / `[match]`.
+
+### Plugin contract
+
+Rules every language package follows. The tests named in brackets fail when
+a plugin breaks one.
+
+- **Pure extractors and augments.** An extractor or an augment is a function
+  of the file's bytes alone: it never reads another file, the scan root, or
+  the environment. The AST cache keys on file content, so anything that looks
+  at another file is served stale from the cache. Cross-file work belongs in
+  the resolver. [`tests/lang/test_s4_build_coherence.py`, `test_h3_*`, `test_m2_*`]
+- **Index refs.** A resolver ref records `node`, the index of its source node
+  in the file's result, not the id. Upstream renames colliding ids in place
+  before resolvers run, so a stored id can dangle; `graphify_lang._common`
+  (`Sink.ref`, `refs_of`, `resolve_ref_id`) reads the current id back.
+  [`tests/lang/test_s3_shared_core.py`, `test_h2_*`]
+- **Augments add, never replace.** An augment returns `nodes`, `edges` and
+  `attrs` keyed by base node id; new ids start with the plugin name prefix,
+  and no base node or attribute is replaced.
+- **`[resolve] context_fields`.** On an incremental build a resolver sees an
+  unchanged file only as a context node read from `graph.json`: no payloads,
+  few edges, and a root-relative `source_file`. A cross-file fact a resolver
+  needs from an unchanged file must be a node field listed in
+  `context_fields` (bmake `bmake_includes`, cc-kb `cc_kb_links`, cargo
+  `cargo_ws_deps`). The core hook forwards those fields and adds
+  `_lang_source_file`, the absolute path.
+- **`source_of`.** A resolver compares node paths through
+  `graphify_lang._common.source_of(node)`, never `node["source_file"]`
+  directly, so fresh and context nodes compare alike.
+  [`tests/lang/test_s4_build_coherence.py::test_e5_incremental_parity`]
+- **`GRAPHIFY_LANG_PATH`.** Folders (`os.pathsep` separated) whose `*.toml`
+  manifests are loaded after the entry points. A manifest's `[extract]
+  runtime` module is imported with its folder first on `sys.path` and exposes
+  `extract` (or `augment`) and an optional `RESOLVER`. A name already
+  registered is rejected and logged.
+- **`graphify lang list --check`** prints one row per plugin, `ok` or its
+  load error, and exits 1 when any plugin failed to load. A failing plugin
+  is logged and skipped; the others still load.
+
+Known limits:
+
+- **Incremental builds miss edges into newly added files.** An incremental
+  build re-resolves only the changed files, so an edge owned by an unchanged
+  file (an unchanged hub's `cites`, a workspace's `has_member`, a `calls` from
+  an unchanged file) into a newly added file appears only on the next full
+  build. This is upstream's incremental model, not a plugin defect.
+- **Toggling `GRAPHIFY_LANG_DISABLE` re-extracts once.** The AST cache
+  namespace carries a fingerprint of the loaded plugin set (names, code, and
+  `GRAPHIFY_LANG_PATH` folders), so the first build after the plugin set
+  changes, including turning discovery off or on, re-extracts every file.
+  Later builds with the same set reuse the cache.
+
+### Upstream seams the fork depends on
+
+Each is a behaviour of upstream code the plugins rely on; an upstream change
+to one breaks a plugin silently. The E5 parity test covers most of them.
+
+| Seam | Where | Relied on by |
+|:-----|:------|:-------------|
+| Colliding ids are renamed in place before resolvers run | `_disambiguate_colliding_node_ids` (`extractors/resolution.py`), called from `extract` | the index-ref contract |
+| Incremental context nodes carry a fixed field list | `watch._rebuild_code`, the `graphify extract` incremental path | the `context_fields` hooks (upstream PR draft: `docs/upstream/`) |
+| Markdown link reconciliation prunes only `references` edges | `watch._reconcile_markdown_links` | cc-kb `cites` edges surviving |
+| `per_file` and `all_nodes` share node dicts | `extract` | bmake, astgrep and cc-kb index reads |
+| Suffix fallback for extractor lookup | `_get_extractor` | the registry dispatch and augment hooks |
+| Resolver suffix match | `run_language_resolvers` | upper-case suffixes (the fork case-folds; upstream PR draft) |
 
 ## AutoLISP
 
 ### Current state
 
-Measured in [The problem](#the-problem): one file node per `.lsp` file, zero
-edges, on a corpus of 79 files. `.dcl` and `.mnl` are not recognised
-suffixes anywhere in `extract.py`, `detect.py`, or `watch.py` (`grep` for
-`".dcl"` and `".mnl"` in those three files returns nothing), so dialog files
-are not scanned at all.
+The `autolisp` and `autolisp-dcl` plugins (`graphify_lang/autolisp/`) claim
+`.lsp` (over the built-in Common Lisp extractor), `.mnl` and `.dcl`, and
+produce the node and edge model below. At the fork point, stock graphify gave
+one file node per `.lsp` file and zero edges ([The problem](#the-problem)),
+and did not scan `.dcl` or `.mnl` at all.
 
 ### Language traits an extractor must know
 
@@ -289,7 +353,8 @@ needs a second read of the string body, not the surrounding tree.
 
 ### Target node and edge model
 
-This is the target, not what exists. Relation names follow the
+Implemented in plans 01 and 02; measured in
+`docs/testing/case_004_plan02-autolisp-fixes.md`. Relation names follow the
 `ARCHITECTURE.md` schema (`relation` plus a confidence label).
 
 | Node kind | Source form |
@@ -316,7 +381,7 @@ This is the target, not what exists. Relation names follow the
 | `sidecar_doc` | file or function → sidecar doc | `@sidecar`, `@doc` | `EXTRACTED` |
 
 Whether `vla-`/`vlax-` COM calls become edges to stub nodes or go on a
-built-ins denylist (the `_LANGUAGE_BUILTIN_GLOBALS` pattern, `base.py:13`)
+built-ins denylist (the `_LANGUAGE_BUILTIN_GLOBALS` pattern in `base.py`)
 is a decision for the first measurement: they appear in most files and would
 otherwise become god nodes.
 
@@ -324,17 +389,17 @@ otherwise become god nodes.
 
 | Option | For | Against |
 |:-------|:----|:--------|
-| Reuse `tree-sitter-commonlisp` with an AutoLISP-aware walker | already a dependency (`pyproject.toml:97`, `:126`); parses `err.lsp` with zero `ERROR` nodes; `package_lit` and `defun_header` give the name and the argument list directly | the grammar is Common Lisp's: `package_lit` is a mis-reading of the prefix, `#` reader syntax and `\|` symbols are not AutoLISP's, and DCL is a different language the grammar cannot read at all |
+| Reuse `tree-sitter-commonlisp` with an AutoLISP-aware walker | already a dependency (the `commonlisp` extra in `pyproject.toml`); parses `err.lsp` with zero `ERROR` nodes; `package_lit` and `defun_header` give the name and the argument list directly | the grammar is Common Lisp's: `package_lit` is a mis-reading of the prefix, `#` reader syntax and `\|` symbols are not AutoLISP's, and DCL is a different language the grammar cannot read at all |
 | A hand-written s-expression reader | AutoLISP's surface syntax is small; AutoLITHP already has one, `tools/lread.py`, 72 lines, that returns nested forms with line numbers; the same reader can be extended to DCL's `name : type { key = value; }` blocks | no incremental parsing, no error recovery, and every construct is the fork's to maintain |
 | A new `tree-sitter-autolisp` grammar | a grammar is the form every other extractor uses, and would give AutoLISP the same tooling elsewhere | there is none to reuse; writing, packaging, and publishing wheels is a project of its own |
 
-The measured facts favour starting with the first option and keeping the
-walker separate from `commonlisp.py`, so that the Common Lisp extractor is
-never edited. The hand reader is the fallback for DCL either way.
+The fork took the first option, with the walker separate from
+`commonlisp.py` so that the Common Lisp extractor is never edited, and a hand
+reader for DCL.
 
 ### Acceptance test
 
-All against AutoLITHP, all mechanical, none of them satisfied at the fork point:
+All against AutoLITHP, all mechanical, none of them satisfied at the fork point, all passing since plan 02:
 
 | Check | Expected | Instrument | Status (case 004, 2026-09-24) |
 |:------|:---------|:-----------|:------------------------------|
@@ -342,45 +407,48 @@ All against AutoLITHP, all mechanical, none of them satisfied at the fork point:
 | `C:` commands appear | `C:LITHP`, `C:LITHP-MGR`, `C:LITHP-INIT` from `src/core/ldr.lsp:526-541` | node labels | PASS |
 | A prefixed name is one symbol | `err:trap` is one node, not `err` plus `trap` | node ids | PASS |
 | DCL edges | at least one `dcl_references` edge into `lithp_mgr` from `src/ui/manager.dcl:3` | edge list | PASS — 1 (INFERRED, D-001) |
-| No upstream regression | `pytest tests/ -q` exit 0 with no test file edited | pytest | PASS — 5485 passed |
+| No upstream regression | `pytest tests/ -q` exit 0 with no upstream test file edited | pytest | PASS — 5485 passed (6238 on `rr-s6`) |
 
 Measurements: `docs/testing/case_004_plan02-autolisp-fixes.md` (`tools/measure_autolisp.py`).
 
 ## Roadmap
 
-Phases, each with an exit criterion. No dates.
+Phases, each with an exit criterion and its state. No dates.
 
-1. **Registry and manifest.** Define the manifest dataclass and the discovery
+1. **Registry and manifest.** Done (plan 01). Define the manifest dataclass and the discovery
    mechanism; add the lookups to the five core tables. Exit: `pytest tests/
    -q` passes unchanged, and a stub language package registered from a test
    is dispatched for its suffix.
-2. **AutoLISP nodes.** An AutoLISP extractor that claims `.lsp` and produces
+2. **AutoLISP nodes.** Done (plan 01). An AutoLISP extractor that claims `.lsp` and produces
    file, function, command, and global nodes with `contains` edges. Exit:
    27 function nodes and 3 command nodes from `err.lsp` and `ldr.lsp`.
-3. **AutoLISP edges.** `calls` (direct and quoted), `loads`,
+3. **AutoLISP edges.** Done (plans 01, 02). `calls` (direct and quoted), `loads`,
    `module_depends`, `sidecar_doc`. Exit: `err:trap` has at least one
    inbound `calls` edge from another file in the corpus.
-4. **DCL.** A `.dcl` reader, dialog nodes, `dcl_references` and `dcl_action`
+4. **DCL.** Done (plans 01, 02). A `.dcl` reader, dialog nodes, `dcl_references` and `dcl_action`
    edges. Exit: the `lithp_mgr` check in the acceptance table.
-5. **Hook and watch.** `.lsp` and `.dcl` in the nudge and watch lists via the
-   manifest. Exit: editing a `.lsp` file under a graphed project triggers the
-   nudge at `cli.py:881`.
-6. **Upstream.** Split the generic registry from the AutoLISP package and
-   open a pull request for the registry alone. Exit: the PR is open and the
-   fork's diff against upstream is the AutoLISP package plus that PR.
+5. **Hook and watch.** Done (plan 01; plugin data files in watch since plan
+   05). `.lsp` and `.dcl` in the nudge and watch lists via the manifest.
+   Exit: editing a `.lsp` file under a graphed project triggers the editor
+   hook's nudge (`_HOOK_SOURCE_EXTS`).
+6. **Upstream.** Open (plan 01 T10). Split the generic registry from the
+   language packages and open a pull request for the registry alone, plus
+   the small core-seam PRs drafted in `docs/upstream/`. Exit: the PR is open
+   and the fork's diff against upstream is the language packages plus that
+   PR.
 
 ## Repository layout
 
-Directories that exist are upstream's. Planned directories are marked.
-
-| Path | Status | Purpose |
-|:-----|:-------|:--------|
-| `graphify/` | upstream | the core; `extract.py`, `detect.py`, `watch.py`, `cli.py`, `resolver_registry.py` |
+| Path | Owner | Purpose |
+|:-----|:------|:--------|
+| `graphify/` | upstream | the core; `extract.py`, `detect.py`, `watch.py`, `cli.py`, `resolver_registry.py`; the fork adds try-wrapped registry lookups only |
+| `graphify/lang_registry.py` | fork | the core-facing registry facade the lookups call |
 | `graphify/extractors/` | upstream | per-language extractors, `base.py`, `models.py`, `engine.py`, `resolution.py`, `MIGRATION.md` |
 | `tests/` | upstream | one file per module; `test_languages.py`, `test_extractors_registry.py`, `fixtures/` |
-| `docs/` | upstream, plus this fork's `UPSTREAM-README.md` | upstream docs and translations |
+| `docs/` | upstream, plus the fork's `UPSTREAM-README.md`, `plans/`, `testing/`, `upstream/` (PR drafts) | upstream docs and translations; the fork's plans, measurements and upstream PR drafts |
+| `tests/lang/` | fork | plugin tests and fixtures; `fixtures/corpus/` holds small synthetic corpus samples |
 | `.claude/` | fork | `CLAUDE.md` and the harness docs, tracked here although upstream's `.gitignore:19` ignores the directory |
-| `graphify_lang/` | fork | the registry and manifest; the namespace root for language packages |
+| `graphify_lang/` | fork | the registry, the manifest, the shared plugin core (`_common.py`) and the rules engine; the root of the language packages |
 | `graphify_lang/autolisp/` | fork | AutoLISP (`.lsp`, `.mnl`) and DCL (`.dcl`): manifests, extractor, resolver |
 | `graphify_lang/vba/` | fork | VBA (`.bas`, `.frm`; `.cls` by sniff against Apex) |
 | `graphify_lang/bmake/` | fork | Bentley bmake (`.mki`, `.mke`) |
@@ -423,25 +491,26 @@ Rules:
 
 ## Development setup
 
-The package name on PyPI and in `pyproject.toml:6` is `graphifyy`; the import
-name is `graphify`; the CLI entry points are `graphify` and `graphify-mcp`
-(`pyproject.toml:104-106`). Python 3.10 or later (`pyproject.toml:13`).
+The package name is `graphifyy`; the import names are `graphify` and
+`graphify_lang`; the CLI entry points are `graphify` and `graphify-mcp`.
+Python 3.10 or later.
 
-The user-facing install on this host is a pipx venv at
-`~/.local/share/pipx/venvs/graphifyy` (`graphifyy 0.9.55`, Python 3.12.3,
-`tree-sitter-commonlisp 0.4.1` present). That venv is left alone. The plan is
-an editable install of the fork into a separate venv:
+Develop and test in the repo's own `.venv`, managed by `uv`, as CI does:
 
 ```bash
-python3 -m venv ~/.venvs/graphify-lang
-~/.venvs/graphify-lang/bin/pip install -e ".[commonlisp]" pytest
-~/.venvs/graphify-lang/bin/pytest tests/ -q
+uv sync --all-extras
+.venv/bin/python -m pytest tests/ -q
+.venv/bin/python -m pytest tests/ -q -m "not corpus and not perf"   # what CI can run
+.venv/bin/graphify lang list --check
 ```
 
-`uv` is not installed on this host (`which uv` returns nothing); `pipx` is
-(`/usr/bin/pipx`). `pyproject.toml:129-130` documents `uv tool install
-graphifyy` as upstream's route, and `pipx install -e .` is the equivalent
-here if a second CLI is wanted on `PATH`.
+Tests marked `corpus` read private repositories under `~/repos`; they skip,
+with a reason starting `corpus:`, where those are absent. Each has a
+checked-in sample variant that always runs.
+
+Never install an editable or untagged build into the pipx venv that serves
+`graphify` on `PATH`; it is installed only from a release wheel ([Installing
+the fork](#installing-the-fork)).
 
 ## Installing the fork
 
@@ -452,7 +521,7 @@ release a new version:
 
 ```bash
 git fetch upstream && git rebase upstream/v8        # on autolisp; then pytest tests/ -q
-# bump version in pyproject.toml (e.g. 0.9.68+lang.1), commit
+# bump version in pyproject.toml to <upstream version>+lang.<n>, commit
 git tag -a v<version> -m "graphify-lang <version>" && git push origin autolisp v<version>
 rm -rf dist && uv build --wheel
 cp dist/*.whl ~/.local/share/graphify-lang/wheels/
@@ -462,12 +531,29 @@ pipx install --force "graphifyy[mcp,commonlisp] @ file://$HOME/.local/share/grap
 
 Do not run `graphify install` or `graphify claude install` from `$HOME`: it
 rewrites the shared `settings.json`. Rollback to stock:
-`pipx install --force "graphifyy[mcp,commonlisp]==0.9.55"`.
+`pipx install --force "graphifyy[mcp,commonlisp]==<upstream version>"`.
 
 ## Status
 
-No code yet. As of 2026-09-07 the fork consists of this README, the moved
-upstream README, and `.claude/CLAUDE.md`.
+- **Released**: `v0.9.67+lang.3`, installed in the pipx venv. Plan 05 (review
+  remediation, `docs/plans/05-review-remediation-cc-cr000-001.md`) is on the
+  `rr-*` branches, rebased onto upstream 0.9.68, and ships as the next
+  `+lang` release.
+- **Languages**: 9 registered plugins. `graphify lang list` shows them:
+
+  | Plugin | Suffixes | Kind |
+  |:-------|:---------|:-----|
+  | `autolisp` | `.lsp` (overrides Common Lisp), `.mnl` | language |
+  | `autolisp-dcl` | `.dcl` | language |
+  | `vba` | `.bas`, `.frm` | language |
+  | `vba-cls` | `.cls` (by sniff, against Apex) | language |
+  | `bmake` | `.mki`, `.mke` | language |
+  | `astgrep` | `.yml`, `.yaml` (by sniff and match) | language |
+  | `ecschema` | `.xml` (by sniff and match) | language |
+  | `cargo` | `Cargo.toml` | augment |
+  | `cc-kb` | `.md` (harness KB `cc-*` docs) | augment |
+
+- **Open**: roadmap phase 6 (upstream PRs, plan 01 T10).
 
 ## Requirements summary
 

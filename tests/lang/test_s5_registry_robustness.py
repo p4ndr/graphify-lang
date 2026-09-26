@@ -323,3 +323,233 @@ def test_n5_cargo_toml_casefold(tmp_path):
     lower = tmp_path / "cargo.toml"
     lower.write_text('[workspace]\nmembers = ["a"]\n')
     assert registry.augment_extractor(lower, inner) is not inner
+
+
+# --- plan 05 review-fix part 5 (cc-CR000.003 S005) ----------------------------
+
+def _ret(tag: str) -> str:
+    return ("def extract(path):\n"
+            f"    return {{'nodes': [{{'id': '{tag}', 'label': '{tag}', 'file_type': 'code',\n"
+            "                         'source_file': str(path)}], 'edges': []}\n")
+
+
+def _path_plugin(folder: Path, name: str, runtime: str, body: str) -> Path:
+    """A path plugin whose runtime is the top-level module ``<runtime>.py``."""
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / f"{name}.toml").write_text(
+        f'schema = 1\n[language]\nname = "{name}"\nsuffixes = [".{name}"]\n'
+        f'[extract]\nruntime = "{runtime}"\n')
+    (folder / f"{runtime}.py").write_text(body)
+    return folder
+
+
+@pytest.fixture
+def _modules_restored():
+    """Undo what a path plugin put into ``sys.modules`` (before the fix, a
+    runtime named ``wave`` replaces the stdlib module process-wide)."""
+    saved = dict(sys.modules)
+    yield
+    for name in [m for m in sys.modules if m not in saved]:
+        del sys.modules[name]
+    sys.modules.update(saved)
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S5-H1: path plugins share sys.modules")
+def test_s5_h1_path_plugins_namespaced(tmp_path, monkeypatch, _modules_restored):
+    a = _path_plugin(tmp_path / "a", "alpha", "plugin", _ret("from-a"))
+    b = _path_plugin(tmp_path / "b", "beta", "plugin", _ret("from-b"))
+    d = _path_plugin(tmp_path / "d", "delta", "wave", _ret("from-d"))  # a stdlib name
+    wave_before = sys.modules.get("wave")
+    monkeypatch.setenv("GRAPHIFY_LANG_PATH", os.pathsep.join(map(str, (a, b, d))))
+    src = tmp_path / "x.src"
+    src.write_text("x")
+    ids = {n: registry.get_manifest(n).extract(src)["nodes"][0]["id"]
+           for n in ("alpha", "beta", "delta")}
+    assert ids == {"alpha": "from-a", "beta": "from-b", "delta": "from-d"}
+    assert sys.modules.get("wave") is wave_before                  # nothing shadowed
+    assert "plugin" not in sys.modules
+    import wave
+    assert hasattr(wave, "open")
+    check = _lang_check(os.pathsep.join(map(str, (a, b, d))))
+    assert check.returncode == 0, check.stdout + check.stderr
+    rows = check.stdout.splitlines()
+    assert any("clash" in r and "plugin" in r for r in rows), check.stdout
+    assert any("clash" in r and "wave" in r for r in rows), check.stdout
+
+
+@pytest.mark.xfail(strict=True, raises=RuntimeError,
+                   reason="S5-M1: a bad GRAPHIFY_LANG_PATH entry escapes isolation")
+def test_s5_m1_bad_path_entry_isolated(tmp_path, monkeypatch):
+    folder = _toy_folder(tmp_path / "plugins")
+    bad = "~nosuchuser_zz/plugins"
+    monkeypatch.setenv("GRAPHIFY_LANG_PATH", os.pathsep.join([bad, str(folder)]))
+    names = registry.registered_names()
+    assert "bmake" in names and "toy" in names                 # later folders still load
+    assert bad in registry.load_errors()
+
+
+@pytest.mark.xfail(strict=True, raises=RuntimeError,
+                   reason="S5-M1: entry_points() runs outside every try")
+def test_s5_m1_entry_points_failure_isolated(tmp_path, monkeypatch):
+    def broken(group=None):
+        raise RuntimeError("corrupt distribution metadata")
+    monkeypatch.setattr(importlib.metadata, "entry_points", broken)
+    folder = _toy_folder(tmp_path / "plugins")
+    monkeypatch.setenv("GRAPHIFY_LANG_PATH", str(folder))
+    assert registry.registered_names() == ["toy"]
+    assert "corrupt distribution metadata" in registry.load_errors()["entry points"]
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S5-M1: --check exits 0 after a bad path entry")
+def test_s5_m1_check_fails_and_suffixes_kept():
+    check = _lang_check("~nosuchuser_zz/plugins")
+    assert check.returncode == 1, check.stdout
+    env = {k: v for k, v in os.environ.items() if k != "GRAPHIFY_LANG_DISABLE"}
+    env["GRAPHIFY_LANG_PATH"] = "~nosuchuser_zz/plugins"
+    out = subprocess.run([sys.executable, "-c",
+                          "import graphify.detect as d; print('.mki' in d.CODE_EXTENSIONS)"],
+                         capture_output=True, text=True, env=env)
+    assert out.stdout.strip() == "True", out.stderr
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S5-M1: check_languages ignores a failed registry merge")
+def test_s5_m1_check_fails_when_registry_unavailable(monkeypatch):
+    import graphify.lang_registry as core
+
+    monkeypatch.setattr(core, "_apply_registry", lambda: None)
+    monkeypatch.setattr(core, "apply_registry", lambda: None)
+    monkeypatch.setattr(core, "_REGISTRY_AVAILABLE", False)
+    table, ok = core.check_languages()
+    assert not ok and "registry" in table
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S5-M3: a relative GRAPHIFY_LANG_PATH entry runs code from CWD")
+def test_s5_m3_relative_entry_rejected(tmp_path, monkeypatch, caplog):
+    _toy_folder(tmp_path / "plugins")
+    monkeypatch.chdir(tmp_path / "plugins")
+    monkeypatch.setenv("GRAPHIFY_LANG_PATH", ".")
+    with caplog.at_level(logging.WARNING, logger="graphify_lang.registry"):
+        names = registry.registered_names()
+    assert "toy" not in names
+    assert "absolute" in registry.load_errors().get(".", "")
+    assert "absolute" in caplog.text
+
+
+@pytest.mark.xfail(strict=True, raises=ImportError,
+                   reason="S5-L1: a plugin's lazy sibling import fails at extraction")
+def test_s5_l1_lazy_sibling_import(tmp_path, monkeypatch, _modules_restored):
+    body = ("def extract(path):\n"
+            "    from . import s5l1_helper\n"
+            "    return s5l1_helper.result(path)\n")
+    folder = _path_plugin(tmp_path / "p", "lazy", "s5l1_plugin", body)
+    (folder / "s5l1_helper.py").write_text(
+        "def result(path):\n    return {'nodes': [{'id': 'lazy'}], 'edges': []}\n")
+    monkeypatch.setenv("GRAPHIFY_LANG_PATH", str(folder))
+    before = list(sys.path)
+    assert registry.get_manifest("lazy").extract(tmp_path / "a.lazy")["nodes"] == [{"id": "lazy"}]
+    assert sys.path == before and "s5l1_helper" not in sys.modules
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S5-L2: an entry point with a taken name overwrites silently")
+def test_s5_l2_duplicate_names_first_wins(tmp_path, monkeypatch):
+    first = LanguageManifest(name="good", suffixes=frozenset({".good"}), extract=lambda p: {})
+    second = LanguageManifest(name="good", suffixes=frozenset({".other"}), extract=lambda p: {})
+    monkeypatch.setattr(importlib.metadata, "entry_points",
+                        lambda group=None: [_EP("one", first), _EP("two", second)]
+                        if group == "graphify_lang_plugins" else [])
+    folder = _toy_folder(tmp_path / "plugins")
+    monkeypatch.setenv("GRAPHIFY_LANG_PATH", os.pathsep.join([str(folder), str(folder)]))
+    assert registry.get_manifest("good") is first
+    assert registry.get_manifest_for_suffix(".other") is None
+    errors = registry.load_errors()
+    assert "already registered" in errors.get("two", "")
+    assert registry.registered_names() == ["good", "toy"]
+    assert list(errors) == ["two"]                             # the repeated folder loads once
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S5-L3: a pyproject.toml counts as a failed plugin")
+def test_s5_l3_non_manifest_toml_skipped(tmp_path, monkeypatch):
+    folder = _toy_folder(tmp_path / "plugins")
+    (folder / "pyproject.toml").write_text("[project]\nname = 'x'\n")
+    (folder / "ruff.toml").write_text("line-length = 99\n")
+    monkeypatch.setenv("GRAPHIFY_LANG_PATH", str(folder))
+    assert "toy" in registry.registered_names()
+    assert registry.load_errors() == {}
+
+
+def _harness(root: Path) -> dict[str, Path]:
+    pages = {
+        "docs/cc-XX000.001.md": "# Doc\n",
+        "scripts/tool.ps1": "Write-Output 1\n",
+        "agents/in-scope.md": "# A\n\nRuns `scripts/tool.ps1`.\n",
+        "agents/missing.md": "# A\n\nRuns `scripts/none.ps1`.\n",
+        "agents/mention.md": "# A\n\nSee cc-XX000.001.\n",
+    }
+    for rel, text in pages.items():
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(text)
+    return {rel: root / rel for rel in pages}
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S5-M2: any .md with a relative link or path span is claimed")
+def test_s5_m2_watch_claims_cc_mention_or_in_scope_path(tmp_path):
+    import graphify.extract  # noqa: F401  (applies the registry)
+    import graphify.lang_registry as core
+
+    h = _harness(tmp_path / "harness")
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    (plain / "other.md").write_text("# O\n")
+    (plain / "linked.md").write_text("# P\n\nSee [o](other.md) and `src/app.py`.\n")
+    (plain / "mention.md").write_text("# P\n\nSee cc-XX000.001.\n")
+    claimed = {p.name if p.parent == plain else str(p.relative_to(tmp_path / "harness")):
+               core.watch_claims(p) for p in [*h.values(), *plain.glob("*.md")]
+               if p.suffix == ".md"}
+    assert claimed == {
+        "docs/cc-XX000.001.md": False,       # a cc doc with no mention
+        "agents/in-scope.md": True,          # names a file under its harness root
+        "agents/missing.md": False,          # names no file
+        "agents/mention.md": True,
+        "other.md": False,
+        "linked.md": False,                  # a relative link and a path span, no harness
+        "mention.md": True,
+    }
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S5-N1: a hook's `import logging` makes logging a local name")
+def test_s5_n1_hook_logging_not_a_local_name():
+    import graphify.cli
+    import graphify.detect
+    import graphify.extract
+
+    hooks = []
+    for module in (graphify.cli, graphify.detect, graphify.extract):
+        lines = Path(module.__file__).read_text(encoding="utf-8").splitlines()
+        hooks += [lines[i + 1].strip() for i, line in enumerate(lines)
+                  if "graphify-lang: log, never break core" in line]
+    assert len(hooks) == 7
+    assert set(hooks) == {"import logging as _lang_logging"}, hooks
+
+
+_TEMPLATE = Path(registry.__file__).parent / "templates" / "path-plugin"
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S5-E1: no path-plugin template yet")
+def test_s5_e1_path_plugin_template_loads(tmp_path, monkeypatch, _modules_restored):
+    assert _TEMPLATE.is_dir()
+    monkeypatch.setenv("GRAPHIFY_LANG_PATH", str(_TEMPLATE))
+    assert "example" in registry.registered_names()
+    assert registry.load_errors() == {}
+    src = tmp_path / "a.example"
+    src.write_text("item one\nitem two\n")
+    labels = {n["label"] for n in registry.get_manifest("example").extract(src)["nodes"]}
+    assert {"a.example", "one", "two"} <= labels

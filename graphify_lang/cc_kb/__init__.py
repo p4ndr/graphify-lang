@@ -8,9 +8,7 @@
 """
 from __future__ import annotations
 
-from dataclasses import replace
-from pathlib import Path
-
+from graphify_lang._common import load_manifest
 from graphify_lang.cc_kb.augment import augment_cc_kb
 from graphify_lang.cc_kb.resolve import RESOLVER
 from graphify_lang.manifest import LanguageManifest
@@ -18,10 +16,7 @@ from graphify_lang.manifest import LanguageManifest
 
 def _get_manifest() -> LanguageManifest:
     """Entry point: the cc-kb augment manifest."""
-    manifest, errors = LanguageManifest.from_toml(Path(__file__).parent / "graphify-lang.toml")
-    if errors:
-        raise ValueError(f"graphify-lang.toml: {errors}")
-    return replace(manifest, augment=augment_cc_kb, resolver=RESOLVER)
+    return load_manifest(__file__, "graphify-lang.toml", augment=augment_cc_kb, resolver=RESOLVER)
 
 
 __all__ = ["augment_cc_kb", "RESOLVER", "_get_manifest"]

@@ -4,7 +4,7 @@
 
 ## Quick Reference
 
-**Topics covered:** General (incremental-build-misses-edges-to-added-files, incremental-context-nodes-relative-source-file, incremental-rebuild-context-nodes-lack-node-kind, watch-augment-claim-by-contribution, ast-cache-key-excludes-plugin-code, graphify-lang-augment-manifest-kind, ...) · Bug Fix (regex-rules-kind-filter) · Pattern (autolisp-package-lit-fix-is-a-query-not-a-walker)
+**Topics covered:** General (incremental-build-misses-edges-to-added-files, incremental-context-nodes-relative-source-file, incremental-rebuild-context-nodes-lack-node-kind, plugin-recursive-call-self-loop, watch-augment-claim-by-contribution, ast-cache-key-excludes-plugin-code, ...) · Bug Fix (regex-rules-kind-filter) · Pattern (autolisp-package-lit-fix-is-a-query-not-a-walker)
 
 Scan entries by category below, or search by topic tag.
 <!-- TEMPLATE-END -->
@@ -41,6 +41,8 @@ Scan entries by category below, or search by topic tag.
 **2026-09-26 · incremental-build-misses-edges-to-added-files** — An incremental build (_rebuild_code(changed_paths=[new file])) never adds an edge OWNED by an unchanged file to a newly added target; it appears only on the next full or cached build. Measured on rr-s4 for cargo has_member (new crate under an unchanged glob workspace), cc-kb cites (unchanged hub -> new spoke), AutoLISP calls and upstream Python imports/calls (unchanged a.py -> new b.py). It is upstream's incremental semantics (only changed files' raw refs/payloads are re-resolved), not a plugin defect; do not special-case one plugin. The E5 parity test (same-bytes rewrite of one file) does not exercise it. (source: graphify-lang plan 05 S4 review (cc-CR000.003 S4-E1))
 
 **2026-09-26 · watch-augment-claim-by-contribution** — An augment's [match] is not a usable 'claims this file' signal for graphify watch: cc-kb's glob claims every .md, so treating a matched .md as code would rebuild on every doc edit and break upstream test_batch_modified_doc_only_does_not_rebuild. watch_claims instead runs the augmented extractor and its __wrapped__ inner and compares results; a file counts only when the augment adds something. Deleted paths count by suffix so reconcile drops them. (source: plan 05 S5 (M3))
+
+**2026-09-26 · plugin-recursive-call-self-loop** — Upstream graphify's built-in extractors keep a recursive call as a calls self-loop (def f(): f() -> r_f -> r_f; same for JS). graphify_lang._common.Sink.edge drops src == tgt unless self_loop=True, so every plugin extractor/resolver that emits calls must pass self_loop=True (rules.Out since S3-L2; AutoLISP and VBA extractors + resolvers since S3-X1, commit 9541fcb). VBA trap: the extractor put a procedure's own name into its locals as the result variable even for a Sub, hiding recursion; a Sub has no result variable, and in a Function/Property `Name(...)` is a call while `Name = x` is the result. Measured: autolithp +37 self-loop calls, bim-chk 0. (source: graphify-lang)
 
 ### Bug Fix
 

@@ -103,3 +103,43 @@ def test_m4_file_ids_portable(tmp_path, plugin):
         runs.append(sorted(ids))
     assert runs[0] == runs[1]
 
+
+
+# N3: every key of a shipped manifest has a reader. Keys read by manifest.py
+# and the plugin core, plus those the rules engine reads when it is the runtime.
+_READ = {
+    "language.name", "language.suffixes", "language.hook_suffixes",
+    "language.priority", "language.kind", "language.augments", "language.overrides",
+    "language.case_insensitive", "grammar.module", "grammar.extra",
+    "extract.runtime", "extract.resolver", "extract.builtins_file", "extract.builtins_prefixes",
+    "match.globs", "match.filenames", "sniff.rules", "sniff.min_score", "sniff.head_bytes",
+}
+_READ_BY_RULES = {
+    "grammar.language_fn", "extract.queries", "extract.comments", "extract.post_file",
+    "extract.python", "rule.kind", "rule.pattern", "rule.scope", "rule.multiline",
+    "rule.suffix", "rule.node", "rule.name_group", "rule.edge", "rule.target",
+    "rule.edge_from_scope",
+}
+_SHIPPED = sorted((Path(__file__).parents[2] / "graphify_lang").rglob("*.toml"))
+
+
+def _keys(data: dict) -> set[str]:
+    out = set()
+    for key, value in data.items():
+        tables = value if isinstance(value, list) else [value]
+        if tables and all(isinstance(t, dict) for t in tables):
+            out |= {f"{key}.{k}" for t in tables for k in t}
+        else:
+            out.add(key)
+    return out
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="cc-CR000.001 N3: schema, type, grammar.kind, language_fn, version unread")
+@pytest.mark.parametrize("toml", _SHIPPED, ids=lambda p: f"{p.parent.name}/{p.name}")
+def test_n3_every_manifest_key_is_read(toml):
+    from graphify_lang.manifest import tomli
+
+    data = tomli.loads(toml.read_text(encoding="utf-8"))
+    read = _READ | (_READ_BY_RULES if data["extract"]["runtime"] == "graphify_lang.rules" else set())
+    assert sorted(_keys(data) - read) == []

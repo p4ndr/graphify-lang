@@ -53,15 +53,6 @@ This document is a LIVE file containing a list of TASKS to be carried out.
 - `[ ]` T10.4 | Include the `run_language_resolvers` casefold as a separate small fix
 - `[ ]` T10.5 | Expect to carry the registry indefinitely; plan accordingly
 
-### `[ ]` T33 | P05-S002 (rr-s2) Repo and CI hygiene — M7 M8 E9 M9 M10 N6
-
-- `[ ]` T33.1 | S2.1 M7 restore publish/release-graph workflows + guard lines
-- `[ ]` T33.2 | S2.2 M8/E9 CI triggers (autolisp, lang-*, rr-*, v* tags) + bandit graphify_lang
-- `[ ]` T33.3 | S2.3 M9 deletions per D3 (git-sp.ps1 stays) + reference repoint
-- `[ ]` T33.4 | S2.4 M10 delete install-mcp.sh; N6 T9.5 text
-- `[ ]` T33.5 | S2.5 Ask owner, push rr-s2, read CI
-- `[ ]` T33.6 | S2.6 Stage close
-
 ### `[ ]` T34 | P05-S003 (rr-s3) Shared plugin core — E2 L5 H2 M4 M6 E7 L3 E8 N3 L12
 
 - `[ ]` T34.1 | S3.1 Red tests: same-stem lsp/mnl/dcl, vba same-stem, portable file ids, post_file prefix

@@ -143,3 +143,13 @@ def test_n3_every_manifest_key_is_read(toml):
     data = tomli.loads(toml.read_text(encoding="utf-8"))
     read = _READ | (_READ_BY_RULES if data["extract"]["runtime"] == "graphify_lang.rules" else set())
     assert sorted(_keys(data) - read) == []
+
+
+@pytest.mark.parametrize("schema, ok", [("1", True), ('"v1"', True), ("2", False)])
+def test_n3_schema_is_read(tmp_path, schema, ok):
+    from graphify_lang.manifest import LanguageManifest
+
+    toml = tmp_path / "m.toml"
+    toml.write_text(f'schema = {schema}\n[language]\nname = "x"\nsuffixes = [".x"]\n'
+                    '[extract]\nruntime = "m"\n')
+    assert (LanguageManifest.from_toml(toml)[1] == []) is ok

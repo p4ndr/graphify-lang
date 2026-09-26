@@ -172,3 +172,18 @@ def test_s1_m1_many_utils_linear(tmp_path):
     secs, nodes, edges, _ = _timed("graphify_lang.astgrep.extract", "extract_astgrep", path)
     assert secs < 2, f"{n} utils took {secs:.2f} s"
     assert (nodes, edges) == (n + 2, n + 1)
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S1-L2: log blames the YAML")
+def test_s1_l2_document_error_names_its_type(tmp_path, monkeypatch, caplog):
+    """A bug midway through a document is logged by type, and the log says the
+    nodes added before it stay (they do: rule and util)."""
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("bug")
+    monkeypatch.setattr(astgrep_extract, "_matches", boom)
+    path = _rule_file(tmp_path, "id: r\nrule: {pattern: x}\nutils:\n  u: {pattern: y}\n")
+    with caplog.at_level("WARNING", logger="graphify_lang.astgrep.extract"):
+        result = extract_astgrep(path)
+    assert [n["node_kind"] for n in result["nodes"]] == ["file", "rule", "util"]
+    assert "RuntimeError" in caplog.text and "kept" in caplog.text
+    assert "skipped" not in caplog.text

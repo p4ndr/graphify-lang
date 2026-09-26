@@ -3,7 +3,7 @@
 - Status: DRAFT. Not opened on GitHub; opening it needs owner approval.
 - Plan: 01 T10 (roadmap phase 6); plan 05 hub D2.
 - Base: upstream `v8` at `4000de1` (release 0.9.68). The diff applies with `git apply` and its test passes there (verified 2026-09-26, plan 05 S6.3).
-- Fork finding: H1 / E3 (`cc-CR000.001`, fixed in the fork by `2adf7bc`, `cd55efb` on `rr-s4`; E3 is this draft).
+- Fork finding: H1 / E3 (`cc-CR000.001`, fixed in the fork by `03dfe51` (`context_fields` hook), `cc0e296` (incremental cross-file edges) on `rr-s6`; E3 is this draft).
 
 ## Problem
 

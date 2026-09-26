@@ -46,17 +46,14 @@ def test_s2_m2_bandit_over_the_fork_layer_gates():
     assert not step.get("continue-on-error")
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S2-L1 red")
 def test_s2_l1_matrix_does_not_fail_fast():
     assert _load(FORK_CI)["jobs"]["test"]["strategy"].get("fail-fast") is False
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S2-N1 red")
 def test_s2_n1_token_is_read_only():
     assert _load(FORK_CI).get("permissions") == {"contents": "read"}
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S2-N2 red")
 def test_s2_n2_tag_filter_matches_fork_tags_only():
     assert _load(FORK_CI)[True]["push"]["tags"] == ["v*\\+lang.*"]
 

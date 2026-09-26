@@ -108,3 +108,42 @@ node and id-free edge diffs 0 on both; the autolithp row matches case 008's
 | S3-E1 | actioned | `80f5d33` | `test_s3_e1_pick_by_prefix`, `test_s3_e1_sink_ref_unique_and_add_salting`, and the stale-cache regression `test_s3_m1_stale_cache_ref_degrades`. |
 | S3-E2 | actioned | `32c510f` | `tools/compare_corpus.py --before <ref> [--after <ref>] PLUGIN=REPO ...`; exits 1 on any difference. |
 | (S002 warning) | actioned | `80f5d33` test, `880c72c` fix | `queries.py` wraps an int grammar pointer (`tree_sitter_commonlisp` 0.4.1) in a `tree_sitter.Language` capsule. |
+
+## S004
+
+**Tests:** `.venv/bin/python -m pytest tests/ -q`: before 6275 passed, 14 skipped;
+after 6288 passed, 14 skipped, 4 xfailed (13 new passing: E5 parity now 15
+cases over two paths (+7), `test_s4_m1_*` 2, `test_s4_l1_*`, `test_s4_l3_*`,
+`test_s4_l4_*`, `test_s3_x1_*`; the 4 xfails are the strict S4-E1 add-file
+pin). Red-first as in S001; S4-L2 / S4-N2 are green guards (the stronger
+assertions hold today, as the review measured). `git diff upstream/v8...HEAD --
+graphify/extractors/` empty; `tests/lang_baseline.txt`,
+`tests/upstream_tables.json` and `tests/test_watch.py` unchanged.
+
+**Import time (S4-M1):** `python -X importtime -c "import graphify.detect"`,
+cumulative, 5 runs: 173-185 ms before, 42-48 ms after (`GRAPHIFY_LANG_DISABLE=1`:
+23-24 ms). Fresh interpreter (`timeit`, 10 runs, median): 193 ms -> 59 ms. The
+namespace computation itself: 1.3 ms.
+
+**Corpus (S3-X1):** `tools/compare_corpus.py --before 151ae36 --after 9541fcb
+autolisp=~/repos/autolithp vba=~/repos/bim-chk` (autolithp `d5a2074`, bim-chk
+`d7ba56f`): autolithp 254 files, nodes 10691 = 10691, edges 25584 -> 25621
+(+37, none removed; all 37 are `calls` self-loops, counted on the after
+graph); bim-chk 33 files, 416 nodes / 1114 edges, no difference.
+
+| Id | Status | Commit(s) | Note |
+|:--|:--|:--|:--|
+| S4-M1 | actioned | `0975dff` test, `1990154` fix | Distributions from `ep.dist` (`registry.distributions()`), no `packages_distributions()`; a plugin package hashes its top-level package dir, a top-level module only its file; `lru_cache` kept. |
+| S4-L1 | actioned | `0975dff` test, `1990154` fix | `_namespace_ast_cache` catches its own failure: `-langerr` namespace plus a warning. |
+| S4-L2 | actioned | `0975dff` | Parametrized over `watch` and `cli` (`dispatch_command("extract")` in-process, `--code-only`; cc-kb watch only); a byte appended per file; whole node and edge dicts minus `_origin` / `community` / `weight` vs a clean build of the edited tree. |
+| S4-L3 | actioned | `0975dff` test, `151ae36` fix | One `enrich_context(nodes, graph, identity)` call after each upstream loop (maps context nodes to persisted nodes by id); failure logged as a warning. Fork diff vs `upstream/v8`: `cli.py` 35 -> 26 lines, `watch.py` 26 -> 18. |
+| S4-L4 | actioned | `bf76df9` test, `d21f7b2` fix, `f215fb0` docs | `graphify/lang_registry.py` hashed into the fingerprint; the other fork lines under `graphify/` still need a version change. Learning 1498 (global) supersedes 1490; spoke 05-S004 deviation added. `cc-LR000.002.md` (auto-exported) not hand-edited. |
+| S4-L5 | actioned | `f215fb0` | `[resolve] context_fields` with the context-node contract in all three templates; README plugin contract extended (fields read on other files' nodes, edges, `enrich_context`). |
+| S4-N1 | actioned | `f215fb0` | Spoke deviation and case 008 §3 say `cc_kb_links` is set in any repo, with the measured sizes. |
+| S4-N2 | actioned | `0975dff` | `cargo_ws_deps` in the union test. |
+| S4-N3 | actioned | `f215fb0` | Spoke deviation names the real test file. |
+| S4-N4 | rejected | `0975dff` (red test), removed in `151ae36` | Every resolver filters by its own suffixes before reading a field, so the union is a read-only superset; scoping by claimed suffix drops fields for a plugin split across manifests (vba declares `visibility` / `accessor`, `vba-cls` owns `.cls`), and prefixing renames persisted fields. |
+| S4-E1 | actioned | `0975dff`, `f215fb0` | Strict xfail `test_s4_e1_add_file_limit` over cargo `has_member`, cc-kb `cites`, AutoLISP `calls`, Python `calls` (each asserts that relation's edges only); the README known-limit line (from S6.2) now names the test. |
+| Open q. (a) | accepted | — | Recorded as S4-E1; no cargo special case. |
+| Open q. (b) | accepted | `f215fb0` | README line under `GRAPHIFY_LANG_DISABLE` (already there from S6.2) now lists the fingerprint inputs. |
+| S3-X1 | actioned | `5eb3902` test, `9541fcb` fix | AutoLISP extractor and resolver, VBA extractor and resolver keep `calls` self-loops (other relations still drop them). VBA: a Sub has no result variable, so a bare `Walk` in `Sub Walk` is a call; in a Function / Property `Name(...)` is a call, `Name = x` the result. Learning 1499 (repo). |

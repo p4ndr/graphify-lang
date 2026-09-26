@@ -80,8 +80,8 @@ try:
     for suffix in graphify.lang_registry.get_registry_suffixes():
         _HOOK_SOURCE_EXTS += (suffix,)
 except Exception as exc:  # graphify-lang: log, never break core (cc-CR000.001 L8)
-    import logging
-    logging.getLogger("graphify.lang_registry").debug("_HOOK_SOURCE_EXTS hook failed: %s", exc)
+    import logging as _lang_logging
+    _lang_logging.getLogger("graphify.lang_registry").debug("_HOOK_SOURCE_EXTS hook failed: %s", exc)
 _GEMINI_NUDGE_TEXT = (
     'graphify: knowledge graph at graphify-out/. For focused questions, run '
     '`graphify query "<question>"` (scoped subgraph, usually much smaller than '

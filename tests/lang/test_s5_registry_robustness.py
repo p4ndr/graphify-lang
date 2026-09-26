@@ -534,8 +534,6 @@ def test_s5_m2_augment_watch_predicate(tmp_path, caplog):
     assert "watch boom" in caplog.text
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S5-N1: a hook's `import logging` makes logging a local name")
 def test_s5_n1_hook_logging_not_a_local_name():
     import graphify.cli
     import graphify.detect

@@ -47,8 +47,8 @@ try:
     graphify.lang_registry.apply_registry()
     CODE_EXTENSIONS.update(graphify.lang_registry.get_code_suffixes())
 except Exception as exc:  # graphify-lang: log, never break core (cc-CR000.001 L8)
-    import logging
-    logging.getLogger("graphify.lang_registry").debug("detect CODE_EXTENSIONS hook failed: %s", exc)
+    import logging as _lang_logging
+    _lang_logging.getLogger("graphify.lang_registry").debug("detect CODE_EXTENSIONS hook failed: %s", exc)
 DOC_EXTENSIONS = {'.md', '.mdx', '.qmd', '.skill', '.txt', '.rst', '.html', '.yaml', '.yml'}
 PAPER_EXTENSIONS = {'.pdf'}
 IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'}
@@ -534,8 +534,8 @@ def classify_file(path: Path) -> FileType | None:
         if graphify.lang_registry.claims_file(path):
             return FileType.CODE
     except Exception as exc:  # graphify-lang: log, never break core (cc-CR000.001 L8)
-        import logging
-        logging.getLogger("graphify.lang_registry").debug("classify_file hook failed: %s", exc)
+        import logging as _lang_logging
+        _lang_logging.getLogger("graphify.lang_registry").debug("classify_file hook failed: %s", exc)
     ext = path.suffix.lower()
     if not ext:
         return _shebang_file_type(path)

@@ -152,8 +152,18 @@ def augment_cc_kb(path: Path, base: dict) -> dict:
                 if owner is not None:
                     code_at.setdefault((ref[0], owner), no)
     out: dict = {}
-    if me and not off("attrs"):
-        out["attrs"] = {base["nodes"][page]["id"]: me}
+    page_attrs = dict(me) if me and not off("attrs") else {}
+    # The doc's Markdown link targets, relative to its folder: a pair a link
+    # joins gets no second edge, and an incremental build sees an unchanged
+    # doc's links only through its (context) page node (H1).
+    page_id = base["nodes"][page]["id"]
+    links = sorted({os.path.relpath(e["target_file"], path.parent).replace("\\", "/")
+                    for e in base.get("edges", []) if e.get("source") == page_id
+                    and e.get("relation") == "references" and e.get("target_file")})
+    if links:
+        page_attrs["cc_kb_links"] = links
+    if page_attrs:
+        out["attrs"] = {page_id: page_attrs}
     refs = {"node": page, "up": up, "cc": [] if off("cc") else sorted(cc.items()),
             "code": [] if off("code") else sorted(code.items()),
             "hubs": bool(me) and not off("hubs")}

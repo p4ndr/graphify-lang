@@ -32,3 +32,8 @@ rules = [
 # graphify_lang.astgrep.extract:extract_astgrep, resolver in resolve.py.
 [extract]
 runtime = "graphify_lang.astgrep.extract"
+
+# Node fields this resolver reads on other files' nodes; an incremental
+# build keeps them on the context nodes of unchanged files (H1).
+[resolve]
+context_fields = ["node_kind", "astgrep_scope", "astgrep_role"]

@@ -25,3 +25,8 @@ rules = [
 # graphify_lang.ecschema.extract:extract_ecschema, resolver in resolve.py.
 [extract]
 runtime = "graphify_lang.ecschema.extract"
+
+# Node fields this resolver reads on other files' nodes; an incremental
+# build keeps them on the context nodes of unchanged files (H1).
+[resolve]
+context_fields = ["node_kind", "ec_schema", "version"]

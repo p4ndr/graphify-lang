@@ -11,6 +11,8 @@ contracts every plugin follows, in one place.
 - Refs store ``node``, the index of their source node in the result's
   ``nodes``; ``resolve_ref_id`` reads the current id back, because upstream
   renames colliding ids in place before resolvers run (H2, ltm learning 1477).
+- ``source_of``: a node's path in the fresh nodes' form, for any node the
+  resolver compares by path (incremental context nodes are root-relative).
 - ``pick_by_prefix``: one candidate, or the one sharing the longest directory
   prefix with the source (INFERRED); a tie resolves to nothing.
 - ``load_manifest`` / ``load_builtins``: a package's TOML manifest and its
@@ -91,6 +93,13 @@ class Sink:
         return {"nodes": self.nodes, "edges": self.edges, refs_key: self.refs}
 
 
+def source_of(node: dict) -> str:
+    """A node's source path as the fresh nodes carry it during resolution: an
+    unchanged file's context node (incremental build) has the root-relative
+    ``source_file`` and, from the registry hook, its absolute form (H1)."""
+    return str(node.get("_lang_source_file") or node.get("source_file", ""))
+
+
 def resolve_ref_id(res: dict, ref: dict) -> str:
     """The current id of a ref's source node (salted by now if it collided)."""
     return res["nodes"][ref["node"]]["id"]
@@ -112,7 +121,7 @@ def pick_by_prefix(found: list[dict], source_file: str) -> tuple[str | None, str
 
     def shared(node: dict) -> int:
         n = 0
-        for a, b in zip(caller, Path(str(node.get("source_file", ""))).parts):
+        for a, b in zip(caller, Path(source_of(node)).parts):
             if a != b:
                 break
             n += 1

@@ -26,7 +26,7 @@ from pathlib import Path
 
 from graphify.resolver_registry import LanguageResolver
 
-from graphify_lang._common import pick_by_prefix as _pick, refs_of
+from graphify_lang._common import pick_by_prefix as _pick, refs_of, source_of
 
 _OUR_SUFFIXES = (".mki", ".mke")
 
@@ -45,10 +45,16 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
     files: dict[str, list[dict]] = {}          # folded basename -> file nodes
     macros: dict[str, list[dict]] = {}         # macro name -> macro nodes
     by_id: dict[str, dict] = {}
+    file_of: dict[str, str] = {}               # source path -> bmake file node id
+    includers: list[dict] = []                 # bmake file nodes with includes
     for n in all_nodes:
-        sf = str(n.get("source_file", ""))
+        sf = source_of(n)
         if n.get("label") == Path(sf).name:
             files.setdefault(Path(sf).name.casefold(), []).append(n)
+            if sf.lower().endswith(_OUR_SUFFIXES) and n.get("node_kind") == "file":
+                file_of.setdefault(sf, n["id"])
+                if n.get("bmake_includes"):
+                    includers.append(n)
         if n.get("node_kind") == "macro" and sf.lower().endswith(_OUR_SUFFIXES):
             macros.setdefault(str(n["label"]), []).append(n)
         by_id.setdefault(n["id"], n)
@@ -67,8 +73,6 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
         return True
 
     refs = refs_of(per_file, "bmake_refs")
-    down: dict[str, set[str]] = {}             # file id -> included file ids
-    up: dict[str, set[str]] = {}
     unresolved: dict[str, list[str]] = {}
     for ref in (r for r in refs if r["kind"] == "include"):
         target, confidence = (None, "EXTRACTED")
@@ -76,19 +80,22 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
             target, confidence = _pick(files.get(ref["name"].casefold(), []), ref["source_file"])
         if ref["expanded"]:
             confidence = "INFERRED"
-        if add(ref, target, confidence, "imports"):
-            down.setdefault(ref["source"], set()).add(target)
-            up.setdefault(target, set()).add(ref["source"])
-        else:
+        if not add(ref, target, confidence, "imports"):
             unresolved.setdefault(ref["source"], []).append(ref["raw"])
     for nid, raws in unresolved.items():
         if nid in by_id:
             by_id[nid]["unresolved_includes"] = "; ".join(raws)
 
-    file_of: dict[str, str] = {}               # source_file -> file node id
-    for res in per_file:
-        if isinstance(res, dict) and res.get("bmake_refs") is not None and res.get("nodes"):
-            file_of[res["nodes"][0]["source_file"]] = res["nodes"][0]["id"]
+    # The include graph from every bmake file node, unchanged ones included,
+    # resolved as the include refs are.
+    down: dict[str, set[str]] = {}             # file id -> included file ids
+    up: dict[str, set[str]] = {}
+    for n in includers:
+        for name in n["bmake_includes"]:
+            target, _ = _pick(files.get(name.casefold(), []), source_of(n))
+            if target:
+                down.setdefault(n["id"], set()).add(target)
+                up.setdefault(target, set()).add(n["id"])
     scope: dict[str, set[str]] = {}            # file id -> file ids on its include chain
     for ref in refs:
         if ref["kind"] == "depends":
@@ -99,7 +106,7 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
                 scope[fid] = _reach(fid, down) | _reach(fid, up)
             chain = scope[fid]
             found = [n for n in macros.get(ref["name"], ())
-                     if file_of.get(str(n.get("source_file"))) in chain]
+                     if file_of.get(source_of(n)) in chain]
             add(ref, *_pick(found, ref["source_file"]), "references")
 
 

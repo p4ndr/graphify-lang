@@ -25,6 +25,7 @@ import posixpath
 
 from graphify.resolver_registry import LanguageResolver
 
+from graphify_lang._common import source_of
 from graphify_lang.cc_kb.augment import CC_ID
 
 # Not ``references``: graphify.watch._reconcile_markdown_links prunes an AST
@@ -51,9 +52,12 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
     docs: dict[tuple[str, str], dict] = {}  # (docs dir, cc_id) -> page node
     files: dict[str, dict] = {}
     by_id: dict[str, dict] = {}
+    linking: list[dict] = []
     for n in all_nodes:
         by_id.setdefault(n.get("id"), n)
-        sf = n.get("source_file")
+        if n.get("cc_kb_links"):
+            linking.append(n)
+        sf = source_of(n)
         if not sf or n.get("label") != posixpath.basename(_norm(sf)):
             continue  # not a file / page node
         files.setdefault(_norm(sf), n)
@@ -64,6 +68,12 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
             docs.setdefault((folder, name[:-3]), n)
 
     pairs = {frozenset((e.get("source"), e.get("target"))) for e in all_edges}
+    for n in linking:  # Markdown links of unchanged docs (context nodes) too
+        folder = posixpath.dirname(_norm(source_of(n)))
+        for rel in n["cc_kb_links"]:
+            target = files.get(_norm(posixpath.join(folder, rel)))
+            if target is not None:
+                pairs.add(frozenset((n["id"], target["id"])))
 
     def add(src: str, tgt: str, relation: str, context: str, sf: str, line: int | None) -> None:
         pair = frozenset((src, tgt))

@@ -151,4 +151,9 @@ def extract_bmake(path: Path) -> dict:
                     out.edge(src, macros[use.group(1)], "references", line)
                 else:
                     out.ref("macro", src, line, unique=True, name=use.group(1))
+    # The include names on the file node too: an incremental build hands an
+    # unchanged file to the resolver as a context node, without its refs (H1).
+    includes = list(dict.fromkeys(r["name"] for r in out.refs if r["kind"] == "include" and r["name"]))
+    if includes:
+        out.nodes[0]["bmake_includes"] = includes
     return out.result("bmake_refs")

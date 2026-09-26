@@ -67,3 +67,21 @@ def test_s1_l4_undecodable_or_deep_manifest_never_raises(tmp_path, data, py_defa
     manifest, errors = LanguageManifest.from_toml(path)
     assert len(errors) == 1 and "\n" not in errors[0]
     assert manifest.name == ""
+
+
+_BASE = '[language]\nname = "x"\nsuffixes = [".x"]\n'
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S1-L5: fields unchecked")
+@pytest.mark.parametrize("text", [
+    pytest.param(_BASE + "[extract]\nruntime = 7\n", id="runtime-int"),
+    pytest.param(_BASE + '[extract]\nruntime = "x.extract"\nresolver = 7\n', id="resolver-int"),
+    pytest.param(_BASE.replace("[language]\n", '[language]\nhook_suffixes = ["LSP"]\n') + _EXTRACT,
+                 id="hook-suffix-no-dot"),
+    pytest.param(_BASE.replace("[language]\n", '[language]\noverrides = ["DCL"]\n') + _EXTRACT,
+                 id="override-no-dot"),
+])
+def test_s1_l5_wrong_field_types_rejected(tmp_path, text):
+    manifest, errors = _load(tmp_path, text)
+    assert len(errors) == 1 and "\n" not in errors[0]
+    assert manifest.name == ""

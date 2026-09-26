@@ -367,3 +367,19 @@ def test_s4_n4_context_fields_scoped_per_manifest():
         {"id": "s_s", "source_file": "s.ecschema.xml", "version": "01.00", "node_kind": "schema",
          "_lang_source_file": "/r/s.ecschema.xml"},
     ]
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S4-L4: fork dispatch edits are not in the fingerprint")
+def test_s4_l4_fingerprint_covers_lang_registry(tmp_path, monkeypatch):
+    """S4-L4: ``graphify/lang_registry.py`` (the fork's dispatch into the
+    plugins) is part of the fingerprint, so an edit to it under an unchanged
+    version string moves the AST cache namespace."""
+    import graphify.lang_registry as core
+
+    fp = core._fingerprint.__wrapped__
+    first = fp(("x",), ())
+    edited = tmp_path / "lang_registry.py"
+    edited.write_text(Path(core.__file__).read_text() + "# edited\n")
+    monkeypatch.setattr(core, "__file__", str(edited))
+    assert fp(("x",), ()) != first

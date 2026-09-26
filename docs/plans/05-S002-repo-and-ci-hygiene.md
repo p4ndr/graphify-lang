@@ -36,7 +36,7 @@ Stage 2 of plan 05: the workflows parse, CI runs on the fork's release branches 
 | S2.2 | Triggers: push/PR `autolisp`, `lang-*`, `rr-*`, `v8`; push tags `v*`. `bandit -r graphify_lang` locally: 0 issues at any severity. | `23735ce` |
 | S2.3 | 38 files removed (`.sidecar-cache/` 2, root scratch 3, `docs/testing/archive/` 32, `cc-T10-COMPLETE.md` 1); `.sidecar-cache/` ignored. Remaining grep hits are history notes (`docs/25-HISTORY.md`, the T1.5b/T9.5 records) and this plan. | `1f8a2e4` |
 | S2.4 | `scripts/install-mcp.sh` and `docs/16-MCP-SETUP.md` deleted; T9.5 text fixed in 30-TODO and 35-DONE; note under 55-SETTLED P1. | `1e2e430` |
-| S2.5 | Pushed `rr-s1` and `rr-s2` to `origin` (owner pre-approved for this run). Run 36219014956 failed: 3.10 could not import `tomllib` in `tests/lang/test_rules.py` (fork-owned). Fixed with the tomli fallback; run 36219115105 green: 3.10 6149 passed/19 skipped, 3.12 and 3.13 6148/20, security-scan success. | `3d3b99f` |
+| S2.5 | Pushed `rr-s1` and `rr-s2` to `origin` (owner pre-approved for this run). Run 36219014956 failed: 3.10 could not import `tomllib` in `tests/lang/test_rules.py` (fork-owned). Fixed with the tomli fallback; run 36219115105 green: 3.10 6149 passed/19 skipped, 3.12 and 3.13 6148/20. The security-scan job was green only through `continue-on-error` (both steps exited 1); corrected in the plan 05 review-fix S2-M1/S2-M2. | `3d3b99f` |
 | S2.6 | `pytest tests/ -q` 6154 passed, 14 skipped (baseline); three-dot extractor diff empty; `tests/lang_baseline.txt`, `tests/upstream_tables.json` unchanged. Findings moved to `cc-CR000.002.md`. | this commit |
 
 Deviations:

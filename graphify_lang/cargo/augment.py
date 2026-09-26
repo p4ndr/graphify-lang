@@ -26,11 +26,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from graphify.ids import make_id
-
-try:
-    import tomllib
-except ImportError:  # Python 3.10
-    import tomli as tomllib
+from graphify_lang.manifest import tomllib
 
 
 def _load(path: Path) -> dict | None:

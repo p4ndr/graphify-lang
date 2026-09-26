@@ -202,7 +202,6 @@ def test_e8_cc_kb_augment_reads_no_other_file(monkeypatch):
     assert calls == []
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S2-N5 red")
 def test_s2_n5_one_tomllib_shim():
     import re
 

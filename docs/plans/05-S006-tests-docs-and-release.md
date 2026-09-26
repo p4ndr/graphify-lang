@@ -41,3 +41,17 @@ Stage 6 of plan 05: the test suite shows what CI really covers, the docs describ
 | S6.4 | Release `v0.9.67+lang.4` and install. | `graphify --version` = `0.9.67+lang.4`; `graphify lang list --check` shows 9 `ok`; the MCP server starts; `import yaml` works in the pipx venv. |
 | S6.5 | Rebuild the 12 graphs; do a second, no-change update; run the E5 parity test's incremental check on scratch copies of bim-chk and BentleyHelp. | Every repo exits 0. Plugin edge counts match `case_007`, or `case_008` records the cause. Cross-file edges survive the incremental update (this closes H1 on real corpora). |
 | S6.6 | Close out: every finding is in `cc-CR000.002.md`, and `cc-CR000.001.md` holds no open finding; plan 05 and all spokes set to DONE; learnings (ltm) for the purity contract, the index-ref contract and the context-field hook; ask the owner, then push `autolisp`, the `rr-*` branches and the tag to `origin`. | Hub §6 acceptance criteria are met. |
+
+## 3. Result
+
+Owner decision (2026-09-26): S6.4 (release), S6.5 (graph rebuild) and S6.6 (close-out) are deferred until after a review-fix pass. This run does S6.0 to S6.3; no version bump, tag, build, install or graph rebuild.
+
+| Step | Result | Commits |
+|:-----|:-------|:--------|
+| S6.0 | `rr-s6` = `rr-s5` + the learnings sidecar, rebased onto `upstream/v8` `4000de15466588ec3ee32f9e10a587ca97d3b8a5` (release 0.9.68; old base `4c73561`, 0.9.67; 25 upstream commits). 104 commits replayed, one conflicting: `7b6eaf3` (the lang.1 commit) in `README.md` (kept the fork README), `pyproject.toml` and `uv.lock` (version line only; kept `0.9.67+lang.1`). No conflict in any code file. `docs/UPSTREAM-README.md` synced to the upstream README. `pytest tests/ -q`: 6233 passed, 14 skipped (6209 + 24 new upstream tests). `git diff upstream/v8...HEAD -- graphify/extractors/` empty; no upstream test file modified; `tests/lang_baseline.txt`, `tests/upstream_tables.json` unchanged. `rr-s1`..`rr-s5` keep the old base. | `9351e4c`, `5a53250` |
+
+Deviations from §1:
+
+- **S6.0 chain.** Only `rr-s6` is rebased; `rr-s1`..`rr-s5` stay as historical refs (owner, this run).
+- **Version.** The branch still says `0.9.67+lang.3` on an upstream 0.9.68 base. The release step (S6.4) must choose between `0.9.67+lang.4` (spoke) and `0.9.68+lang.4` (the real base).
+- **Upstream `8928031`** ("preserve cross-file edges during incremental updates") feeds context nodes into JS/Python symbol resolution in `resolution.py`; it does not touch `watch.py` or the fork's `context_fields` hooks, and the E5 parity tests still pass.

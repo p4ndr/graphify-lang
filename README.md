@@ -569,7 +569,7 @@ git fetch upstream && git rebase upstream/v8        # on rr-fix; then pytest tes
 git tag -a v<version> -m "graphify-lang <version>" && git push origin rr-fix v<version>
 rm -rf build dist && uv build --wheel
 cp dist/*.whl ~/.local/share/graphify-lang/wheels/
-pipx install --force "graphifyy[mcp,commonlisp] @ file://$HOME/.local/share/graphify-lang/wheels/graphifyy-<version>-py3-none-any.whl"
+pipx install --force "graphifyy[mcp,commonlisp,sql] @ file://$HOME/.local/share/graphify-lang/wheels/graphifyy-<version>-py3-none-any.whl"
 ~/.local/share/pipx/venvs/graphifyy/bin/python -c "from graphify.install import _copy_skill_file; _copy_skill_file('claude')"
 ```
 
@@ -580,7 +580,7 @@ moves `autolisp` onto `rr-fix`, release from `autolisp` again.
 
 Do not run `graphify install` or `graphify claude install` from `$HOME`: it
 rewrites the shared `settings.json`. Rollback to stock:
-`pipx install --force "graphifyy[mcp,commonlisp]==<upstream version>"`.
+`pipx install --force "graphifyy[mcp,commonlisp,sql]==<upstream version>"`.
 
 ## Status
 

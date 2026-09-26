@@ -136,6 +136,16 @@ def test_l1_deep_nesting_falls_back(tmp_path, py_default_recursion_limit):
     assert labels == {"deep.lsp": None, "deep": "INFERRED", "c:other": "INFERRED"}
 
 
+@pytest.mark.xfail(strict=True, raises=RecursionError, reason="S1-L1: action_callees unguarded")
+def test_s1_l1_deep_action_tile_keeps_file(tmp_path, py_default_recursion_limit):
+    depth = 1200
+    path = tmp_path / "act.lsp"
+    path.write_text('(defun c:x () (action_tile "k" "' + "(foo " * depth + "1" + ")" * depth
+                    + '"))\n', encoding="utf-8")
+    result = extract_autolisp(path)
+    assert [n["label"] for n in result["nodes"]] == ["act.lsp", "c:x"]
+
+
 def test_l2_large_schema_linear(tmp_path):
     n = 20_000
     props = "\n".join(f'    <ECProperty propertyName="P{i}" typeName="Status"/>' for i in range(n))

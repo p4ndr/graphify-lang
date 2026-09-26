@@ -124,6 +124,7 @@ This document is a LIVE file containing items that have been settled and are no 
 **Settled:** 2026-09-21
 
 - Owner answer: The global `.lsp` claim in the shipped entry-point stanza is acceptable. Development and tests discover the plugin through `GRAPHIFY_LANG_PATH`, which is deterministic and needs no packaging.
+- Note (2026-09-26, plan 05 S5, cc-CR000.001 M5): `GRAPHIFY_LANG_PATH` was collected but never loaded until `4071b40`; `test_m5_lang_path_loads_plugin` now loads a plugin from a tmp folder. The shipped plugins still load through the `graphify_lang_plugins` entry points of the editable install.
 - Item source: `cc-RS000.001.md` §1.4 Q8; `cc-IP000.001.md` §S009 Q8.
 
 ### `[S]` P3 | SRS §1.4, F18.3 — Should the fork ship `overrides = ['.lsp']` in the default entry-point stanza?

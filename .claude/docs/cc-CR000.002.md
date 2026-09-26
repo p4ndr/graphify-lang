@@ -33,6 +33,16 @@ Findings moved out of `cc-CR000.001.md` once fixed or closed. Each entry keeps t
 | L11 | Low | Fixed | `dc8a8ec` | plan 05 S4 |
 | E1 | Enhancement | Done (with M2) | `2e2cba1` | plan 05 S4 |
 | E5 | Enhancement | Done | `a5961fe`, `cd55efb` | plan 05 S4 |
+| M1 | Medium | Fixed | `4071b40` | plan 05 S5 (`rr-s5`, engine commit) |
+| L7 | Low | Fixed (with M1) | `4071b40` | plan 05 S5 |
+| M5 | Medium | Fixed (implemented, D4) | `4071b40` | plan 05 S5 |
+| E4 | Enhancement | Done | `a05bc8b`, `cb21e7e` | plan 05 S5 |
+| M3 | Medium | Fixed in fork (D2) | `32d4618`, `227c194` | plan 05 S5 |
+| L6 | Low | Fixed | `7d9fbf8` | plan 05 S5 |
+| L8 | Low | Fixed | `34510f8` | plan 05 S5 |
+| N5 | Nit | Fixed | `b80a115` | plan 05 S5 |
+| L10 | Low | Closed: accepted (measured) | - | plan 05 S5 |
+| L13 | Low | Closed: kept per D2, pinned | `ef2012a` (test) | plan 05 S5 |
 
 ## High
 
@@ -121,6 +131,28 @@ Findings moved out of `cc-CR000.001.md` once fixed or closed. Each entry keeps t
 - **Fix**: E1: in `_apply_registry`, append a fingerprint of the registered manifests (names, plugin distribution versions, maybe a hash of plugin module files) to `graphify.cache._EXTRACTOR_VERSION` (a runtime attribute set, no source edit), so each plugin set gets its own namespace.
 - **Resolution (2026-09-26, plan 05 S4.5)**: fixed in `2e2cba1` with E1. Test `test_m2_disable_toggle_uses_own_cache` (the disabled run no longer poisons the enabled one) and `test_m2_same_plugin_set_shares_cache`. ltm learnings 1480 / 1484 superseded by 1490.
 
+### M1 One failing plugin disables every plugin
+
+- **Where**: `graphify_lang/registry.py:112-118` (`result = result()` runs outside the `try` at `registry.py:71-75` and `89-93`); every shipped `_get_manifest` raises `ValueError` on a TOML error (for example `graphify_lang/bmake/__init__.py:19-21`).
+- **Problem**: the exception propagates out of `_init_state`; `_apply_registry` (`graphify/lang_registry.py:47-49`) catches it and sets `_REGISTRY_AVAILABLE = False`, so all plugins vanish behind one warning. Manifests registered before the failure stay in `_STATE`, so later direct registry calls see a partial state.
+- **Failure scenario (measured)**: an entry point whose manifest callable raises, loaded first: every `registered_names()` call raises `ValueError`; with the core wrapper, no plugin suffix is registered.
+- **Fix**: move `result = result()` inside the per-entry-point `try` (log `failed to load entry point %s`), or wrap `_process_loader_result(ep.name, result)` in it. Add a test with one raising entry point next to a good one.
+- **Resolution (2026-09-26, plan 05 S5.2)**: fixed in `4071b40`. Each entry point loads inside its own `try` (the manifest callable included); a failure logs `failed to load entry point <name>: <error>`, is recorded in `load_errors()`, and the other plugins register. Test `test_m1_bad_entry_point_isolated`.
+
+### M3 `graphify watch` ignores plugin-claimed data files
+
+- **Where**: upstream `graphify/watch.py:282` (`_WATCHED_EXTENSIONS`), `watch.py:2306` (`_batch_triggers_rebuild` checks `_CODE_EXTENSIONS`); fork `graphify/lang_registry.py:41-43` adds `[match]` suffixes only to the hook list.
+- **Problem**: `.xml` is in neither `CODE_EXTENSIONS` nor `DOC_EXTENSIONS`, so an ECSchema edit produces no watch event at all; `.yml` (ast-grep), `Cargo.toml` (cargo augment) and `.md` (cc-kb augment) edits are treated as doc changes and never trigger the AST rebuild. The git-hook path works (it uses `_HOOK_SOURCE_EXTS`), watch mode does not.
+- **Fix**: **upstream PR** or a registry lookup in `_batch_triggers_rebuild` and the watch filter: treat a path as code when `lang_registry.claims_file(path)` or an augment claims it. Adding the suffixes to `CODE_EXTENSIONS` is not an option (it would classify every `.xml` as code).
+- **Resolution (2026-09-26, plan 05 S5.3)**: fixed in the fork per hub D2: `32d4618` (engine: `lang_registry.watch_claims`, a `[match]` claim, or an augment that adds to the built-in's result; a deleted path counts by suffix) and `227c194` (one try-wrapped lookup, `_lang_claims`, at the watch filter, `_batch_triggers_rebuild` and `_has_non_code`). Tests `test_m3_watch_triggers_on_claimed_xml_yml_toml_md`, `test_m3_watch_handler_sees_claimed_xml`; upstream `tests/test_watch.py` unchanged and passing. Upstream PR draft in S006.
+
+### M5 `GRAPHIFY_LANG_PATH` is collected and never used; docs say tests rely on it
+
+- **Where**: `graphify_lang/registry.py:96-108` (paths go into `search_paths`, which nothing reads; when any entry point registered a manifest first, `_STATE` already exists and the list is discarded); `docs/55-SETTLED.md:125` ("Development and tests discover the plugin through `GRAPHIFY_LANG_PATH`"); `docs/35-DONE.md:289`; module docstring `registry.py:1` ("or namespace", not implemented). `_RegistryState.enabled` (`registry.py:30`) is also never read.
+- **Failure scenario**: a user or test sets `GRAPHIFY_LANG_PATH` to a directory with a manifest; nothing is loaded and nothing is logged.
+- **Fix**: delete `_PATH_VAR`, `search_paths` and `enabled` (YAGNI; entry points cover packaging and tests), and correct the two docs and the docstring. Implement path discovery only when a real out-of-tree plugin needs it.
+- **Resolution (2026-09-26, plan 05 S5.2)**: implemented per hub D4 (not deleted) in `4071b40`: each `GRAPHIFY_LANG_PATH` folder's `*.toml` manifests load after the entry points; `[extract] runtime` is imported with the folder first on `sys.path` for that import only and must expose `extract` (or `augment`) and may expose `RESOLVER`; a missing folder, a bad manifest or a taken name logs one warning and is skipped. Loaded folders join the E1 fingerprint. `_RegistryState.enabled` (and the unread `warned_builtins`) deleted; module docstring fixed. Tests `test_m5_lang_path_loads_plugin`, `test_m5_missing_dir_warns`, `test_m5_bad_path_manifest_isolated`, `test_m5_path_plugin_in_cache_fingerprint`.
+
 ## Low
 
 ### L1 AutoLISP walker recursion overflows on deep nesting
@@ -175,6 +207,40 @@ Findings moved out of `cc-CR000.001.md` once fixed or closed. Each entry keeps t
 - **Fix**: `posixpath.normpath` both sides first.
 - **Resolution (2026-09-26, plan 05 S4.4)**: fixed in `dc8a8ec` (`os.path.normpath` on both sides). Test `test_l11_dotdot_ruledirs`.
 
+### L6 Upper-case suffix variants are redundant
+
+- **Where**: `graphify/lang_registry.py:36-42,94`.
+- **Problem**: upstream already lower-cases (`classify_file`, `extract.py:6891-6892` fallback, `resolver_registry.py:80`), so `.LSP` entries only add noise to the core tables; `extract.py:6754-6757` then finds no manifest for them anyway. The comment at `:36` says "casefolded" but the code adds `upper()`.
+- **Fix**: drop the `upper()` variants and fix the comment.
+- **Resolution (2026-09-26, plan 05 S5.4)**: fixed in `7d9fbf8`; comment fixed. `tests/upstream_tables.json` unchanged (it is the plugins-disabled snapshot). Test `test_l6_no_upper_variants` (an `ERR.LSP` file still extracts).
+
+### L7 Two entry-point groups and a dead Python 3.9 path
+
+- **Where**: `graphify_lang/registry.py:55-94` scans `graphify_lang.plugins` and `graphify_lang_plugins` with duplicated loops; the `entry_points().get(...)` fallback (`:63-64,81-82`) and `import importlib_metadata` (`:58-59`) cannot run under `requires-python >= 3.10`.
+- **Fix**: one group (`graphify_lang_plugins`, as `pyproject.toml:122` ships), one loop.
+- **Resolution (2026-09-26, plan 05 S5.2)**: fixed in `4071b40`: one group, `graphify_lang_plugins`, one loop, no `importlib_metadata` fallback. Test `test_l7_single_group`.
+
+### L8 Core hook sites swallow errors silently
+
+- **Where**: `graphify/detect.py:49-50,535-536`, `graphify/extract.py:6719-6720,6758-6759,6883-6884,6920-6921`, `graphify/cli.py:82-83` (`except Exception: pass`).
+- **Problem**: a bug in `claims_file` or `augment_extractor` silently reverts files to stock behaviour on every call, with no trace.
+- **Fix**: `except Exception as exc: logging.getLogger("graphify.lang_registry").debug(...)` (keeps the one-line upstream diff).
+- **Resolution (2026-09-26, plan 05 S5.4)**: fixed in `34510f8`: the seven sites plus the two S4 `context_fields` fallbacks log at debug level to `graphify.lang_registry`. Test `test_l8_hook_error_logged`.
+
+### L10 Router suffixes widen `collect_files`
+
+- **Where**: `graphify/lang_registry.py:92-94` puts `.yml`, `.yaml`, `.xml` routers in `_DISPATCH`; upstream `collect_files` (`graphify/extract.py:8698,8729`) collects every `_DISPATCH` suffix.
+- **Problem**: every YAML/XML file under a `python -m graphify.extract <dir>` scan is dispatched to a router that returns empty results: wasted reads.
+- **Fix**: accept, or omit `[match]`-only suffixes from `dispatch_table` (they only reach extraction through `claims_file`, which gives CODE).
+- **Resolution (2026-09-26, plan 05 S5.4)**: closed as accepted. `_get_extractor` finds extractors only in `_DISPATCH` (no built-in claims `.yml`, `.yaml`, `.xml`), so dropping the routers would stop claimed files being extracted. Measured cost on this repo: `collect_files` returns 27 `.yml`/`.xml` files, 16 unclaimed, 0.1 ms of router time in total (the glob fails before any read). Test `test_l10_claimed_yml_still_extracted` pins the router.
+
+### L13 Upstream-file edit in `resolver_registry.py`
+
+- **Where**: `graphify/resolver_registry.py:78-80`.
+- **Problem**: case-folding changes activation for every upstream resolver (a `.PY` file now activates the Python resolver) and is a direct edit outside the registry-lookup rule; each upstream rebase can conflict. Tracked as T10.4 but not proposed.
+- **Fix**: send it upstream as its own small PR (T10.4) and drop it from the fork once merged.
+- **Resolution (2026-09-26, plan 05 S5.4)**: closed: kept in the fork per hub D2 and pinned by `test_l13_upper_suffix_activates_resolver` (a `.LSP` file activates the AutoLISP resolver). The upstream PR draft (T10.4) is written in S006; the fork edit goes when upstream merges it.
+
 ## Nit
 
 - **N4** `text.count("\n", 0, m.start())` per match is quadratic (`autolisp/extract.py:252,298,304,331`, `astgrep/extract.py:132`); use a `bisect` over newline offsets if a large file shows up.
@@ -184,6 +250,9 @@ Findings moved out of `cc-CR000.001.md` once fixed or closed. Each entry keeps t
 
 - **N3** Manifest keys that nothing reads: `type`, `grammar.kind`, `language_fn`, `version`, `case_insensitive`, `builtins_file`, `builtins_prefixes` (for example `autolisp/graphify-lang.toml:5,13-17,23-24`); the builtins lists are hard-coded again in `autolisp/extract.py:31-32`. Delete the unread keys or read them.
 - **Resolution (2026-09-26, plan 05 S3)**: fixed in `7711700` (engine: the top-level `schema` key is read, only 1 / `"v1"`), `0db2814` (`type`, `grammar.kind`, `grammar.language_fn`, `grammar.version` deleted from the shipped manifests; the templates keep only keys the rules engine reads), `bbf0a1f` and `67a582c` (`builtins_file`, `builtins_prefixes`, `case_insensitive` read by `load_builtins` and the `Sink`; the copy in `autolisp/extract.py:31-32` is gone). Tests `test_n3_every_manifest_key_is_read[12 manifests]` (red `5287844`) and `test_n3_schema_is_read`. `graphify lang list` shows 9 languages.
+
+- **N5** `[match] filenames` compare case-sensitively (`registry.py:240`): `cargo.toml` on a case-insensitive filesystem is not claimed.
+- **Resolution (2026-09-26, plan 05 S5.4)**: fixed in `b80a115` (`casefold()` on both sides). Test `test_n5_cargo_toml_casefold`.
 
 ## Enhancements
 
@@ -201,3 +270,5 @@ Findings moved out of `cc-CR000.001.md` once fixed or closed. Each entry keeps t
 - **Resolution (2026-09-26, plan 05 S4.5)**: done in `2e2cba1`: `-lang<fingerprint>` (manifest names, plugin distribution versions, a hash of every `graphify_lang` and plugin package `.py` / `.toml`) is appended to `graphify.cache._EXTRACTOR_VERSION` from `_apply_registry`. Pre-stage-3 entries (refs without `node`) sit in the plain namespace and are never read (`test_e1_pre_stage3_entries_unreachable`).
 - **E5** One parity test: for each plugin fixture, full build == full build then touch-one-file incremental build (edges and ids). — Effort: LOW | Benefit: HIGH
 - **Resolution (2026-09-26, plan 05 S4.1-S4.2)**: done: `test_e5_incremental_parity` over autolisp (2 trees), vba, bmake, cargo, astgrep, ecschema, cc-kb, every plugin file touched in turn; red `a5961fe`, green `cd55efb`.
+- **E4** `graphify lang list --check`: load every manifest, report load errors per plugin (complements M1). — Effort: LOW | Benefit: NEUTRAL
+- **Resolution (2026-09-26, plan 05 S5.2)**: done in `a05bc8b` (engine `check_languages`) and `cb21e7e` (`cli.py` `lang` branch): one row per plugin, `ok` or `error: <reason>`, exit 1 when any plugin failed; 9 `ok` rows on this tree. Test `test_e4_lang_list_check`.

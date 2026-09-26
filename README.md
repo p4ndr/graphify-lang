@@ -226,7 +226,14 @@ settles open question 3 below. The code is `graphify_lang/registry.py`
   and `attrs` keyed by base node id; new ids must start with the plugin
   name prefix, and no base node or attribute is replaced.
 - `graphify lang list` shows a `sniff` column, `*` after a shared suffix and
-  `+` before an augmented one.
+  `+` before an augmented one. `graphify lang list --check` prints one row
+  per plugin, `ok` or its load error, and exits 1 when any plugin failed.
+- **Discovery.** The `graphify_lang_plugins` entry points, then every
+  `*.toml` manifest in each `GRAPHIFY_LANG_PATH` folder (`os.pathsep`
+  separated). A path manifest's `[extract] runtime` module is imported with
+  its folder first on `sys.path` and exposes `extract` (or `augment`) and
+  an optional `RESOLVER`. A plugin that fails to load is logged and skipped;
+  `GRAPHIFY_LANG_DISABLE=1` turns discovery off.
 
 Open questions the design has to settle before code, each with the options
 on the table:

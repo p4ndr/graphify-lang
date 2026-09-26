@@ -96,7 +96,7 @@ _M4 = {
 }
 
 
-_M4_OPEN = {"autolisp", "vba", "astgrep"}  # each plugin move closes its own
+_M4_OPEN = {"autolisp", "vba"}  # each plugin move closes its own
 
 
 @pytest.mark.parametrize("plugin", [

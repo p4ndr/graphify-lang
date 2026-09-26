@@ -53,14 +53,6 @@ This document is a LIVE file containing a list of TASKS to be carried out.
 - `[ ]` T10.4 | Include the `run_language_resolvers` casefold as a separate small fix
 - `[ ]` T10.5 | Expect to carry the registry indefinitely; plan accordingly
 
-### `[ ]` T36 | P05-S005 (rr-s5) Registry robustness — M1 E4 M5 M3 L6 L7 L8 L10 L13 N5
-
-- `[ ]` T36.1 | S5.1 Red tests for each finding
-- `[ ]` T36.2 | S5.2 M1 isolation, L7 one group, M5 GRAPHIFY_LANG_PATH, E4 lang list --check
-- `[ ]` T36.3 | S5.3 M3 watch.py claimed-path hooks
-- `[ ]` T36.4 | S5.4 L6, L8, L10, N5
-- `[ ]` T36.5 | S5.5 Stage close
-
 ### `[ ]` T37 | P05-S006 (rr-s6) Tests, docs, release lang.4 — M12 M11 N1 N2 PR drafts
 
 - `[ ]` T37.1 | S6.1 M12 corpus marker + checked-in corpus samples

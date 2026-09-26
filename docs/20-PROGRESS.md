@@ -15,6 +15,16 @@ This document is a LIVE running changelog for all work in the repo.
 
 ## 3. CURRENT SESSION
 
+### 2026-09-26 16:27 (UTC+10)
+
+- T36.1 done: 14 tests, 12 strict xfail red, L10/L13 pinned (ef2012a)
+- T36.2 done: M1, L7, M5 (4071b40), E4 (a05bc8b, cb21e7e); lang list --check 9 ok rows
+- T36.3 done: M3 watch hooks (32d4618, 227c194); upstream test_watch.py unchanged, 181 passed
+- T36.4 done: L6 7d9fbf8, L8 34510f8, N5 b80a115, L10 accepted (0.1 ms measured), L13 pinned; test leak fix 728c6a3
+- T36.5 done: 6209 passed / 14 skipped; extractors diff empty; findings moved (87eb37a); CI 36223498678 green
+- T36 done (all steps): P05-S005 (rr-s5) Registry robustness — M1 E4 M5 M3 L6 L7 L8 L10 L13 N5
+- T36 (plan 05 S5, rr-s5 ef2012a..87eb37a): M1, E4, M5 (GRAPHIFY_LANG_PATH implemented, in E1 fingerprint), M3 (watch hooks), L6, L7, L8, N5 fixed; L10 accepted (measured), L13 pinned. pytest 6209 passed / 14 skipped; CI 36223498678 green.
+
 ### 2026-09-26 15:57 (UTC+10)
 
 - T35.6 done: pytest 6195 passed / 14 skipped; extractors diff empty; H1 H3 M2 L9 L11 E1 E5 moved to cc-CR000.002 (E3 open for S006)

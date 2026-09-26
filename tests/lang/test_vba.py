@@ -172,6 +172,8 @@ def test_bim_chk_this_workbook(path):
     The synthetic sample is a CRLF document-module export, like bim-chk's."""
     if not path.is_file():
         pytest.skip("corpus: bim-chk not on this host")
+    if "fixtures" in path.parts:  # the sample is pinned CRLF (.gitattributes -text)
+        assert b"\r\n" in path.read_bytes()
     result = _get_extractor(path)(path)
     assert len(result["nodes"]) > 1
     assert Counter(n["node_kind"] for n in result["nodes"])["class"] == 1

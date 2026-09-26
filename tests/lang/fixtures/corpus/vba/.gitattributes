@@ -1,0 +1,2 @@
+# Keep the synthetic VBA export CRLF, as the VBE writes it (cc-CR000.003 S6-N2).
+*.cls -text

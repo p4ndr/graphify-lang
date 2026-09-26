@@ -227,6 +227,11 @@ class LanguageManifest:
         runtime = extract.get("runtime")
         if not runtime:
             errors.append("missing required field: extract.runtime")
+        elif not isinstance(runtime, str):
+            errors.append("extract.runtime must be a string")
+        resolver = extract.get("resolver")
+        if resolver is not None and not isinstance(resolver, str):
+            errors.append("extract.resolver must be a string")
 
         if sniff is not None and isinstance(suffixes, (list, tuple)):
             both = sorted(set(overrides) & set(suffixes))
@@ -245,7 +250,7 @@ class LanguageManifest:
             extract=lambda p: {},  # placeholder until the entry point sets it
             grammar=grammar_module,
             extra=extra,
-            resolver=extract.get("resolver"),
+            resolver=resolver,
             hook_suffixes=hook_suffixes,
             fixture=None,
             kind=kind,
@@ -266,7 +271,8 @@ class LanguageManifest:
         if not manifest.suffixes and kind != "augment":
             return cls._invalid("suffixes must not be empty")
 
-        for s in manifest.suffixes | manifest.augments:
+        # S1-L5: a dotless suffix can never equal a Path.suffix, so it would do nothing.
+        for s in manifest.suffixes | manifest.augments | manifest.overrides | set(hook_suffixes):
             if not s.startswith("."):
                 return cls._invalid(f"suffix '{s}' must start with '.'")
 

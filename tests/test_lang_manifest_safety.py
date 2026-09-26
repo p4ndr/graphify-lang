@@ -72,7 +72,6 @@ def test_s1_l4_undecodable_or_deep_manifest_never_raises(tmp_path, data, py_defa
 _BASE = '[language]\nname = "x"\nsuffixes = [".x"]\n'
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S1-L5: fields unchecked")
 @pytest.mark.parametrize("text", [
     pytest.param(_BASE + "[extract]\nruntime = 7\n", id="runtime-int"),
     pytest.param(_BASE + '[extract]\nruntime = "x.extract"\nresolver = 7\n', id="resolver-int"),

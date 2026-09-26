@@ -34,13 +34,10 @@ def _apply_registry() -> None:
         # Get suffixes from registry
         registry_suffixes = lang_registry.registered_suffixes()
         
-        # Merge into our set (casefolded for robustness)
-        for suffix in registry_suffixes:
-            _REGISTRY_SUFFIXES.add(suffix)
-            # Also register uppercase variant for case-insensitive filesystems
-            _REGISTRY_SUFFIXES.add(suffix.upper())
-        for suffix in lang_registry.hook_suffixes():
-            _HOOK_SUFFIXES.update((suffix, suffix.upper()))
+        # Lower-case only: manifests lower-case their suffixes, and every core
+        # lookup lower-cases the path suffix first (cc-CR000.001 L6).
+        _REGISTRY_SUFFIXES.update(registry_suffixes)
+        _HOOK_SUFFIXES.update(lang_registry.hook_suffixes())
         _HOOK_SUFFIXES |= _REGISTRY_SUFFIXES
 
         _REGISTRY_AVAILABLE = True
@@ -111,7 +108,7 @@ def _fingerprint(names: tuple[str, ...], modules: tuple[str, ...],
 
 
 def get_registry_suffixes() -> set[str]:
-    """Suffixes whose edit should rebuild the graph (including case variants).
+    """Suffixes whose edit should rebuild the graph (lower-case).
 
     The code suffixes plus every manifest's ``hook_suffixes``. ``graphify.cli``
     merges this into ``_HOOK_SOURCE_EXTS``; ``detect`` uses ``get_code_suffixes``.
@@ -120,7 +117,7 @@ def get_registry_suffixes() -> set[str]:
 
 
 def get_code_suffixes() -> set[str]:
-    """Suffixes a plugin claims whole: code by suffix (including case variants)."""
+    """Suffixes a plugin claims whole: code by suffix (lower-case)."""
     return _REGISTRY_SUFFIXES.copy()
 
 
@@ -152,7 +149,6 @@ def apply_dispatch() -> None:
             _BUILTIN_DISPATCH = dict(extract_module._DISPATCH)
         for suffix, extractor in lang_registry.dispatch_table(_BUILTIN_DISPATCH).items():
             extract_module._DISPATCH[suffix] = extractor
-            extract_module._DISPATCH[suffix.upper()] = extractor
             _LOG.debug("registered %s -> %s", suffix, extractor.__name__)
     except Exception as exc:
         _LOG.warning("registry dispatch failed: %s", exc)

@@ -155,8 +155,6 @@ def _m2_run(src: Path, cache: Path, disable: bool) -> list[str]:
     return json.loads(out.strip().splitlines()[-1])
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="cc-CR000.001 M2: one AST cache namespace for every plugin set")
 def test_m2_disable_toggle_uses_own_cache(tmp_path):
     src = _write(tmp_path / "p", {"app.lsp": "(defun c:go () (princ))\n(defun helper () 1)\n"})[0]
     cache = tmp_path / "cache"
@@ -178,9 +176,6 @@ def test_m2_same_plugin_set_shares_cache(tmp_path):
     assert sorted(cache_dir(tmp_path / "cache").glob("*.json")) == first
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="cc-CR000.001 E1: pre-stage-3 AST entries (refs without node) "
-                          "are served from the shared namespace")
 def test_e1_pre_stage3_entries_unreachable(tmp_path):
     """Stage 3 open point: an entry written before stage 3 holds refs without
     ``node``. It lives in the plain ``v<version>-s<schema>`` namespace; E1 moves

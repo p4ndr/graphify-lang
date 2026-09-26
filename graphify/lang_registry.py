@@ -1,6 +1,7 @@
 """Registry integration layer — merges language extensions from graphify_lang."""
 from __future__ import annotations
 
+import functools
 import logging
 from typing import Callable
 
@@ -47,6 +48,62 @@ def _apply_registry() -> None:
     except Exception as exc:
         _LOG.warning("registry merge failed: %s", exc)
         _REGISTRY_AVAILABLE = False
+    try:
+        _namespace_ast_cache(lang_registry)
+    except Exception as exc:
+        _LOG.warning("plugin-set cache namespace failed: %s", exc)
+
+
+# graphify.cache._EXTRACTOR_VERSION before a plugin fingerprint was appended.
+_BASE_CACHE_VERSION: str | None = None
+
+
+def _namespace_ast_cache(lang_registry) -> None:
+    """Give the active plugin set its own AST cache namespace (cc-CR000.001 M2,
+    E1). The extractor chosen for a file depends on the plugin set
+    (``GRAPHIFY_LANG_DISABLE``, a plugin installed, plugin code changed), but
+    the cache key is the file's bytes and the graphify version, so the
+    namespace ``v<version>-s<schema>`` gets ``-lang<fingerprint>`` appended at
+    run time (no edit to ``cache.py``). Entries written before this, including
+    pre-stage-3 results whose refs have no ``node``, are never read again.
+    """
+    global _BASE_CACHE_VERSION
+    import graphify.cache as cache
+
+    if _BASE_CACHE_VERSION is None:
+        _BASE_CACHE_VERSION = cache._EXTRACTOR_VERSION
+    names = tuple(sorted(m.name for m in lang_registry.iter_manifests()))
+    modules = tuple(sorted({getattr(m.augment or m.extract, "__module__", "") or ""
+                            for m in lang_registry.iter_manifests()}))
+    cache._EXTRACTOR_VERSION = f"{_BASE_CACHE_VERSION}-lang{_fingerprint(names, modules)}"
+
+
+@functools.lru_cache(maxsize=8)
+def _fingerprint(names: tuple[str, ...], modules: tuple[str, ...]) -> str:
+    """Hash of the manifest names, each plugin distribution's version, and the
+    ``.py`` / ``.toml`` files of ``graphify_lang`` and every plugin package."""
+    import hashlib
+    import sys
+    from importlib import metadata
+    from pathlib import Path
+
+    import graphify_lang
+
+    h = hashlib.sha256("\0".join(names).encode())
+    dirs = {Path(graphify_lang.__file__).parent}
+    for name in modules:
+        mod = sys.modules.get(name)
+        if getattr(mod, "__file__", None):
+            dirs.add(Path(mod.__file__).parent)
+    tops = sorted({m.split(".")[0] for m in modules if m} | {"graphify_lang"})
+    dists = metadata.packages_distributions()
+    for dist in sorted({d for top in tops for d in dists.get(top, ())}):
+        h.update(f"\0{dist}={metadata.version(dist)}".encode())
+    for d in sorted(dirs):
+        for f in sorted(d.rglob("*")):
+            if f.suffix in (".py", ".toml") and f.is_file():
+                h.update(b"\0" + f.relative_to(d).as_posix().encode() + b"\0" + f.read_bytes())
+    return h.hexdigest()[:12]
 
 
 def get_registry_suffixes() -> set[str]:

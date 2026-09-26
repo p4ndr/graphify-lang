@@ -32,9 +32,11 @@ def _timed(mod: str, fn: str, path: Path, timeout: float = 30) -> tuple[float, i
     """(seconds, nodes, edges) of ``mod.fn(path)`` in a child process."""
     try:
         proc = subprocess.run([sys.executable, "-c", _CHILD, mod, fn, str(path)],
-                              capture_output=True, text=True, timeout=timeout, check=True)
+                              capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         pytest.fail(f"{fn}({path.name}) still running after {timeout} s")
+    if proc.returncode:
+        pytest.fail(f"{fn}({path.name}) exited {proc.returncode}:\n{proc.stderr}")
     secs, nodes, edges = proc.stdout.split()
     return float(secs), int(nodes), int(edges)
 
@@ -82,8 +84,9 @@ def test_e6_rule_doc_error_keeps_file_node(tmp_path, monkeypatch):
 
 @pytest.fixture
 def py_default_recursion_limit():
-    """graphify.extract raises the limit to 10 000 on import; pin Python's
-    default so the review's 1200 levels overflow whatever test ran first."""
+    """``_raise_recursion_limit()`` in graphify.extract raises the limit to
+    10 000 when an extraction runs (not on import); pin Python's default so the
+    review's 1200 levels overflow whatever test ran first."""
     limit = sys.getrecursionlimit()
     sys.setrecursionlimit(1000)
     yield

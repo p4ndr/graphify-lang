@@ -100,7 +100,6 @@ class LanguageManifest:
     extra: str | None = None
     resolver: Any | None = None
     hook_suffixes: tuple[str, ...] = ()
-    fixture: Path | None = None
     # Plan 04 §3: shared-suffix routing and the augment kind.
     kind: str = "language"
     augments: frozenset[str] = frozenset()
@@ -257,7 +256,6 @@ class LanguageManifest:
             extra=extra,
             resolver=resolver,
             hook_suffixes=hook_suffixes,
-            fixture=None,
             kind=kind,
             augments=frozenset(augments),
             overrides=frozenset(overrides),

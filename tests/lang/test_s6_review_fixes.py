@@ -22,8 +22,6 @@ def test_s6_n4_corpus_ls_keeps_spaced_names(tmp_path, corpus_ls):
     assert sorted(corpus_ls(tmp_path, "*.cls")) == ["a b.cls", "c.cls"]
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S6-L4: LanguageManifest.fixture is set by nothing and read by nothing")
 def test_s6_l4_manifest_has_no_fixture_field():
     from graphify_lang.manifest import LanguageManifest
 

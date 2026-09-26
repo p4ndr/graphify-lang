@@ -180,25 +180,32 @@ flowchart LR
     REG -.-> NX
 ```
 
-The language-package contract, as a manifest. 'Where the core reads it' names
-the existing table each field feeds.
+The language-package contract, as a TOML manifest (`graphify-lang.toml`, or
+any `*.toml` with a `[language]` table in a `GRAPHIFY_LANG_PATH` folder;
+parsed by `LanguageManifest.from_toml`, `graphify_lang/manifest.py`). 'Where
+the core reads it' names the existing table each key feeds.
 
-| Field | Required | Type | Where the core reads it |
-|:------|:---------|:-----|:------------------------|
-| `name` | yes | `str` | registry key, same role as the `LANGUAGE_EXTRACTORS` key (`graphify/extractors/__init__.py`) |
-| `suffixes` | yes | `frozenset[str]` | `_DISPATCH` and `collect_files` (`extract.py`), `CODE_EXTENSIONS` (`detect.py`), `_WATCHED_EXTENSIONS` (`watch.py`) |
-| `extract` | yes | `Callable[[Path], dict]` | `_DISPATCH` value; must return the schema in `ARCHITECTURE.md` ('Extraction output schema'), enforced by `validate.py` |
-| `grammar` | no | tree-sitter module name, or `None` for a hand parser | the package's own import. The core sees only the `error` key convention when the grammar is absent (as `extract_commonlisp` returns it) |
-| `extra` | no | `str` | `_EXTRA_FOR_EXTENSION` (`extract.py`), so the missing-grammar hint names the right `pip install "graphifyy[...]"` |
-| `resolver` | no | `LanguageResolver` | `register` in `resolver_registry.py` (`register_language_resolver` in `extract.py`) |
-| `hook_suffixes` | no | `tuple[str, ...]` | `_HOOK_SOURCE_EXTS` (`cli.py`) |
-| `[resolve] context_fields` | no | `list[str]`, default `["node_kind"]` | the incremental context nodes in `watch._rebuild_code` and the `graphify extract` incremental path (`cli.py`); see [Plugin contract](#plugin-contract) |
-| `fixture` | no | path | the package's own tests; the core's `tests/test_languages.py` is not edited |
-| `overrides` | no | suffixes | wins that suffix from the built-in with no sniff (`.lsp`) |
-| `priority` | no | `int` | breaks a sniff tie between plugins (higher wins) |
+| TOML key | Required | Value | Where the core reads it |
+|:---------|:---------|:------|:------------------------|
+| `schema` | no | `1` or `"v1"` (default `1`) | `from_toml` rejects any other value |
+| `[language] name` | yes | string | registry key, same role as the `LANGUAGE_EXTRACTORS` key (`graphify/extractors/__init__.py`) |
+| `[language] suffixes` | yes (empty for an augment) | list of strings, each with a leading `.` | `_DISPATCH` and `collect_files` (`extract.py`), `CODE_EXTENSIONS` (`detect.py`), `_WATCHED_EXTENSIONS` (`watch.py`) |
+| `[language] kind`, `augments` | no | `"language"` (default) or `"augment"`; suffixes | an augment adds to a suffix's extractor output |
+| `[language] overrides` | no | suffixes | wins that suffix from the built-in with no sniff (`.lsp`) |
+| `[language] priority` | no | integer | breaks a sniff tie between plugins (higher wins) |
+| `[language] hook_suffixes` | no | suffixes | `_HOOK_SOURCE_EXTS` (`cli.py`) |
+| `[language] case_insensitive` | no | boolean | the plugin's builtins filter (`graphify_lang/builtins.py`) |
+| `[grammar] module` | no | tree-sitter module name; absent for a hand parser | the package's own import. The core sees only the `error` key convention when the grammar is absent (as `extract_commonlisp` returns it) |
+| `[grammar] extra` | no | string | `_EXTRA_FOR_EXTENSION` (`extract.py`), so the missing-grammar hint names the right `pip install "graphifyy[...]"` |
+| `[extract] runtime` | yes | module name | the module that holds `extract` (or `augment`), `RESOLVER` and `WATCH`. An entry-point package sets them itself (`graphify_lang._common.load_manifest`); a path plugin is loaded from this module. `extract` must return the schema in `ARCHITECTURE.md` ('Extraction output schema'), enforced by `validate.py` |
+| `[extract] builtins_file`, `builtins_prefixes` | no | path relative to the manifest; list of prefixes | the plugin's builtins filter (`graphify_lang/builtins.py`) |
+| `[extract] resolver` | no | string | validated only; the resolver is the module's `RESOLVER` (a `LanguageResolver`), handed to `register` in `resolver_registry.py` |
+| `[resolve] context_fields` | no | list of strings, default `["node_kind"]` | the incremental context nodes in `watch._rebuild_code` and the `graphify extract` incremental path (`cli.py`); see [Plugin contract](#plugin-contract) |
 | `[sniff]` | no | `head_bytes`, `rules = [{ re, weight, flags }]`, `min_score` | the sniff router, for a suffix with more than one claimant |
 | `[match]` | no | `globs`, `filenames` | the router, and the `classify_file` hook for data suffixes |
-| `kind`, `augments` | no | `"language"` or `"augment"`, suffixes | an augment adds to a suffix's extractor output |
+
+`WATCH` (augments only, not a TOML key) is the module's `graphify watch`
+predicate; see 'Shared suffixes, data files and augments'.
 
 ### Shared suffixes, data files and augments
 

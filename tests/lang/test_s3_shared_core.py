@@ -144,12 +144,8 @@ def test_n3_every_manifest_key_is_read(toml):
     assert sorted(_keys(data) - read) == []
 
 
-_N2 = pytest.mark.xfail(strict=True, raises=AssertionError, reason="S3-N2: True == 1")
-
-
 @pytest.mark.parametrize("schema, ok", [("1", True), ('"v1"', True), ("2", False),
-                                        pytest.param("true", False, marks=_N2),
-                                        pytest.param("1.0", False, marks=_N2)])
+                                        ("true", False), ("1.0", False)])
 def test_n3_schema_is_read(tmp_path, schema, ok):
     from graphify_lang.manifest import LanguageManifest
 
@@ -308,7 +304,6 @@ def test_s3_n3_every_read_key_has_a_reader_in_code():
     assert missing == []
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S3-N2: message omits v1")
 def test_s3_n2_schema_message_names_both_forms(tmp_path):
     from graphify_lang.manifest import LanguageManifest
 

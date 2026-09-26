@@ -208,7 +208,13 @@ def _headers(out: Sink, text: str, path: Path, line_of) -> None:
 
 
 def extract_autolisp(path: Path) -> dict:
-    """Extract one AutoLISP file (plan 02 §3)."""
+    """Extract one AutoLISP file (plan 02 §3).
+
+    A file nested deeper than the recursion limit (L1) falls back to the regex
+    path: its defuns and top-level globals, INFERRED, and ``contains`` edges only.
+    Every call, dialog and action of the file is lost, not only the deep defun's
+    (S1-L3, accepted: one walker per file).
+    """
     try:
         source = path.read_bytes()
         root = _parser().parse(source).root_node

@@ -134,6 +134,10 @@ def test_l1_deep_nesting_falls_back(tmp_path, py_default_recursion_limit):
     result = extract_autolisp(path)
     labels = {n["label"]: n.get("confidence") for n in result["nodes"]}
     assert labels == {"deep.lsp": None, "deep": "INFERRED", "c:other": "INFERRED"}
+    # S1-L3: the fallback keeps defuns and globals only; every call, dialog and
+    # action ref of the file is dropped (c:other -> deep too), not just the deep defun's.
+    assert [e["relation"] for e in result["edges"]] == ["contains", "contains"]
+    assert result["autolisp_refs"] == []
 
 
 def test_s1_l1_deep_action_tile_keeps_file(tmp_path, py_default_recursion_limit):

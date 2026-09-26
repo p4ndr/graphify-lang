@@ -5,7 +5,10 @@ the corpus prefix (``src_core_err_...``) as they do under ``extract(root=)``.
 """
 
 import sys
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10: tomli is a dependency below 3.11
+    import tomli as tomllib
 import types
 from pathlib import Path
 

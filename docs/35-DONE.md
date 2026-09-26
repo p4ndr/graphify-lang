@@ -15,6 +15,15 @@ This document is a LIVE file containing a list of TASKS that have been carried o
 
 ## 3. TASK LIST
 
+### `[x]` T35 | P05-S004 (rr-s4) Build coherence — H1 E3 E5 H3 L9 L11 M2 E1
+
+- `[x]` T35.1 | S4.1 E5 parity test + H3/L9/L11/M2 red tests
+- `[x]` T35.2 | S4.2 H1 watch.py context_fields registry hook + [resolve] context_fields
+- `[x]` T35.3 | S4.3 H3/L9 pure augments; cargo and cc-kb resolvers
+- `[x]` T35.4 | S4.4 L11 normpath ruleDirs
+- `[x]` T35.5 | S4.5 M2/E1 plugin-set fingerprint in cache namespace; update learning 1484
+- `[x]` T35.6 | S4.6 Stage close (E3 open until PR draft)
+
 ### `[x]` T34 | P05-S003 (rr-s3) Shared plugin core — E2 L5 H2 M4 M6 E7 L3 E8 N3 L12
 
 - `[x]` T34.1 | S3.1 Red tests: same-stem lsp/mnl/dcl, vba same-stem, portable file ids, post_file prefix

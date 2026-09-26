@@ -13,6 +13,21 @@ This document is an ARCHIVE of session progress cut-over from `20-PROGRESS.md`.
 
 ## 3. SESSION HISTORY
 
+### 2026-09-24 14:42 (UTC+10)
+
+- bash: timeout 1200 .venv/bin/python -m pytest tests/ -q -p no:cacheprovider 2>&1 | tail -1; TMPDIR=/tmp/claude-1000/-home-p4n…, cd ~/repos/autolisp-pvcase && rtk git log -1 --format='%h %ci'; git status --porcelain | head -5; git ls-files '*.lsp' …
+- T26.4 done: `.venv/bin/python -m pytest tests/ -q`: 5495 passed, 12 skipped (before this session 5485/12; +10 are new fork tests), no upstream test file edited. tools/measure_autolisp.py on the 4 repos: autolithp 4,212 nodes / 19,157 edges (calls 15,017, contains 4,128, dcl_references 4, module_depends 8), err:trap 88 inbound cross-file, lithp_mgr 1, 0 missed, 0 token, 0 dup; autolithp02 3,160/13,178; snap-rework 3,069/12,430 — all identical to case 005. pvcase is 1,301/5,634 over 32 files vs case 005's 1,176/4,972 over 29: the repo gained 3 files in commit bf69f47 at 14:23 today, which is not a regression. guard: graphify/ differs from v8 in cli, detect, extract (@doc, D-004), lang_registry and resolver_registry (the committed casefold fix, 0b2d2e4); no hand-added suffix; extract.py has 0 graphify_lang/autolisp strings.
+- T26 done (all steps): Settled items follow-up: fork version string (P9), restore detect.py (P10), `gr…
+- ag-build session (Phase 0 file ~/.claude/cache/phase0/graphify-lang/phase0-20260924-142911.md): T1, T24 and T26 done; T5-T8 steps closed where the code already meets them or needed a small fix; T5.2-T5.6 open under P16, T6.2/T6.4/T7.4/T8.2/T8.4 open under P17; P15 raised (fork and stock evict each other's AST cache dir)
+- Code changes: detect.py is v8 plus the registry lookup; version 0.9.55+lang.1 (uv.lock: that line only); `graphify lang list` (cli.py + lang_registry.format_languages); manifest.py uses stdlib tomllib; the walker no longer counts cond clause heads as calls; the licence file ships in package-data
+- Tests: SC2 subprocess snapshot test, lang list test, tests/lang/test_autolisp_corpus_fixtures.py (8 tests on the real err/ldr/manager fixtures plus authored .mnl/defun-q/cond/ERR.LSP). pytest 5495 passed / 12 skipped; measure_autolisp is identical to case 005 for autolithp, autolithp02 and snap-rework
+
+### 2026-09-24 14:41 (UTC+10)
+
+- T8.1 done: graphify_lang/autolisp/dcl.toml is a second manifest in the same package (autolisp-dcl, markup, .dcl, grammar regex, runtime extract_dcl); `graphify lang list` shows it.
+- T8.3 done: dcl_references come from new_dialog (EXTRACTED) and wrapper string args (INFERRED, D-005a); dcl_action comes from action_tile strings, re-parsed as AutoLISP. Pinned by test_autolisp_plan02.py::test_dcl_references and test_dcl_action.
+- T8.5 done: .mnl is claimed in graphify-lang.toml. New test_mnl_and_defun_q_authored: an authored acad.mnl dispatches to the walker without error and gives its functions and a call. SC6b: 1 dcl_references into lithp_mgr in autolithp (measure_autolisp, D-005a INFERRED); manager.dcl gives dialog lithp_mgr (test_manager_dcl_dialog).
+
 ### 2026-09-24 14:40 (UTC+10)
 
 - bash: rtk read graphify_lang/rules.py; sed -n 1,60p graphify_lang/queries.py; sed -n 1,50p graphify_lang/regex_rules.py; sed …, sed -n 40,135p graphify_lang/manifest.py; rtk grep -n "def test" tests/lang/test_rules.py tests/lang/test_autolisp_node…, S=/tmp/claude-1000/-home-p4ndr-repos-graphify-lang/rt && mkdir -p $S && cat > $S/tags.scm <<'EOF'

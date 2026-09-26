@@ -53,15 +53,6 @@ This document is a LIVE file containing a list of TASKS to be carried out.
 - `[ ]` T10.4 | Include the `run_language_resolvers` casefold as a separate small fix
 - `[ ]` T10.5 | Expect to carry the registry indefinitely; plan accordingly
 
-### `[ ]` T35 | P05-S004 (rr-s4) Build coherence — H1 E3 E5 H3 L9 L11 M2 E1
-
-- `[ ]` T35.1 | S4.1 E5 parity test + H3/L9/L11/M2 red tests
-- `[ ]` T35.2 | S4.2 H1 watch.py context_fields registry hook + [resolve] context_fields
-- `[ ]` T35.3 | S4.3 H3/L9 pure augments; cargo and cc-kb resolvers
-- `[ ]` T35.4 | S4.4 L11 normpath ruleDirs
-- `[ ]` T35.5 | S4.5 M2/E1 plugin-set fingerprint in cache namespace; update learning 1484
-- `[ ]` T35.6 | S4.6 Stage close (E3 open until PR draft)
-
 ### `[ ]` T36 | P05-S005 (rr-s5) Registry robustness — M1 E4 M5 M3 L6 L7 L8 L10 L13 N5
 
 - `[ ]` T36.1 | S5.1 Red tests for each finding

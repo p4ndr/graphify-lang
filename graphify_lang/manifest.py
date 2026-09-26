@@ -89,7 +89,7 @@ def _lower(values) -> tuple[str, ...]:
 class LanguageManifest:
     """A language package manifest.
 
-    Fields match the schema defined in docs/plans/cc-IP000.001.md §S003.
+    Fields match the schema defined in .claude/docs/cc-IP000.001.md §S003.
     """
 
     name: str
@@ -227,12 +227,12 @@ class LanguageManifest:
         if errors:
             return cls._invalid("; ".join(errors))
 
-        # Build the manifest - extract is the runtime module name
-        # The registry will call runtime.build(path, data) to get the extract callable
+        # extract / augment / resolver are set by the package's entry point
+        # (graphify_lang._common.load_manifest); extract.runtime is only checked.
         manifest = cls(
             name=name,
             suffixes=frozenset(suffixes) if suffixes else frozenset(),
-            extract=lambda p: {},  # Placeholder, replaced by runtime.build()
+            extract=lambda p: {},  # placeholder until the entry point sets it
             grammar=grammar_module,
             extra=extra,
             resolver=extract.get("resolver"),

@@ -52,3 +52,55 @@ This document is a LIVE file containing a list of TASKS to be carried out.
 - `[ ]` T10.3 | Cite issues #3180 and #1070, which both ask for exactly this
 - `[ ]` T10.4 | Include the `run_language_resolvers` casefold as a separate small fix
 - `[ ]` T10.5 | Expect to carry the registry indefinitely; plan accordingly
+
+### `[ ]` T32 | P05-S001 (rr-s1) Security and crash safety — H4 E6 L1 L2 L4 N4
+
+- `[ ]` T32.1 | S1.1 Red tests: alias bomb, self-alias, deep nesting, large schema, bad manifest sections
+- `[ ]` T32.2 | S1.2 H4/E6 memoised _matches + per-document try
+- `[ ]` T32.3 | S1.3 L1 RecursionError fallback, L2 edge-key sets, N4 bisect line numbers
+- `[ ]` T32.4 | S1.4 L4 manifest validation never raises; lower-case suffix keys
+- `[ ]` T32.5 | S1.5 Stage close: hub §3 checks; move findings to cc-CR000.002
+
+### `[ ]` T33 | P05-S002 (rr-s2) Repo and CI hygiene — M7 M8 E9 M9 M10 N6
+
+- `[ ]` T33.1 | S2.1 M7 restore publish/release-graph workflows + guard lines
+- `[ ]` T33.2 | S2.2 M8/E9 CI triggers (autolisp, lang-*, rr-*, v* tags) + bandit graphify_lang
+- `[ ]` T33.3 | S2.3 M9 deletions per D3 (git-sp.ps1 stays) + reference repoint
+- `[ ]` T33.4 | S2.4 M10 delete install-mcp.sh; N6 T9.5 text
+- `[ ]` T33.5 | S2.5 Ask owner, push rr-s2, read CI
+- `[ ]` T33.6 | S2.6 Stage close
+
+### `[ ]` T34 | P05-S003 (rr-s3) Shared plugin core — E2 L5 H2 M4 M6 E7 L3 E8 N3 L12
+
+- `[ ]` T34.1 | S3.1 Red tests: same-stem lsp/mnl/dcl, vba same-stem, portable file ids, post_file prefix
+- `[ ]` T34.2 | S3.2 graphify_lang/_common.py; move bmake
+- `[ ]` T34.3 | S3.3 Move ecschema, astgrep, vba, autolisp, cc_kb (one commit each)
+- `[ ]` T34.4 | S3.4 H2/M4 complete; case_008 id-form note
+- `[ ]` T34.5 | S3.5 M6 (D1), N3, L3/E8, L12
+- `[ ]` T34.6 | S3.6 Stage close; E7 closed per D1
+
+### `[ ]` T35 | P05-S004 (rr-s4) Build coherence — H1 E3 E5 H3 L9 L11 M2 E1
+
+- `[ ]` T35.1 | S4.1 E5 parity test + H3/L9/L11/M2 red tests
+- `[ ]` T35.2 | S4.2 H1 watch.py context_fields registry hook + [resolve] context_fields
+- `[ ]` T35.3 | S4.3 H3/L9 pure augments; cargo and cc-kb resolvers
+- `[ ]` T35.4 | S4.4 L11 normpath ruleDirs
+- `[ ]` T35.5 | S4.5 M2/E1 plugin-set fingerprint in cache namespace; update learning 1484
+- `[ ]` T35.6 | S4.6 Stage close (E3 open until PR draft)
+
+### `[ ]` T36 | P05-S005 (rr-s5) Registry robustness — M1 E4 M5 M3 L6 L7 L8 L10 L13 N5
+
+- `[ ]` T36.1 | S5.1 Red tests for each finding
+- `[ ]` T36.2 | S5.2 M1 isolation, L7 one group, M5 GRAPHIFY_LANG_PATH, E4 lang list --check
+- `[ ]` T36.3 | S5.3 M3 watch.py claimed-path hooks
+- `[ ]` T36.4 | S5.4 L6, L8, L10, N5
+- `[ ]` T36.5 | S5.5 Stage close
+
+### `[ ]` T37 | P05-S006 (rr-s6) Tests, docs, release lang.4 — M12 M11 N1 N2 PR drafts
+
+- `[ ]` T37.1 | S6.1 M12 corpus marker + checked-in corpus samples
+- `[ ]` T37.2 | S6.2 M11 README, N1 CLAUDE.md symbols, N2 plan statuses
+- `[ ]` T37.3 | S6.3 Upstream PR drafts (H1/E3, M3, L13, registry lookups)
+- `[ ]` T37.4 | S6.4 Release v0.9.67+lang.4 + pipx install (README form)
+- `[ ]` T37.5 | S6.5 Rebuild 12 graphs; incremental check on real corpora
+- `[ ]` T37.6 | S6.6 Close-out: CR file, DONE statuses, learnings, ask owner then push

@@ -248,3 +248,65 @@ graphed nodes (the `test_e5_incremental_parity` comparison).
   add a same-basename pair to the bmake and cc-kb E5 parity fixtures.
 
 Rollback per repo: `cp graphify-out/graph.pre-plan05.json graphify-out/graph.json`.
+
+## 6. T38: duplicate-basename file nodes (release `0.9.68+lang.5`)
+
+**Date:** 2026-09-26
+**Build:** `graphify 0.9.68+lang.5` (tag `v0.9.68+lang.5`, commit `f2fd223` on
+`rr-fix`). Fix `a296fa7`, test-first `21a82f2`.
+
+**Fix.** `graphify_lang._common.is_file_node(node)` wraps upstream's
+`graphify.build._is_file_node_label(label, source_of(node))` (basename, or the
+#2032 path-suffix label). `bmake/resolve.py` (file index), `cc_kb/resolve.py`
+(file and page index; the page's cc id and the hub parent now come from the
+path, not the label) and `autolisp/resolve.py` (`sidecar_doc`: the same
+`label == basename` lookup, found by the resolver audit) use it. The other
+resolvers index symbol nodes only: `vba` (module label = `VB_Name`, no
+suffix), `ecschema` (schema and member labels), `astgrep` (rule ids),
+`cargo` (node `type`).
+
+**Tests.** E5 parity cases `bmake-dupname` (watch, cli), `cc-kb-dupname` and
+`autolisp-dupname` (watch; the CLI path skips `.md`), fixtures
+`tests/lang/fixtures/{bmake,cc_kb,autolisp}_dupname/`. At `21a82f2` all four
+fail by `AssertionError` on exactly the missing edge (`depends_on` to
+`A/source/vf.cpp`, two `cites` code_ref to `skills/x/SKILL.md`,
+`sidecar_doc` to `x/notes.md`) under strict `xfail(raises=AssertionError)`;
+`a296fa7` removes the markers and they pass. The autolisp sidecar is named
+`notes.md`, not `a.md`: a same-stem `a.lsp` / `a.md` pair un-salts on
+re-extraction (upstream, see the E5 docstring) and would mask the case.
+Full suite: 6309 passed, 14 skipped, 4 xfailed (baseline 6305 + 4).
+CI on `f2fd223` (branch and tag runs, `wheel` job included): success.
+
+**Real corpora** (E5 instrument of §5, `git archive HEAD` copies, one file
+touched, incremental `_rebuild_code(changed_paths=...)` against a clean build
+of the edited tree):
+
+| Corpus | File changed | `lang.4` (pipx) | `lang.5` (repo `.venv`) |
+|:--|:--|:--|:--|
+| BentleyHelp | `PyDgnPlatform.mke` | 1 bmake `depends_on` lost (`$(o)valueformat$(oext)` -> `PyDgnPlatform/source/valueformat.cpp`) + 11 upstream stub pairs | 11 upstream stub pairs only |
+| `~/.claude` | `docs/cc-IP000.012.md` (19 `SKILL.md` cites) | 48 `cites` lost (`code_ref` to `SKILL.md` files, `cc_ref` to a `cc-MA000.003.md` whose basename also collides), 1 extra + 24 upstream stub pairs | 1 extra `cites` + 24 upstream stub pairs |
+
+The upstream stub pairs are the `ambiguous_python_import_<hash>` retargets of
+§5 (no plugin node). The one extra edge is not T38 and predates it:
+`cc-IP000.012 -> cc-CR000.001` (`cc_ref`, L16). The cc-kb resolver joins a
+pair once in either direction; a clean build adds `cc-CR000.001 ->
+cc-IP000.012` first and skips the reverse, but in the incremental build the
+unchanged `cc-CR000.001`'s edge is not in the resolver's `all_edges`, so the
+reverse is added too. Filed as T39. (`lang.4` vs `lang.5` node totals differ
+by 162 `.sql` nodes: the repo `.venv` has `tree_sitter_sql`, the pipx venv
+does not.)
+
+**Rebuild.** One repo at a time: `graph.json` backed up to
+`graph.pre-lang5.json`, `graphify-out/cache/ast/` deleted, `graphify update
+<path>`; exit 0, no traceback, only upstream warnings (syntax errors,
+missing `tree_sitter_sql`, zero-node `policy.yml`).
+
+| Repo | Before nodes / edges | After nodes / edges | Plugin rows after | Id-level diff |
+|:--|:--|:--|:--|:--|
+| BentleyHelp | 22231 / 36946 | 22231 / 36946 | bmake 729 / 2254 / 347 | none |
+| claude-config | 47568 / 64638 | 47568 / 64638 | cites 12104 | none |
+| `~/.claude` | 18326 / 33834 | 18326 / 33834 | cites 10594 | none |
+
+As §5 predicted, a full update was never affected; the fix matters to the
+git-hook and `graphify watch` paths. Rollback per repo:
+`cp graphify-out/graph.pre-lang5.json graphify-out/graph.json`.

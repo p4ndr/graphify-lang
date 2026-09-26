@@ -13,6 +13,21 @@ This document is an ARCHIVE of session progress cut-over from `20-PROGRESS.md`.
 
 ## 3. SESSION HISTORY
 
+### 2026-09-25 13:19 (UTC+10)
+
+- bash: rtk read docs/plans/04-content-sniffing-augment-plugins-and-five-new-languages.md && rtk git log --oneline -3 && rtk gi…, rtk read graphify/lang_registry.py && rtk read graphify_lang/registry.py && rtk read graphify_lang/manifest.py && rtk r…, pwsh -NoProfile -File $HOME/.claude/scripts/phase0.ps1 -Repo /home/p4ndr/repos/graphify-lang -Task "content-sniff route…, rtk read /home/p4ndr/.claude/cache/phase0/graphify-lang/phase0-20260925-130317.md --max-lines 60; rtk read graphify_lan…, sed -n 6700,6780p graphify/extract.py; grep -n "def _get_extractor" -A60 graphify/extract.py | head -90; grep -n '"\.ls…, sed -n 1,80p tests/test_lang_registry.py; grep -n "upstream_tables\|lang_baseline" -r tests/*.py tools/ | head; grep -n… (+35 more)
+- edit: tests/test_lang_sniff.py
+- T27.1 done: 7181bea: 6 fixtures + tests/test_lang_sniff.py; 14 red (13 AttributeError no dispatch_table, 1 _get_extractor still extract_apex)
+- T27.2 done: eda6b03: manifest [sniff]/[match]/kind/augments/overrides/priority; 8 schema tests pass
+- T27.3 done: 135113d: dispatch_table + sniff_router[.cls]; S1 tests green; .lsp stays extract_autolisp; lang list sniff column + * marker
+- T27.4 done: f893e65: classify_file claims_file hook; detect ~/.claude 0.716s -> 0.718s; upstream_tables.json unchanged
+- T27.5 done: 355831d: augmented[.md] wrapper, prefix/no-overwrite merge, composed with router; base md nodes unchanged
+- T27.6 done: 0761cf5 docs, a68c964 version 0.9.67+lang.2, local tag v0.9.67+lang.2; pytest 6065 passed 14 skipped
+- T27 done (all steps): P04-A (lang-sniff) Sniff router, detect hook, augment kind — plan 04 S1-S6
+- T27 done on branch lang-sniff (7 commits 7181bea..a68c964, local tag v0.9.67+lang.2, not pushed): sniff router, [match] detect hook in classify_file, augment kind; pytest 6065 passed / 14 skipped (baseline 6026); git diff upstream/v8 -- graphify/extractors/ empty; upstream_tables.json and lang_baseline.txt unchanged.
+- Open for S10: Cargo.toml and pyproject.toml are already CODE upstream via is_package_manifest_path, and _get_extractor sends them to extract_package_manifest before _DISPATCH, so a [match] cargo plugin on .toml is never called by the router.
+- Phase 0 file: /home/p4ndr/.claude/cache/phase0/graphify-lang/phase0-20260925-130317.md
+
 ### 2026-09-25 13:01 (UTC+10)
 
 - bash: rtk ls -d ~/repos/*/ ~/GIT/*/ ~/git/*/ 2>/dev/null; graphify lang list 2>&1 | head -30, cd ~/repos/graphify-lang && .venv/bin/python -c "

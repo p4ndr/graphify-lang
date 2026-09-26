@@ -15,6 +15,8 @@ This document is a LIVE file containing a list of TASKS that have been carried o
 
 ## 3. TASK LIST
 
+### `[x]` T38 | Fix H1 residual: bmake and cc-kb resolvers miss duplicate-basename file nodes on incremental builds (case_008 §5; use graphify.build._is_file_node_label; same-basename E5 fixtures; release lang.5)
+
 ### `[x]` T37 | P05-S006 (rr-s6) Tests, docs, release lang.4 — M12 M11 N1 N2 PR drafts
 
 - `[x]` T37.1 | S6.1 M12 corpus marker + checked-in corpus samples

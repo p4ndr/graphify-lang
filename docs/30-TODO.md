@@ -53,4 +53,4 @@ This document is a LIVE file containing a list of TASKS to be carried out.
 - `[ ]` T10.4 | Include the `run_language_resolvers` casefold as a separate small fix
 - `[ ]` T10.5 | Expect to carry the registry indefinitely; plan accordingly
 
-### `[ ]` T38 | Fix H1 residual: bmake and cc-kb resolvers miss duplicate-basename file nodes on incremental builds (case_008 §5; use graphify.build._is_file_node_label; same-basename E5 fixtures; release lang.5)
+### `[ ]` T39 | cc-kb incremental asymmetry: a changed doc gets a `cites` edge whose reverse an unchanged doc already holds (pair dedupe is undirected; the reverse edge is not in the resolver's all_edges); measured ~/.claude cc-IP000.012 -> cc-CR000.001 (case_008 §6)

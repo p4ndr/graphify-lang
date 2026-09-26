@@ -564,14 +564,19 @@ MCP entries in `~/.claude.json` and `~/.omp/agent/mcp.json` need no edit. To
 release a new version:
 
 ```bash
-git fetch upstream && git rebase upstream/v8        # on autolisp; then pytest tests/ -q
+git fetch upstream && git rebase upstream/v8        # on rr-fix; then pytest tests/ -q
 # bump version in pyproject.toml to <upstream version>+lang.<n>, run uv lock, commit both
-git tag -a v<version> -m "graphify-lang <version>" && git push origin autolisp v<version>
-rm -rf dist && uv build --wheel
+git tag -a v<version> -m "graphify-lang <version>" && git push origin rr-fix v<version>
+rm -rf build dist && uv build --wheel
 cp dist/*.whl ~/.local/share/graphify-lang/wheels/
 pipx install --force "graphifyy[mcp,commonlisp] @ file://$HOME/.local/share/graphify-lang/wheels/graphifyy-<version>-py3-none-any.whl"
 ~/.local/share/pipx/venvs/graphifyy/bin/python -c "from graphify.install import _copy_skill_file; _copy_skill_file('claude')"
 ```
+
+The release branch is `rr-fix` since `v0.9.68+lang.4`: `autolisp` still
+holds the pre-rebase plan 01-04 history and is not an ancestor of `rr-fix`
+(checked at `v0.9.68+lang.5`), so it cannot be fast-forwarded. Once the owner
+moves `autolisp` onto `rr-fix`, release from `autolisp` again.
 
 Do not run `graphify install` or `graphify claude install` from `$HOME`: it
 rewrites the shared `settings.json`. Rollback to stock:
@@ -579,10 +584,12 @@ rewrites the shared `settings.json`. Rollback to stock:
 
 ## Status
 
-- **Released**: `v0.9.67+lang.3`, installed in the pipx venv. Plan 05 (review
-  remediation, `docs/plans/05-review-remediation-cc-cr000-001.md`) is on the
-  `rr-*` branches, rebased onto upstream 0.9.68, and ships as
-  `v0.9.68+lang.4`.
+- **Released**: `v0.9.68+lang.5`, installed in the pipx venv (T38: the
+  bmake, cc-kb and AutoLISP resolvers recognise a file node by upstream's
+  `_is_file_node_label`, so incremental builds keep edges into files whose
+  basename collides). Plan 05 (review remediation,
+  `docs/plans/05-review-remediation-cc-cr000-001.md`) shipped as
+  `v0.9.68+lang.4` from `rr-fix`, rebased onto upstream 0.9.68.
 - **Languages**: 9 registered plugins. `graphify lang list` shows them:
 
   | Plugin | Suffixes | Kind |

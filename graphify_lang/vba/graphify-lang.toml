@@ -3,15 +3,10 @@ schema = 1
 # Standard modules and forms: no built-in claims .bas or .frm, so no sniff.
 [language]
 name = "vba"
-type = "programming"
 suffixes = [".bas", ".frm"]
 hook_suffixes = [".bas", ".cls", ".frm"]
 priority = 10
 case_insensitive = true
-
-[grammar]
-kind = "regex"
-language_fn = "vba"
 
 # graphify_lang.vba.extract:extract_vba (a line scanner), resolver in resolve.py.
 # .frx (form binary resources) is not extracted.

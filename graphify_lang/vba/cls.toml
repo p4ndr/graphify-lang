@@ -4,14 +4,9 @@ schema = 1
 # here only when the sniff scores min_score or more (plan 04 D2, R1).
 [language]
 name = "vba-cls"
-type = "programming"
 suffixes = [".cls"]
 priority = 10
 case_insensitive = true
-
-[grammar]
-kind = "regex"
-language_fn = "vba"
 
 [sniff]
 head_bytes = 4096

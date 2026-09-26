@@ -5,7 +5,6 @@ schema = 1
 # other .xml, and every .xsd, stays exactly as upstream classifies it.
 [language]
 name = "ecschema"
-type = "data"
 suffixes = [".xml"]
 hook_suffixes = [".xml"]
 

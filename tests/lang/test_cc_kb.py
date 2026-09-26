@@ -44,9 +44,11 @@ def test_payload():
     doc = DOCS / "cc-XX000.001.md"
     refs = _get_extractor(doc)(doc)["cc_kb_refs"]
     assert refs["cc"] == [("cc-YY100.000", 3), ("cc-ZZ999.000", 3)]   # no self, no .2 version
-    assert refs["code"] == [("scripts/tool.ps1", 4)]                # :line, alias, fence, missing
+    # :line, alias, fence; a missing file stays in the payload, the resolver drops it (H3)
+    assert refs["code"] == [("scripts/none.ps1", 4), ("scripts/tool.ps1", 4)]
     assert refs["cc_heads"] == [("cc-YY100.000", 3, 1), ("cc-ZZ999.000", 3, 1)]
-    assert refs["code_heads"] == [("scripts/tool.ps1", 4, 1)]
+    assert refs["code_heads"] == [("scripts/none.ps1", 4, 1), ("scripts/tool.ps1", 4, 1)]
+    assert refs["up"] == [2, 1]
 
 
 def test_heads_payload_per_section():
@@ -64,11 +66,11 @@ def test_heads_payload_per_section():
 
 def test_root_agent_skill_payload_no_attrs():
     """D11: refs only; no attrs, no hub step, base nodes unchanged."""
-    for rel, up in (("README.md", 1), ("agents/ag-x.md", 2), ("skills/s/SKILL.md", 3)):
+    for rel, up in (("README.md", [1]), ("agents/ag-x.md", [1, 2]), ("skills/s/SKILL.md", [1, 3])):
         p = FIXTURE / rel
         got, base = _get_extractor(p)(p), extract_markdown(p)
         assert got["nodes"] == base["nodes"] and got["edges"] == base["edges"], rel
-        assert got["cc_kb_refs"]["up"] == up and got["cc_kb_refs"]["hubs"] is False, rel
+        assert got["cc_kb_refs"]["up"][:len(up)] == up and got["cc_kb_refs"]["hubs"] is False, rel
     odd = DOCS / "cc-XX000.001.squad-check.md"   # docs/cc-* off-schema: refs, no attrs
     got = _get_extractor(odd)(odd)
     assert got["nodes"] == extract_markdown(odd)["nodes"] and got["cc_kb_refs"]["cc"] == [
@@ -79,8 +81,13 @@ def test_root_agent_skill_payload_no_attrs():
 
 @pytest.mark.parametrize("path", [FIXTURE / "docs" / "notes.md", PLAIN / "README.md",
                                   PLAIN / "docs" / "guide.md", PLAIN / "agents" / "a.md"])
-def test_out_of_scope_unchanged(path):
-    assert _get_extractor(path)(path) == extract_markdown(path)
+def test_out_of_scope_unchanged(path, tmp_path):
+    """The augment cannot see its scope (H3): nodes and edges are the base ones,
+    and the resolver, finding no graphed harness root, adds nothing."""
+    got, base = _get_extractor(path)(path), extract_markdown(path)
+    assert got["nodes"] == base["nodes"] and got["edges"] == base["edges"]
+    res = extract([path], cache_root=tmp_path)
+    assert not [e for e in res["edges"] if e.get("context") in ("cc_ref", "hub_spoke", "code_ref")]
 
 
 def _graph(cache):

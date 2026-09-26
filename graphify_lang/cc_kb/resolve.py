@@ -1,8 +1,10 @@
 """cc-kb cross-file resolver (plan 04 §3.4, S13).
 
-Consumes the ``cc_kb_refs`` payload of each augmented result (a ``cc-*.md``
-doc, or a root, agent or skill ``.md`` file). The harness root is ``up``
-folders above the file. Targets are found by file name, never by id scheme:
+Consumes the ``cc_kb_refs`` payload of each augmented ``.md`` result. The
+harness root is the first of the ``up`` candidates (folders above the file)
+whose ``docs/`` holds a graphed ``cc-*.md`` page; a file with none is out of
+scope. Only graphed nodes are read (plan 05 S4, H3). Targets are found by
+file name, never by id scheme:
 
 - a ``cc`` mention -> the page node of ``cc-<id>.md`` in the root's ``docs/``
   folder (edge ``RELATION``,
@@ -13,7 +15,7 @@ folders above the file. Targets are found by file name, never by id scheme:
   spoke. The edge is owned by the child's file;
 - a ``code`` path -> the file node of that path under the harness root
   (edge ``RELATION``, context ``code_ref``). A path that is not a graphed
-  file adds nothing;
+  file, or is the doc itself, adds nothing;
 - ``cc_heads`` / ``code_heads`` (D12): the same edge again from the heading
   node whose section holds the mention, added after every page-level edge.
 
@@ -85,16 +87,23 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
                           "confidence_score": 1.0, "source_file": sf,
                           "source_location": f"L{line or 1}", "weight": 1.0})
 
+    # A harness root: a folder whose docs/ holds a graphed cc-*.md page (H3:
+    # decided here, over graphed nodes only, never by reading the disk).
+    harness = {posixpath.dirname(folder) for folder, _ in docs}
     work = []
     for res in per_file:
         if isinstance(res, dict) and res.get("cc_kb_refs"):
             node = res["nodes"][res["cc_kb_refs"]["node"]]
             me = by_id.get(node["id"], node)
             sf = node.get("source_file", "")
-            root = _norm(sf)
-            for _ in range(res["cc_kb_refs"].get("up", 2)):
-                root = posixpath.dirname(root)
-            work.append((res["cc_kb_refs"], me, sf, root, res["nodes"]))
+            ups = res["cc_kb_refs"].get("up", [2])
+            for up in ups if isinstance(ups, list) else [ups]:
+                root = _norm(source_of(me))
+                for _ in range(up):
+                    root = posixpath.dirname(root)
+                if root in harness:
+                    work.append((res["cc_kb_refs"], me, sf, root, res["nodes"]))
+                    break
 
     # Hub -> spoke first: a structural edge wins a pair over a mention.
     for refs, me, sf, root, _ in work:
@@ -114,7 +123,7 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
             me["dangling_cc_refs"] = dangling
         for rel, line in refs.get("code", []):
             target = files.get(_norm(posixpath.join(root, rel)))
-            if target is not None:
+            if target is not None and target["id"] != me["id"]:
                 add(me["id"], target["id"], RELATION, "code_ref", sf, line)
     # Heading -> target (D12) last, so the page-level edges above are unchanged.
     for refs, me, sf, root, nodes in work:
@@ -124,7 +133,7 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
                 add(nodes[node]["id"], target["id"], RELATION, "cc_ref", sf, line)
         for rel, line, node in refs.get("code_heads", []):
             target = files.get(_norm(posixpath.join(root, rel)))
-            if target is not None:
+            if target is not None and target["id"] != me["id"]:   # not its own file
                 add(nodes[node]["id"], target["id"], RELATION, "code_ref", sf, line)
 
 RESOLVER = LanguageResolver(name="cc-kb", suffixes=frozenset({".md"}), resolve=resolve)

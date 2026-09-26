@@ -2,8 +2,9 @@
 
 Fixture tree: tests/lang/fixtures/cargo/ (a virtual workspace: members
 ``crates/*`` + ``tools/gen``, ``crates/skip`` excluded). Core
-``extract_package_manifest`` runs first; the augment adds the workspace node,
-``has_member`` edges, ``external_deps``, and the edge for a renamed path dep.
+``extract_package_manifest`` runs first; the augment adds the workspace node
+and the ``cargo_refs`` payload; the resolver adds ``has_member`` edges,
+``external_deps``, and the edge for a renamed path dep (plan 05 S4, H3).
 """
 from __future__ import annotations
 
@@ -27,23 +28,35 @@ def test_cargo_listed_as_augment():
     assert "+.toml" in row and "match" in row
 
 
-def test_virtual_root_gets_workspace_and_members():
+def test_virtual_root_gets_workspace_and_payload():
+    """The augment reads only its own file (H3): members are a payload."""
     root = FIXTURE / "Cargo.toml"
     assert extract_package_manifest(root) == {"nodes": [], "edges": []}
     got = _get_extractor(root)(root)
     assert [(n["id"], n["type"]) for n in got["nodes"]] == [("cargo_workspace_cargo", "workspace")]
-    assert _rel("has_member", got) == [("cargo_workspace_cargo", m) for m in MEMBERS]
+    assert got["nodes"][0]["cargo_ws_deps"] == ["demo-core=demo-core@path", "serde=serde"]
+    assert got["edges"] == []
+    assert got["cargo_refs"]["workspace"] == {"id": "cargo_workspace_cargo",
+                                              "members": ["crates/*", "tools/gen"],
+                                              "exclude": ["crates/skip"]}
 
 
-def test_crate_keeps_base_and_adds_external_and_renamed():
+def test_crate_keeps_base_and_carries_deps():
     cli = FIXTURE / "crates" / "cli" / "Cargo.toml"
     base, got = extract_package_manifest(cli), _get_extractor(cli)(cli)
-    assert got["edges"][:len(base["edges"])] == base["edges"]
-    assert got["nodes"] == [{**base["nodes"][0], "external_deps": ["clap", "windows"]}]
-    assert _rel("depends_on", got) == sorted(
-        _rel("depends_on", base) + [("pkg_demo_cli", "pkg_demo_gen")])
-    core = FIXTURE / "crates" / "core" / "Cargo.toml"             # workspace-inherited external
-    assert _get_extractor(core)(core)["nodes"][0]["external_deps"] == ["serde"]
+    assert got["edges"] == base["edges"] and got["nodes"] == base["nodes"]
+    assert got["cargo_refs"]["crate"] == {"id": "pkg_demo_cli", "external": ["clap", "windows"],
+                                          "renamed": ["demo-gen"], "inherit": ["demo-core="]}
+
+
+def test_pipeline_external_and_renamed():
+    files = sorted(FIXTURE.rglob("Cargo.toml"))
+    with tempfile.TemporaryDirectory() as cache:
+        result = extract(files, cache_root=Path(cache), root=FIXTURE)
+    by_id = {n["id"]: n for n in result["nodes"]}
+    assert by_id["pkg_demo_cli"]["external_deps"] == ["clap", "windows"]
+    assert by_id["pkg_demo_core"]["external_deps"] == ["serde"]   # workspace-inherited external
+    assert ("pkg_demo_cli", "pkg_demo_gen") in _rel("depends_on", result)
 
 
 def test_pyproject_untouched():

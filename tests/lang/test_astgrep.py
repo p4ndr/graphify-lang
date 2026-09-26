@@ -118,24 +118,6 @@ def test_malformed_yaml_warns_and_keeps_file_node(caplog):
     assert "YAML does not parse" in caplog.text
 
 
-def test_flat_fallback_without_pyyaml(monkeypatch):
-    # PyYAML is not a graphify dependency: the flat parser must give the same
-    # nodes, with a local util's references credited to its rule (the ceiling).
-    files = ["sgconfig.yml", "rules/python/no-eval.yml", "rules/python/print-and-exec.yml",
-             "utils/is-call.yml", "rule-tests/no-eval-test.yml",
-             "rule-tests/__snapshots__/no-eval-snapshot.yml"]
-
-    def run():
-        return [extract_astgrep(FIXTURE / f) for f in files]
-    exact = run()
-    monkeypatch.setattr(astgrep_extract, "_yaml", None)
-    flat = run()
-    assert [r["nodes"] for r in flat] == [r["nodes"] for r in exact]
-    assert [r["edges"] for r in flat] == [r["edges"] for r in exact]
-    refs = [[(x["kind"], x["name"]) for x in r["astgrep_refs"]] for r in flat]
-    assert refs[1] == [("util", "is-call")]  # the note's prose `matches:` is not a key
-
-
 @pytest.mark.skipif(not (CORPUS / "sgconfig.yml").is_file(), reason="llm-linter-tool not present")
 def test_corpus_rules_and_tests(tmp_path):
     ls = subprocess.run(["git", "-C", str(CORPUS), "ls-files", "*.yml", "*.yaml"],

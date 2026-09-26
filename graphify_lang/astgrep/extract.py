@@ -15,9 +15,8 @@ same document has that id. Everything cross-file is left on the result as
 ``astgrep_refs`` for ``resolve.py``: global util references, a test or
 snapshot's rule id, and the ``ruleDirs`` / ``utilDirs`` of an sgconfig.
 
-PyYAML is used when importable; it is not a graphify dependency, so without it
-a flat parser reads the top-level keys this module needs. A document that does
-not parse keeps the file node only and logs a warning.
+PyYAML (a runtime dependency) parses each document. A document that does not
+parse keeps the file node only and logs a warning.
 """
 from __future__ import annotations
 
@@ -27,85 +26,21 @@ from bisect import bisect_left
 from functools import lru_cache
 from pathlib import Path
 
+import yaml
+
 from graphify_lang._common import Sink, _make_id
 
 _LOG = logging.getLogger(__name__)
-
-try:
-    import yaml as _yaml
-except ImportError:  # not a graphify dependency (upstream treats it as optional too)
-    _yaml = None
-
-
 _DOC_SPLIT_RE = re.compile(r"^---[ \t]*(?:#.*)?$", re.MULTILINE)
-_TOP_RE = re.compile(r"^([A-Za-z_][\w-]*):(?:[ \t]+(.*?))?[ \t]*$")
-_CHILD_KEY_RE = re.compile(r"^([ \t]+)(?:-[ \t]+)?([\w.-]+):(?:[ \t]+(.*?))?[ \t]*$")
-# A ``matches:`` key: at a line start (after an optional ``- ``) or in a flow map.
-_MATCHES_RE = re.compile(r"(?:^[ \t]*(?:-[ \t]+)?|[{,][ \t]*)matches:[ \t]*['\"]?([\w.-]+)",
-                         re.MULTILINE)
 
 
-def _scalar(value: str | None):
-    if value is None or value in ("", "|", ">", "|-", ">-"):
-        return None
-    value = re.sub(r"[ \t]+#.*$", "", value).strip()
-    if value.startswith("[") and value.endswith("]"):
-        return [_scalar(v) for v in value[1:-1].split(",") if v.strip()]
-    return value.strip("'\"")
-
-
-def _flat_load(text: str) -> dict:
-    """Top-level keys only: a scalar, a list (of scalars or ``- key: value``
-    maps), or the child keys of a mapping. Fallback when PyYAML is absent.
-
-    ponytail: nested rule trees are not parsed; ``matches:`` is found by regex
-    over the whole document (``_matches``), so a local util's references are
-    credited to its rule. Install PyYAML for exact attribution.
-    """
-    out: dict = {}
-    key, indent = None, None
-    for line in text.splitlines():
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        if not line[0].isspace():
-            m = _TOP_RE.match(line)
-            key, indent = (m.group(1), None) if m else (None, None)
-            if m:
-                out[key] = _scalar(m.group(2))
-            continue
-        if key is None:
-            continue
-        stripped = line.strip()
-        if stripped.startswith("- ") and (indent is None or len(line) - len(line.lstrip()) <= indent):
-            indent = len(line) - len(line.lstrip())
-            if not isinstance(out[key], list):
-                out[key] = []
-            m = _CHILD_KEY_RE.match(line)
-            out[key].append({m.group(2): _scalar(m.group(3))} if m else _scalar(stripped[2:]))
-            continue
-        m = _CHILD_KEY_RE.match(line)
-        if m and not isinstance(out[key], list) and (indent is None or len(m.group(1)) == indent):
-            indent = len(m.group(1))
-            if not isinstance(out[key], dict):
-                out[key] = {}
-            out[key][m.group(2)] = _scalar(m.group(3))
-    return out
-
-
-def _load(text: str):
-    return _yaml.safe_load(text) if _yaml is not None else _flat_load(text)
-
-
-def _matches(obj, text: str | None = None, seen: set[int] | None = None) -> list[str]:
-    """Every ``matches: <id>`` value under ``obj``; the regex scan of ``text``
-    when the tree was not parsed (flat fallback).
+def _matches(obj, seen: set[int] | None = None) -> list[str]:
+    """Every ``matches: <id>`` value under ``obj``.
 
     Each dict / list is visited once (``seen`` holds their ids): YAML aliases
     share subtrees, so without it N levels of 10 aliases cost 10^N visits and a
     self-referencing alias never ends (cc-CR000.001 H4).
     """
-    if _yaml is None:
-        return _MATCHES_RE.findall(text or "") if text is not None else []
     if not isinstance(obj, (dict, list)):
         return []
     seen = set() if seen is None else seen
@@ -180,7 +115,7 @@ def _rule_doc(out: Sink, doc: dict, text: str, first: int, role: str) -> None:
         local[uid] = out.add(_make_id(owner, "util", uid), uid, "util", uline,
                              astgrep_scope="local")
         out.edge(owner, local[uid], "contains", uline)
-    uses = [(owner, line, _matches({k: v for k, v in doc.items() if k != "utils"}, text))]
+    uses = [(owner, line, _matches({k: v for k, v in doc.items() if k != "utils"}))]
     uses += [(local[str(u)], line, _matches(body)) for u, body in utils.items()]
     for src, ln, names in uses:
         for name in dict.fromkeys(names):
@@ -192,7 +127,7 @@ def _rule_doc(out: Sink, doc: dict, text: str, first: int, role: str) -> None:
 
 def _document(out: Sink, path: Path, chunk: str, first: int) -> None:
     """One ``---``-separated document; any error skips it (the caller logs)."""
-    doc = _load(chunk)
+    doc = yaml.safe_load(chunk)
     if not isinstance(doc, dict):
         return
     role = _role(doc, path)

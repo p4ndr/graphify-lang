@@ -285,7 +285,6 @@ def test_s3_e1_sink_ref_unique_and_add_salting(tmp_path):
     assert [(r["node"], r["line"]) for r in s.refs] == [(1, 2), (1, 4)]
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S3-N4: Out overrides Sink methods")
 def test_s3_n4_rules_out_keeps_the_sink_signatures():
     import inspect
 

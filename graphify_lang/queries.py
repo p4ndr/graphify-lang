@@ -129,5 +129,5 @@ class QueryRules:
         for byte, label, relation, line in refs:
             inner = [s for s in scopes if s[0] <= byte < s[1]]
             src = min(inner, key=lambda s: s[1] - s[0])[2] if inner else out.file_nid
-            out.ref(src, label, relation, line)
+            out.name_ref(src, label, relation, line)
         return tree

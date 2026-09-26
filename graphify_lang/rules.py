@@ -47,20 +47,21 @@ class Out(Sink):
         self._by_label: dict[str, str] = {}
         self._names: list[tuple[str, str, str, int]] = []
 
-    def node(self, kind: str, label: str, line: int) -> str:
+    def node(self, kind: str, label: str, line: int, **attrs) -> str:
         nid = _make_id(self.stem, label)
         if nid in self._ids:
             nid = _make_id(self.stem, label, str(line))
-        self.add(nid, label, kind, line)
+        self.add(nid, label, kind, line, **attrs)
         self._by_label.setdefault(self.builtins.fold(label), nid)
         self.edge(self.file_nid, nid, "contains", line)
         return nid
 
-    def ref(self, source: str, name: str, relation: str, line: int) -> None:
+    def name_ref(self, source: str, name: str, relation: str, line: int) -> None:
+        """A reference by name, resolved in the file by ``resolved``."""
         if not self.builtins.is_builtin(name):
             self._names.append((source, name, relation, line))
 
-    def result(self) -> dict:
+    def resolved(self) -> dict:
         # ponytail: in-file resolution only; a cross-file ref needs a plugin resolver.
         for src, name, relation, line in self._names:
             tgt = self._by_label.get(self.builtins.fold(name))
@@ -115,7 +116,7 @@ def build(manifest_path: Path, manifest: dict[str, Any], *,
         tree = queries.apply(source, out) if queries else None
         if regex:
             regex.apply(source.decode("utf-8", errors="replace"), path, out)
-        result = out.result()
+        result = out.resolved()
         if hook:
             got = hook(path, tree, result["nodes"], result["edges"], manifest)
             if isinstance(got, dict):

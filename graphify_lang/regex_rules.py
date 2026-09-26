@@ -92,7 +92,7 @@ class RegexRules:
             elif "edge" in rule:
                 name = _group(m, rule.get("target", rule.get("name_group", "name")))
                 src = stack[-1] if stack and rule.get("edge_from_scope", True) else out.file_nid
-                out.ref(src, name, rule["edge"], line)
+                out.name_ref(src, name, rule["edge"], line)
             if scope == "pop" and stack:
                 stack.pop()
 

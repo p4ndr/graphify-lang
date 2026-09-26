@@ -17,21 +17,12 @@ def _load(tmp_path: Path, text: str):
     return LanguageManifest.from_toml(path)
 
 
-_RAISES = pytest.mark.xfail(strict=True, raises=AttributeError,
-                           reason="cc-CR000.001 L4: a non-table section raises")
-_ACCEPTS = pytest.mark.xfail(strict=True, raises=AssertionError,
-                            reason="cc-CR000.001 L4: a non-string name is accepted")
-_CASE = pytest.mark.xfail(strict=True, raises=AssertionError,
-                         reason="cc-CR000.001 L4: suffixes are not lower-cased")
-
-
 @pytest.mark.parametrize("text", [
-    pytest.param('language = "x"\n', marks=_RAISES),
-    pytest.param('grammar = "g"\n[language]\nname = "x"\nsuffixes = [".x"]\n' + _EXTRACT,
-                 marks=_RAISES),
-    pytest.param('extract = "e"\n[language]\nname = "x"\nsuffixes = [".x"]\n', marks=_RAISES),
-    pytest.param('[language]\nname = 7\nsuffixes = [".x"]\n' + _EXTRACT, marks=_ACCEPTS),
-    pytest.param('[language]\nname = ["x"]\nsuffixes = [".x"]\n' + _EXTRACT, marks=_ACCEPTS),
+    'language = "x"\n',
+    'grammar = "g"\n[language]\nname = "x"\nsuffixes = [".x"]\n' + _EXTRACT,
+    'extract = "e"\n[language]\nname = "x"\nsuffixes = [".x"]\n',
+    '[language]\nname = 7\nsuffixes = [".x"]\n' + _EXTRACT,
+    '[language]\nname = ["x"]\nsuffixes = [".x"]\n' + _EXTRACT,
 ])
 def test_l4_bad_sections_never_raise(tmp_path, text):
     manifest, errors = _load(tmp_path, text)
@@ -39,7 +30,6 @@ def test_l4_bad_sections_never_raise(tmp_path, text):
     assert manifest.name == ""
 
 
-@_CASE
 def test_l4_suffixes_lower_cased(tmp_path):
     manifest, errors = _load(tmp_path, '[language]\nname = "x"\nsuffixes = [".LSP", ".Mnl"]\n'
                              'hook_suffixes = [".LSP"]\noverrides = [".DCL"]\n' + _EXTRACT)
@@ -49,7 +39,6 @@ def test_l4_suffixes_lower_cased(tmp_path):
     assert manifest.overrides == frozenset({".dcl"})
 
 
-@_CASE
 def test_l4_augments_lower_cased(tmp_path):
     manifest, errors = _load(tmp_path, '[language]\nname = "x"\nkind = "augment"\n'
                              'augments = [".MD"]\n' + _EXTRACT)

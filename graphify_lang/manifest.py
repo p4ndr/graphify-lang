@@ -112,6 +112,8 @@ class LanguageManifest:
     # Node fields the resolver reads on other files' nodes: kept on the
     # context nodes of unchanged files in an incremental build (H1).
     context_fields: tuple[str, ...] = ("node_kind",)
+    # ``[extract] runtime``: the module a GRAPHIFY_LANG_PATH plugin is loaded from.
+    runtime: str | None = None
 
     @property
     def has_match(self) -> bool:
@@ -233,7 +235,8 @@ class LanguageManifest:
             return cls._invalid("; ".join(errors))
 
         # extract / augment / resolver are set by the package's entry point
-        # (graphify_lang._common.load_manifest); extract.runtime is only checked.
+        # (graphify_lang._common.load_manifest), or from the ``runtime`` module
+        # for a GRAPHIFY_LANG_PATH plugin (registry._path_manifest).
         manifest = cls(
             name=name,
             suffixes=frozenset(suffixes) if suffixes else frozenset(),
@@ -251,6 +254,7 @@ class LanguageManifest:
             match_globs=match_globs,
             match_filenames=match_filenames,
             context_fields=context_fields,
+            runtime=runtime,
         )
 
         # Additional validation

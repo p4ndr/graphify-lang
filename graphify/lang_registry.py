@@ -75,13 +75,17 @@ def _namespace_ast_cache(lang_registry) -> None:
     names = tuple(sorted(m.name for m in lang_registry.iter_manifests()))
     modules = tuple(sorted({getattr(m.augment or m.extract, "__module__", "") or ""
                             for m in lang_registry.iter_manifests()}))
-    cache._EXTRACTOR_VERSION = f"{_BASE_CACHE_VERSION}-lang{_fingerprint(names, modules)}"
+    folders = tuple(str(p) for p in lang_registry.search_paths())
+    cache._EXTRACTOR_VERSION = (f"{_BASE_CACHE_VERSION}-lang"
+                                f"{_fingerprint(names, modules, folders)}")
 
 
 @functools.lru_cache(maxsize=8)
-def _fingerprint(names: tuple[str, ...], modules: tuple[str, ...]) -> str:
+def _fingerprint(names: tuple[str, ...], modules: tuple[str, ...],
+                 folders: tuple[str, ...] = ()) -> str:
     """Hash of the manifest names, each plugin distribution's version, and the
-    ``.py`` / ``.toml`` files of ``graphify_lang`` and every plugin package."""
+    ``.py`` / ``.toml`` files of ``graphify_lang``, every plugin package and
+    every ``GRAPHIFY_LANG_PATH`` folder (cc-CR000.001 M5)."""
     import hashlib
     import sys
     from importlib import metadata
@@ -90,7 +94,7 @@ def _fingerprint(names: tuple[str, ...], modules: tuple[str, ...]) -> str:
     import graphify_lang
 
     h = hashlib.sha256("\0".join(names).encode())
-    dirs = {Path(graphify_lang.__file__).parent}
+    dirs = {Path(graphify_lang.__file__).parent} | {Path(f) for f in folders}
     for name in modules:
         mod = sys.modules.get(name)
         if getattr(mod, "__file__", None):

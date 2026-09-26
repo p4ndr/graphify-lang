@@ -15,6 +15,14 @@ This document is a LIVE file containing a list of TASKS that have been carried o
 
 ## 3. TASK LIST
 
+### `[x]` T32 | P05-S001 (rr-s1) Security and crash safety — H4 E6 L1 L2 L4 N4
+
+- `[x]` T32.1 | S1.1 Red tests: alias bomb, self-alias, deep nesting, large schema, bad manifest sections
+- `[x]` T32.2 | S1.2 H4/E6 memoised _matches + per-document try
+- `[x]` T32.3 | S1.3 L1 RecursionError fallback, L2 edge-key sets, N4 bisect line numbers
+- `[x]` T32.4 | S1.4 L4 manifest validation never raises; lower-case suffix keys
+- `[x]` T32.5 | S1.5 Stage close: hub §3 checks; move findings to cc-CR000.002
+
 ### `[x]` T31 | P04-E Release, rebuild graphs, docs — plan 04 S15-S17
 
 - `[x]` T31.1 | S15 Merge branches, tag v0.9.67+lang.3, build wheel, pipx install --force

@@ -53,14 +53,6 @@ This document is a LIVE file containing a list of TASKS to be carried out.
 - `[ ]` T10.4 | Include the `run_language_resolvers` casefold as a separate small fix
 - `[ ]` T10.5 | Expect to carry the registry indefinitely; plan accordingly
 
-### `[ ]` T32 | P05-S001 (rr-s1) Security and crash safety — H4 E6 L1 L2 L4 N4
-
-- `[ ]` T32.1 | S1.1 Red tests: alias bomb, self-alias, deep nesting, large schema, bad manifest sections
-- `[ ]` T32.2 | S1.2 H4/E6 memoised _matches + per-document try
-- `[ ]` T32.3 | S1.3 L1 RecursionError fallback, L2 edge-key sets, N4 bisect line numbers
-- `[ ]` T32.4 | S1.4 L4 manifest validation never raises; lower-case suffix keys
-- `[ ]` T32.5 | S1.5 Stage close: hub §3 checks; move findings to cc-CR000.002
-
 ### `[ ]` T33 | P05-S002 (rr-s2) Repo and CI hygiene — M7 M8 E9 M9 M10 N6
 
 - `[ ]` T33.1 | S2.1 M7 restore publish/release-graph workflows + guard lines

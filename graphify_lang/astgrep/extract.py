@@ -103,17 +103,27 @@ def _load(text: str):
     return _yaml.safe_load(text) if _yaml is not None else _flat_load(text)
 
 
-def _matches(obj, text: str | None = None) -> list[str]:
+def _matches(obj, text: str | None = None, seen: set[int] | None = None) -> list[str]:
     """Every ``matches: <id>`` value under ``obj``; the regex scan of ``text``
-    when the tree was not parsed (flat fallback)."""
+    when the tree was not parsed (flat fallback).
+
+    Each dict / list is visited once (``seen`` holds their ids): YAML aliases
+    share subtrees, so without it N levels of 10 aliases cost 10^N visits and a
+    self-referencing alias never ends (cc-CR000.001 H4).
+    """
     if _yaml is None:
         return _MATCHES_RE.findall(text or "") if text is not None else []
+    if not isinstance(obj, (dict, list)):
+        return []
+    seen = set() if seen is None else seen
+    if id(obj) in seen:
+        return []
+    seen.add(id(obj))
     if isinstance(obj, dict):
         return [x for k, v in obj.items()
-                for x in ([str(v)] if k == "matches" and isinstance(v, (str, int)) else _matches(v))]
-    if isinstance(obj, list):
-        return [x for v in obj for x in _matches(v)]
-    return []
+                for x in ([str(v)] if k == "matches" and isinstance(v, (str, int))
+                          else _matches(v, seen=seen))]
+    return [x for v in obj for x in _matches(v, seen=seen)]
 
 
 def _documents(text: str) -> list[tuple[int, str]]:
@@ -212,6 +222,33 @@ def _rule_doc(out: _Out, doc: dict, text: str, first: int, role: str) -> None:
                 out.ref("util", src, name, ln)
 
 
+def _document(out: _Out, path: Path, chunk: str, first: int) -> None:
+    """One ``---``-separated document; any error skips it (the caller logs)."""
+    doc = _load(chunk)
+    if not isinstance(doc, dict):
+        return
+    role = _role(doc, path)
+    if "astgrep_role" not in out.nodes[0]:
+        out.nodes[0]["astgrep_role"] = role
+    if role == "sgconfig":
+        tests = doc.get("testConfigs") if isinstance(doc.get("testConfigs"), list) else []
+        test_dirs = [str(t["testDir"]) for t in tests if isinstance(t, dict) and t.get("testDir")]
+        for key in ("ruleDirs", "utilDirs"):
+            for d in _dirs(doc.get(key)):
+                out.ref("dir", out.file_nid, d, _key_line(chunk, first, rf"^{key}:"))
+        out.nodes[0].update({"rule_dirs": _dirs(doc.get("ruleDirs")),
+                             "util_dirs": _dirs(doc.get("utilDirs")),
+                             "test_dirs": test_dirs})
+        return
+    if doc.get("id") is None:
+        return
+    if role in ("test", "snapshot"):
+        out.nodes[0].setdefault("astgrep_id", str(doc["id"]))
+        out.ref(role, out.file_nid, str(doc["id"]), _key_line(chunk, first, r"^id:"))
+        return
+    _rule_doc(out, doc, chunk, first, role)
+
+
 def extract_astgrep(path: Path) -> dict:
     """Extract one ast-grep project YAML file (plan 04 §3.4)."""
     path = Path(path)
@@ -222,31 +259,9 @@ def extract_astgrep(path: Path) -> dict:
     out = _Out(path)
     for first, chunk in _documents(text):
         try:
-            doc = _load(chunk)
-        except Exception as exc:  # malformed YAML: keep the file node, never crash
-            _LOG.warning("astgrep: %s line %d: YAML does not parse: %s",
-                         path, first, str(exc).splitlines()[0] if str(exc) else exc)
-            continue
-        if not isinstance(doc, dict):
-            continue
-        role = _role(doc, path)
-        if "astgrep_role" not in out.nodes[0]:
-            out.nodes[0]["astgrep_role"] = role
-        if role == "sgconfig":
-            tests = doc.get("testConfigs") if isinstance(doc.get("testConfigs"), list) else []
-            test_dirs = [str(t["testDir"]) for t in tests if isinstance(t, dict) and t.get("testDir")]
-            for key in ("ruleDirs", "utilDirs"):
-                for d in _dirs(doc.get(key)):
-                    out.ref("dir", out.file_nid, d, _key_line(chunk, first, rf"^{key}:"))
-            out.nodes[0].update({"rule_dirs": _dirs(doc.get("ruleDirs")),
-                                 "util_dirs": _dirs(doc.get("utilDirs")),
-                                 "test_dirs": test_dirs})
-            continue
-        if doc.get("id") is None:
-            continue
-        if role in ("test", "snapshot"):
-            out.nodes[0].setdefault("astgrep_id", str(doc["id"]))
-            out.ref(role, out.file_nid, str(doc["id"]), _key_line(chunk, first, r"^id:"))
-            continue
-        _rule_doc(out, doc, chunk, first, role)
+            _document(out, path, chunk, first)
+        except Exception as exc:  # keep the file node, never crash (H4)
+            _LOG.warning("astgrep: %s line %d: document skipped (YAML does not parse"
+                         " or is malformed): %s", path, first,
+                         str(exc).splitlines()[0] if str(exc) else exc)
     return {"nodes": out.nodes, "edges": out.edges, "astgrep_refs": out.refs}

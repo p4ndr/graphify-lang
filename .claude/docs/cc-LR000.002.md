@@ -4,7 +4,7 @@
 
 ## Quick Reference
 
-**Topics covered:** General (ast-cache-key-excludes-plugin-code, graphify-lang-augment-manifest-kind, graphify-lang-sniff-router-shared-suffix, plugin-import-cycle-via-extractors-package, plugin-node-ids-and-resolver-order, graphify-ast-cache-sweeps-sibling-versions, ...) · Bug Fix (regex-rules-kind-filter) · Pattern (autolisp-package-lit-fix-is-a-query-not-a-walker)
+**Topics covered:** General (incremental-rebuild-context-nodes-lack-node-kind, ast-cache-key-excludes-plugin-code, graphify-lang-augment-manifest-kind, graphify-lang-sniff-router-shared-suffix, plugin-import-cycle-via-extractors-package, plugin-node-ids-and-resolver-order, ...) · Bug Fix (regex-rules-kind-filter) · Pattern (autolisp-package-lit-fix-is-a-query-not-a-walker)
 
 Scan entries by category below, or search by topic tag.
 <!-- TEMPLATE-END -->
@@ -33,6 +33,8 @@ Scan entries by category below, or search by topic tag.
 **2026-09-25 · graphify-lang-sniff-router-shared-suffix** — A suffix claimed by a built-in extractor and a plugin (e.g. .cls = Apex built-in + vba-cls) is routed by content, not suffix: when any claimant has [sniff] or [match], apply_dispatch puts sniff_router[<suffix>] in _DISPATCH. It reads the file head once (head_bytes, BOM stripped, NUL/empty never passes), picks the plugin with the highest score >= min_score (then priority, then first registered, one tie warning per suffix), else falls back to the overrides plugin / built-in / empty result. Built-ins never get a sniff profile (plan 04 D1/D2). Data suffixes (.yml/.toml/.xml) become CODE only via classify_file -> lang_registry.claims_file when a [match] glob AND the sniff pass; they are never added to CODE_EXTENSIONS. `graphify lang list` shows a sniff column, * after a shared suffix, + before an augmented one. (source: graphify-lang plan 04 (T27, T31))
 
 **2026-09-25 · graphify-lang-augment-manifest-kind** — Manifest kind = "augment" (augments = [".md"] plus [match]) adds to a built-in extractor's output without editing it: the registry wraps the suffix's extractor (built-in or sniff router) as augmented[<suffix>] = merge(base(p), augment(p, base(p))), only when [match] passes. The plugin exports augment(path, base_result) -> {nodes, edges, attrs keyed by base node id}; new node ids must carry the plugin prefix, no base node is deleted/renamed, an existing attribute is never overwritten (clash logged). Augments run only in the AST pass (semantic-backed docs skip it; 0 of 1277 cc-*.md were semantic-backed, so no extra hooks). Used by cc-kb (.md) and cargo (on extract_package_manifest, which upstream calls before _DISPATCH, so cargo needed a registry-lookup hook in _get_extractor). (source: graphify-lang plan 04 (T27, T29, T30))
+
+**2026-09-26 · incremental-rebuild-context-nodes-lack-node-kind** — graphify.watch._rebuild_code(changed_paths=...) hands resolvers the unchanged corpus as context nodes with only id/label/source_file/file_type/type plus a fixed marker list (watch.py ~1723); node_kind and plugin attrs (astgrep_scope, visibility, accessor) are dropped. Plugin resolvers that index targets by node_kind therefore find nothing in unchanged files, and an incremental rebuild silently drops every cross-file edge from the changed file (measured: autolisp calls edge gone after editing the caller only). Test incremental == full, and do not rely on node_kind for resolver targets without an upstream fix. (source: graphify-lang code review 2026-09-26)
 
 ### Bug Fix
 

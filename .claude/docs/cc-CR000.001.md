@@ -1,16 +1,16 @@
 # Code review: graphify-lang fork layer
 
-Open findings only. Fixed and closed findings move to `cc-CR000.002.md` (plan 05 stage 1 moved H4, E6, L1, L2, L4, N4 on 2026-09-26).
+Open findings only. Fixed and closed findings move to `cc-CR000.002.md` (plan 05 stage 1 moved H4, E6, L1, L2, L4, N4 and stage 2 moved M7, M8, M9, M10, N6, E9 on 2026-09-26).
 
 | Severity | Count |
 |:---------|------:|
 | Critical | 0 |
 | High | 3 |
-| Medium | 12 |
+| Medium | 8 |
 | Low | 10 |
-| Nit | 5 |
-| **Defects total** | **30** |
-| Enhancements | 8 |
+| Nit | 4 |
+| **Defects total** | **25** |
+| Enhancements | 7 |
 
 - **Date**: 2026-09-26
 - **Mode**: Diff (`git diff upstream/v8...autolisp`), branch `autolisp`, HEAD `013c902` (v0.9.67+lang.3)
@@ -82,30 +82,6 @@ Open findings only. Fixed and closed findings move to `cc-CR000.002.md` (plan 05
 - **Where**: `graphify_lang/rules.py` (132 lines), `queries.py` (133), `regex_rules.py` (101), `builtins.py` (45), `templates/*.toml` (179), `tests/lang/test_rules.py` (259), fixtures `tests/lang/rules_dcl.toml`, plus shipped package data.
 - **Problem**: no plugin calls `rules.build()`; its own docstring says "none depends on it". It also carries an import-by-string hook (`rules.py:86-95`, `post_file = "module:fn"` from TOML). Every shipped plugin duplicates what it would provide (builtins lists, sinks).
 - **Fix**: delete the engine, its tests and the templates (git keeps them), or move them to the `lang-rules` branch until a plugin needs them.
-
-### M7 `publish.yml` and `release-graph.yml` are corrupted YAML
-
-- **Where**: `.github/workflows/publish.yml:20,33,36,39,50,53` and `release-graph.yml:17,25,34,39,42,52,58` (a trailing `:` was appended to lines, for example `contents: read:`, `uses: actions/checkout@v4:`).
-- **Problem (measured)**: `yaml.safe_load` fails on both files ("mapping values are not allowed here"). The `if: github.repository == 'Graphify-Labs/graphify'` guard never gets evaluated because the file does not parse; a release event on the fork shows an invalid-workflow failure, and the corruption would break publishing if the diff ever went upstream. It also adds rebase conflicts in upstream-owned files.
-- **Fix**: `git checkout upstream/v8 -- .github/workflows/publish.yml .github/workflows/release-graph.yml`, then re-add only the one-line `if:` guards (or disable the workflows in the fork's repo settings instead of editing them).
-
-### M8 Fork CI does not run on the release branch
-
-- **Where**: `.github/workflows/graphify-lang-ci.yml:4-7` (branches `lang-registry`, `v8`); upstream `ci.yml:5-7` (v1-v8, main). Releases are cut from `autolisp` (README 'Installing the fork').
-- **Problem**: no workflow runs on a push to `autolisp` or on the `v*+lang.*` tags, so a released wheel is never CI-tested. The security job's `bandit -r graphify` (`:56`) skips `graphify_lang`.
-- **Fix**: trigger on `autolisp` and `lang-*` branches and on `v*` tags; run `bandit -r graphify graphify_lang`.
-
-### M9 Committed junk and scratch files
-
-- **Where**: `git-sp.ps1` (765 lines, an unrelated sparse-checkout TUI); `.sidecar-cache/restore-8135b1ee46771d6c.json` (362 KB copy of `extract.py`) and `.sidecar-cache/T6-Resume-20260923.md`; repo-root `src_core_test.lsp`, `test_dcl.toml`, `test_pattern.toml` (unused: `tests/lang/test_autolisp_nodes.py:314` writes its own copy to `tmp_path`); `docs/testing/archive/` (32 near-duplicate `T14-*` reports); `.claude/docs/cc-T10-COMPLETE.md` (off-schema name).
-- **Problem**: noise in every diff against upstream, in the repo's own graph (the root `.lsp` becomes a graph node), and in reviews; the JSON bloats clones.
-- **Fix**: `git rm` them; add `.sidecar-cache/` to `.gitignore`; keep one summary of T14 if any of it is still referenced.
-
-### M10 `scripts/install-mcp.sh` writes a config key nothing reads
-
-- **Where**: `scripts/install-mcp.sh:1-10,64+` writes `.watch._HOOK_SOURCE_EXTS` into `~/.claude/mcp.json`.
-- **Problem**: no component reads that key; hook suffixes come from the registry (`graphify/cli.py:76-83`). The script mutates a shared user config file for no effect, and `docs/30-TODO.md:46` still lists a manual run as pending.
-- **Fix**: delete the script and the TODO line.
 
 ### M11 README is stale in several load-bearing places
 
@@ -183,7 +159,6 @@ Open findings only. Fixed and closed findings move to `cc-CR000.002.md` (plan 05
 - **N2** `docs/plans/00-INDEX.md` and plan headers mark plans 01 and 02 ACTIVE; plan 02 shipped in lang.1 (plan 01 is open only for T10).
 - **N3** Manifest keys that nothing reads: `type`, `grammar.kind`, `language_fn`, `version`, `case_insensitive`, `builtins_file`, `builtins_prefixes` (for example `autolisp/graphify-lang.toml:5,13-17,23-24`); the builtins lists are hard-coded again in `autolisp/extract.py:31-32`. Delete the unread keys or read them.
 - **N5** `[match] filenames` compare case-sensitively (`registry.py:240`): `cargo.toml` on a case-insensitive filesystem is not claimed.
-- **N6** `docs/30-TODO.md:46` and `docs/35-DONE.md:270` mark T9.5 done with "(TODO: run manually)" inside it; resolve with M10.
 
 ## Architectural findings
 
@@ -200,7 +175,6 @@ Open findings only. Fixed and closed findings move to `cc-CR000.002.md` (plan 05
 - **E5** One parity test: for each plugin fixture, full build == full build then touch-one-file incremental build (edges and ids). — Effort: LOW | Benefit: HIGH
 - **E7** Remove the rules engine and templates (M6). — Effort: TRIVIAL | Benefit: NEUTRAL
 - **E8** `lru_cache` on `cc_kb.augment._is_root` and one `by_id` map in the cc-kb resolver (L3). — Effort: TRIVIAL | Benefit: MINOR
-- **E9** CI on `autolisp`, `lang-*`, `v*` tags with `bandit` over `graphify_lang` (M8). — Effort: TRIVIAL | Benefit: HIGH
 
 ## Suggestion plan
 

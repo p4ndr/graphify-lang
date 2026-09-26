@@ -2,7 +2,7 @@
 
 Stage 2 of plan 05: the workflows parse, CI runs on the fork's release branches and tags, and the repo holds no junk.
 
-- Status: ACTIVE
+- Status: DONE (2026-09-26)
 - Task: T33
 - Hub: `05-review-remediation-cc-cr000-001.md`
 - Branch: `rr-s2` from `rr-s1`
@@ -27,3 +27,20 @@ Stage 2 of plan 05: the workflows parse, CI runs on the fork's release branches 
 | S2.4 | M10 and N6. | The T9.5 text has no open TODO. |
 | S2.5 | Ask the owner, then push `rr-s2` to `origin` and read the CI result. | The fork CI run on `rr-s2` is green. |
 | S2.6 | Stage close (hub §3); move the findings to `cc-CR000.002.md`. | Hub §3 checks pass. |
+
+## 3. Result (2026-09-26)
+
+| Step | Result | Commit |
+|:-----|:-------|:-------|
+| S2.1 | Before: `publish.yml` and `release-graph.yml` fail `yaml.safe_load`. After: all 4 workflows parse; `git diff upstream/v8` shows only the guard line in each. `actionlint` is not installed. | `711dfc6` |
+| S2.2 | Triggers: push/PR `autolisp`, `lang-*`, `rr-*`, `v8`; push tags `v*`. `bandit -r graphify_lang` locally: 0 issues at any severity. | `23735ce` |
+| S2.3 | 38 files removed (`.sidecar-cache/` 2, root scratch 3, `docs/testing/archive/` 32, `cc-T10-COMPLETE.md` 1); `.sidecar-cache/` ignored. Remaining grep hits are history notes (`docs/25-HISTORY.md`, the T1.5b/T9.5 records) and this plan. | `1f8a2e4` |
+| S2.4 | `scripts/install-mcp.sh` and `docs/16-MCP-SETUP.md` deleted; T9.5 text fixed in 30-TODO and 35-DONE; note under 55-SETTLED P1. | `1e2e430` |
+| S2.5 | Pushed `rr-s1` and `rr-s2` to `origin` (owner pre-approved for this run). Run 36219014956 failed: 3.10 could not import `tomllib` in `tests/lang/test_rules.py` (fork-owned). Fixed with the tomli fallback; run 36219115105 green: 3.10 6149 passed/19 skipped, 3.12 and 3.13 6148/20, security-scan success. | `3d3b99f` |
+| S2.6 | `pytest tests/ -q` 6154 passed, 14 skipped (baseline); three-dot extractor diff empty; `tests/lang_baseline.txt`, `tests/upstream_tables.json` unchanged. Findings moved to `cc-CR000.002.md`. | this commit |
+
+Deviations:
+
+- `docs/16-MCP-SETUP.md` was also deleted (S2.4): it only documented `install-mcp.sh` and told users to write the unread key by hand.
+- CI bandit (`continue-on-error`) reports 4 High, all upstream B324 (sha1/md5 used for ids) in `graphify/_minhash.py:47`, `graphify/extract.py:391`, `graphify/extractors/engine.py:16`, `graphify/extractors/resolution.py:982`; none in `graphify_lang`. Upstream-only, not fixed here.
+- The CI job matrix is fail-fast: the first 3.10 failure cancelled 3.12 and 3.13, so run 36219014956 did not test them.

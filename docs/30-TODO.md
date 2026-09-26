@@ -53,15 +53,6 @@ This document is a LIVE file containing a list of TASKS to be carried out.
 - `[ ]` T10.4 | Include the `run_language_resolvers` casefold as a separate small fix
 - `[ ]` T10.5 | Expect to carry the registry indefinitely; plan accordingly
 
-### `[ ]` T34 | P05-S003 (rr-s3) Shared plugin core — E2 L5 H2 M4 M6 E7 L3 E8 N3 L12
-
-- `[ ]` T34.1 | S3.1 Red tests: same-stem lsp/mnl/dcl, vba same-stem, portable file ids, post_file prefix
-- `[ ]` T34.2 | S3.2 graphify_lang/_common.py; move bmake
-- `[ ]` T34.3 | S3.3 Move ecschema, astgrep, vba, autolisp, cc_kb (one commit each)
-- `[ ]` T34.4 | S3.4 H2/M4 complete; case_008 id-form note
-- `[ ]` T34.5 | S3.5 M6 (D1), N3, L3/E8, L12
-- `[ ]` T34.6 | S3.6 Stage close; E7 closed per D1
-
 ### `[ ]` T35 | P05-S004 (rr-s4) Build coherence — H1 E3 E5 H3 L9 L11 M2 E1
 
 - `[ ]` T35.1 | S4.1 E5 parity test + H3/L9/L11/M2 red tests

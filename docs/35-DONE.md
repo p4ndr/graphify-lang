@@ -15,6 +15,15 @@ This document is a LIVE file containing a list of TASKS that have been carried o
 
 ## 3. TASK LIST
 
+### `[x]` T34 | P05-S003 (rr-s3) Shared plugin core — E2 L5 H2 M4 M6 E7 L3 E8 N3 L12
+
+- `[x]` T34.1 | S3.1 Red tests: same-stem lsp/mnl/dcl, vba same-stem, portable file ids, post_file prefix
+- `[x]` T34.2 | S3.2 graphify_lang/_common.py; move bmake
+- `[x]` T34.3 | S3.3 Move ecschema, astgrep, vba, autolisp, cc_kb (one commit each)
+- `[x]` T34.4 | S3.4 H2/M4 complete; case_008 id-form note
+- `[x]` T34.5 | S3.5 M6 (D1), N3, L3/E8, L12
+- `[x]` T34.6 | S3.6 Stage close; E7 closed per D1
+
 ### `[x]` T33 | P05-S002 (rr-s2) Repo and CI hygiene — M7 M8 E9 M9 M10 N6
 
 - `[x]` T33.1 | S2.1 M7 restore publish/release-graph workflows + guard lines

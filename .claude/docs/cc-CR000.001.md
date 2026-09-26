@@ -49,30 +49,22 @@ None open.
 
 ## Suggestion plan
 
-1. H4 + E6 (memoised `_matches`, per-document `try`): trivial, security.
-2. H2 (index-based refs in autolisp and vba) with M4 (suffix-qualified file ids) and a same-stem fixture test.
-3. H1: open the upstream PR (E3); meanwhile add the parity test (E5) marked `xfail` so the gap is visible.
-4. H3: move cargo member/workspace and cc-kb code-path resolution into the resolvers.
-5. M1, M2 (E1), M3 (upstream PR or registry lookup in watch).
-6. M7, M8 (E9), M9, M10: repository and CI hygiene in one commit.
-7. M5, M6 (E7), L6, L7, L12: deletions.
-8. M11 README and plan index (N1, N2).
-9. Remaining Low and Nit items as touched.
+None open: all nine plan items were actioned in plan 05 stages 1-6 (resolutions in `cc-CR000.002.md`).
 
 ## Metrics
 
+Open findings only; all are closed, so every count is 0 (as in the header table).
+
 | Category | High | Medium | Low | Total |
 |:---------|:----:|:------:|:---:|:-----:|
-| Errors | 3 | 4 | 5 | 12 |
-| Warnings | 0 | 3 | 4 | 7 |
-| Security | 1 | 0 | 0 | 1 |
-| Performance | 0 | 0 | 2 | 2 |
-| Style / docs / CI | 0 | 4 | 2 | 6 |
-| Test quality | 0 | 1 | 0 | 1 |
-| Nit | - | - | - | 6 |
-| Enhancements | - | - | - | 9 |
-
-Errors = H1-H3, M1-M4, L1, L4, L9, L10, L11. Security = H4. Warnings = M5, M6, M10, L5-L8. Style/docs/CI = M7, M8, M9, M11, L12, L13. Test quality = M12. Performance = L2, L3.
+| Errors | 0 | 0 | 0 | 0 |
+| Warnings | 0 | 0 | 0 | 0 |
+| Security | 0 | 0 | 0 | 0 |
+| Performance | 0 | 0 | 0 | 0 |
+| Style / docs / CI | 0 | 0 | 0 | 0 |
+| Test quality | 0 | 0 | 0 | 0 |
+| Nit | - | - | - | 0 |
+| Enhancements | - | - | - | 0 |
 
 - **Files reviewed**: 27 fork source files (`graphify/lang_registry.py`, 4 core hook blocks, 22 `graphify_lang` modules and manifests), 11 fork test modules, 3 workflows, `pyproject.toml`, 12 fork docs.
 - **Files with issues**: 24.

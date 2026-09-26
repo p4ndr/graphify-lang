@@ -2,7 +2,7 @@
 
 Stage 4 of plan 05: an incremental build, a cached build and a clean build give the same graph.
 
-- Status: ACTIVE
+- Status: DONE (2026-09-26, `rr-s4` `a5961fe`..HEAD)
 - Task: T35
 - Hub: `05-review-remediation-cc-cr000-001.md`
 - Branch: `rr-s4` from `rr-s3`
@@ -29,3 +29,23 @@ Stage 4 of plan 05: an incremental build, a cached build and a clean build give 
 | S4.4 | L11. | Its test passes. |
 | S4.5 | M2 and E1 fingerprint (engine commit). Update ltm learning 1484. | `test_m2_*` passes; two builds with the same plugin set share the cache (the second build is served from cache). |
 | S4.6 | Stage close (hub §3); move the findings to `cc-CR000.002.md` (E3 stays open until its PR draft is written in S006). | Hub §3 checks pass. |
+
+## 3. Result
+
+| Step | Result | Commits |
+|:-----|:-------|:--------|
+| S4.1 | 13 red tests, strict xfail with `raises=AssertionError`: E5 parity on 7 of 8 fixture trees (cargo already equal), H3 x2 (no `pkg_b` member from a cached root manifest; no `cites` to a script added after its doc), L9 (outer workspace's renamed dep leaks in), L11 (no `loads` for `../shared/rules`), M2 (a disabled run poisons the enabled one), E1 (pre-stage-3 entries served; the resolver fails on `'node'`). | `a5961fe` |
+| S4.2 | Engine: `[resolve] context_fields` manifest key (default `["node_kind"]`), `graphify.lang_registry.context_fields()`, try-wrapped lookups in `watch._rebuild_code` and the `graphify extract` incremental path (`cli.py`), which also add `_lang_source_file` (absolute path). Plugins declare their fields; resolvers compare paths through `_common.source_of`; bmake gets `bmake_includes`, cc-kb `cc_kb_links`. Parity: 0 differing files on all 8 trees (was 23 of 49 plugin files). | `2adf7bc`, `cd55efb` |
+| S4.3 | cargo and cc-kb augments read only their own file; new cargo resolver; cc-kb resolver chooses the harness root among graphed docs. H3, L9 tests pass. Clean-build counts unchanged: has_member 16 / 5 / 5, external_deps 45 / 23 / 23; claude-config hub_spoke 235, cc_ref 8995, code_ref 3182, cc_id 632 (case 008 §3). | `22855e9` |
+| S4.4 | L11 `os.path.normpath` on both sides; test passes. | `dc8a8ec` |
+| S4.5 | `-lang<fingerprint>` appended to `graphify.cache._EXTRACTOR_VERSION` in `_apply_registry` (enabled `...-lang132611af4a75`, disabled `...-lang22ec7175d162` on this tree). M2, E1 tests pass; two builds with one plugin set share entries. ltm learning 1484 (and repo 1480) superseded by global learning 1490 (learnings have no update path). | `2e2cba1` |
+| S4.6 | `pytest tests/ -q`: 6195 passed, 14 skipped (baseline 6178 / 14; +16 in `test_s4_build_coherence.py`, +1 cargo pipeline test). `git diff upstream/v8...HEAD -- graphify/extractors/` empty; `tests/lang_baseline.txt`, `tests/upstream_tables.json`, `tests/test_watch.py` unchanged. H1, H3, M2, L9, L11, E1, E5 moved to `cc-CR000.002.md`; E3 stays open (PR draft in S006). | this commit |
+
+Deviations from §1:
+
+- **H1 needs more than `node_kind`.** Context nodes carry the root-relative `source_file`, fresh nodes the absolute one, so the hook also adds `_lang_source_file`; and an unchanged file's refs and non-structural edges never reach the resolver, so bmake's include graph (`bmake_includes`) and cc-kb's link-joined pairs (`cc_kb_links`) are now node fields.
+- **`cli.py` too.** The `graphify extract` incremental path builds context nodes the same way as `watch.py`; it gets the same lookup.
+- **E5 scope.** The parity test touches only plugin files and compares edges between graphed nodes; the two upstream behaviours it excludes are in case 008 §4.
+- **cc-kb payload on every `.md`.** A pure augment cannot know whether a file is in a harness root, so any `.md` with a mention or a path-like span carries a `cc_kb_refs` payload; the resolver drops files with no graphed root. Out-of-scope files keep base nodes and edges.
+- **Known limit.** An incremental build re-resolves only the changed files' payloads: a crate added under an unchanged workspace manifest gets its `has_member` edge on the next full or cached build, not on the incremental one (the edge belongs to the root manifest).
+

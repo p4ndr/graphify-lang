@@ -50,12 +50,13 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --all-extras --frozen
 
       - name: bandit (static security analysis)
         continue-on-error: true
         run: uv run --frozen bandit -r graphify graphify_lang -ll
 
+      # --skip-editable: the project itself (graphifyy +lang.N) is not on PyPI;
+      # with --strict that skip was fatal, so the audit never ran (cc-CR000.003 S2-M1)
       - name: pip-audit (dependency vulnerabilities)
-        continue-on-error: true
-        run: uv run --frozen pip-audit --strict
+        run: uv run --frozen pip-audit --skip-editable

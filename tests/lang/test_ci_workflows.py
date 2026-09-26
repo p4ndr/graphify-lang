@@ -35,7 +35,6 @@ def test_s2_e2_every_workflow_parses(path):
     assert True in data or "on" in data  # PyYAML reads the bare key `on` as True
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S2-M1 red")
 def test_s2_m1_pip_audit_skips_the_editable_project_and_gates():
     step = _step("security-scan", "pip-audit")
     assert "--skip-editable" in step["run"] and "--strict" not in step["run"]

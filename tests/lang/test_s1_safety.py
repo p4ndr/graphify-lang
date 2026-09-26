@@ -92,8 +92,6 @@ def py_default_recursion_limit():
     sys.setrecursionlimit(limit)
 
 
-@pytest.mark.xfail(strict=True, raises=RecursionError,
-                   reason="cc-CR000.001 L1: the walker recurses per list level")
 def test_l1_deep_nesting_falls_back(tmp_path, py_default_recursion_limit):
     depth = 1200
     path = tmp_path / "deep.lsp"
@@ -104,8 +102,6 @@ def test_l1_deep_nesting_falls_back(tmp_path, py_default_recursion_limit):
     assert labels == {"deep.lsp": None, "deep": "INFERRED", "c:other": "INFERRED"}
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="cc-CR000.001 L2: quadratic edge de-duplication")
 def test_l2_large_schema_linear(tmp_path):
     n = 20_000
     props = "\n".join(f'    <ECProperty propertyName="P{i}" typeName="Status"/>' for i in range(n))

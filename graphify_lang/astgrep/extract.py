@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import logging
 import re
+from bisect import bisect_left
+from functools import lru_cache
 from pathlib import Path
 
 _LOG = logging.getLogger(__name__)
@@ -137,9 +139,20 @@ def _documents(text: str) -> list[tuple[int, str]]:
     return [(ln, t) for ln, t in docs if t.strip()]
 
 
+@lru_cache(maxsize=4)
+def _newlines(text: str) -> tuple[int, ...]:
+    return tuple(m.start() for m in re.finditer("\n", text))
+
+
+def _line_of(text: str, pos: int) -> int:
+    """1-based line of offset ``pos``: a bisect over newline offsets built once
+    per text, not a count from the start per match (cc-CR000.001 N4)."""
+    return bisect_left(_newlines(text), pos) + 1
+
+
 def _key_line(text: str, first: int, pattern: str) -> int:
     m = re.search(pattern, text, re.MULTILINE)
-    return first + text.count("\n", 0, m.start()) if m else first
+    return first + _line_of(text, m.start()) - 1 if m else first
 
 
 def _role(doc: dict, path: Path) -> str:
@@ -170,6 +183,7 @@ class _Out:
         self.refs: list[dict] = []
         self._ids: set[str] = set()
         self._order: dict[str, int] = {}
+        self._edge_keys: set[tuple[str, str, str]] = set()
         self.file_nid = self.add(self.stem, path.name, "file", 1)
 
     def add(self, nid: str, label: str, kind: str, line: int, **attrs) -> str:
@@ -182,11 +196,12 @@ class _Out:
         return nid
 
     def edge(self, src: str, tgt: str, relation: str, line: int) -> None:
-        if src != tgt and not any(e["source"] == src and e["target"] == tgt
-                                  and e["relation"] == relation for e in self.edges):
-            self.edges.append({"source": src, "target": tgt, "relation": relation,
-                               "confidence": "EXTRACTED", "source_file": self.sf,
-                               "source_location": f"L{line}", "weight": 1.0})
+        if src == tgt or (src, tgt, relation) in self._edge_keys:
+            return
+        self._edge_keys.add((src, tgt, relation))
+        self.edges.append({"source": src, "target": tgt, "relation": relation,
+                           "confidence": "EXTRACTED", "source_file": self.sf,
+                           "source_location": f"L{line}", "weight": 1.0})
 
     def ref(self, kind: str, source: str, name: str, line: int) -> None:
         # The resolver reads the source id back through the node index (ids may be

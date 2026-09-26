@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from graphify.extractors.base import _file_stem, _make_id
 from graphify_lang.rules import build
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
@@ -42,6 +43,11 @@ def _run(manifest, path=ERR, manifest_path=None):
     extract, resolver = build(manifest_path or FIXTURE_DIR / "m.toml", manifest)
     assert resolver is None
     return extract(Path(path))
+
+
+def _stem(path):
+    """Symbol-id prefix: the file id without its suffix (M4)."""
+    return _make_id(_file_stem(Path(path)))
 
 
 def _kinds(result, kind):
@@ -73,7 +79,7 @@ def test_corpus_file_list():
 def test_empty_manifest_emits_the_file_node():
     r = _run({})
     assert r["edges"] == []
-    assert r["nodes"] == [{"id": "src_core_err", "label": "err.lsp", "file_type": "code",
+    assert r["nodes"] == [{"id": "src_core_err_lsp", "label": "err.lsp", "file_type": "code",
                            "node_kind": "file", "source_file": "src/core/err.lsp",
                            "source_location": "L1"}]
 
@@ -88,7 +94,7 @@ def test_regex_tier_on_err_lsp():
     for n in r["nodes"]:
         assert all(n.get(k) for k in CONTRACT), n
         assert n["file_type"] == "code" and n["source_file"] == "src/core/err.lsp"
-    assert _edges(r, "contains") == {("src_core_err", nid) for nid in fns.values()}
+    assert _edges(r, "contains") == {("src_core_err_lsp", nid) for nid in fns.values()}
     calls = _edges(r, "calls")
     assert ("src_core_err_err_trap_161", "src_core_err_err_trap") in calls
     assert len(calls) == 29
@@ -125,7 +131,7 @@ def test_id_clash_gets_the_line_number(tmp_path):
     f.write_text("(defun foo ()\n  1)\n(defun foo ()\n  (foo))\n")
     r = _run({"rule": LISP_REGEX}, f)
     ids = [n["id"] for n in r["nodes"] if n["node_kind"] == "function"]
-    stem = r["nodes"][0]["id"]
+    stem = _stem(f)
     assert ids == [f"{stem}_foo", f"{stem}_foo_3"]
     assert _edges(r, "calls") == {(f"{stem}_foo_3", f"{stem}_foo")}
 
@@ -154,10 +160,10 @@ def test_scope_push_pop_and_edge_from_scope(tmp_path):
         {"pattern": r"use (?P<name>\w+)", "edge": "uses"},
     ]
     r = _run({"rule": rules}, f)
-    stem = r["nodes"][0]["id"]
-    assert _edges(r, "uses") == {(f"{stem}_a", f"{stem}_b"), (stem, f"{stem}_a")}
+    stem, fid = _stem(f), r["nodes"][0]["id"]
+    assert _edges(r, "uses") == {(f"{stem}_a", f"{stem}_b"), (fid, f"{stem}_a")}
     rules[2] = {**rules[2], "edge_from_scope": False}
-    assert _edges(_run({"rule": rules}, f), "uses") == {(stem, f"{stem}_b"), (stem, f"{stem}_a")}
+    assert _edges(_run({"rule": rules}, f), "uses") == {(fid, f"{stem}_b"), (fid, f"{stem}_a")}
     rules[2] = {**rules[2], "suffix": ".other"}
     assert _edges(_run({"rule": rules}, f), "uses") == set()
 
@@ -252,7 +258,7 @@ def test_programming_template_runs(tmp_path):
     f = tmp_path / "s.ext"
     f.write_text("def a(x):\n    b(x)\ndef b(y):\n    print(y)\n")
     r = extract(f)
-    stem = r["nodes"][0]["id"]
+    stem = _stem(f)
     assert list(_kinds(r, "function")) == ["a", "b"]
     assert _edges(r, "calls") == {(f"{stem}_a", f"{stem}_b")}
 

@@ -50,8 +50,6 @@ def _has(graph: dict, src: dict, relation: str, tgt: dict) -> bool:
                for e in graph["edges"])
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="cc-CR000.001 H2: autolisp refs carry extraction-time ids")
 def test_h2_same_stem_lsp_mnl_dcl(tmp_path):
     g = _build(tmp_path, {
         "app/x.lsp": ('; @sidecar x.md\n(defun helper () (libfn))\n'
@@ -94,13 +92,7 @@ _M4 = {
 }
 
 
-_M4_OPEN = {"autolisp"}  # each plugin move closes its own
-
-
-@pytest.mark.parametrize("plugin", [
-    pytest.param(p, marks=pytest.mark.xfail(strict=True, raises=AssertionError,
-                 reason=f"cc-CR000.001 M4: {p} file ids drop the suffix")) if p in _M4_OPEN
-    else p for p in _M4])
+@pytest.mark.parametrize("plugin", list(_M4))
 def test_m4_file_ids_portable(tmp_path, plugin):
     # A same-stem .py file beside the plugin files: its file node id is the
     # built-in form every plugin file must collide with and be salted from.

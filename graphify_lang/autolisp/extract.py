@@ -16,21 +16,8 @@ from bisect import bisect_left
 from functools import lru_cache
 from pathlib import Path
 
+from graphify_lang._common import Sink, load_builtins
 
-
-def _file_stem(path):
-    # Lazy: importing graphify.extractors at plugin load re-enters graphify.detect,
-    # which is still loading the registry (circular import since upstream 0.9.67).
-    from graphify.extractors.base import _file_stem as f
-    return f(path)
-
-
-def _make_id(*parts):
-    from graphify.extractors.base import _make_id as f
-    return f(*parts)
-
-_BUILTINS_FILE = Path(__file__).parent / "data" / "builtins.txt"
-_COM_PREFIXES = ("vla-", "vlax-", "vlr-")  # A1
 _DEFUN_RE = re.compile(r"^[ \t]*\(defun[ \t]+([^\s()]+)", re.M | re.I)
 _HEADER_RE = re.compile(r"^[ \t]*;+[ \t]*@(module|depends|sidecar)[ \t]+(.+?)[ \t]*$", re.M)
 _DIALOG_RE = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*dialog\s*\{")
@@ -42,16 +29,16 @@ _SYMBOLS = ("sym_lit", "package_lit")
 _COMMENTS = ("comment", "block_comment")
 
 
-@lru_cache(maxsize=1)
-def _builtins() -> frozenset[str]:
-    lines = _BUILTINS_FILE.read_text(encoding="utf-8").splitlines()
-    return frozenset(s.strip().casefold() for s in lines if s.strip() and not s.startswith(";"))
+@lru_cache(maxsize=2)
+def _builtins(toml: str = "graphify-lang.toml"):
+    """A manifest's builtins filter: ``builtins_file``, ``builtins_prefixes``
+    (the COM ``vla-`` / ``vlax-`` / ``vlr-`` calls, A1), ``case_insensitive``."""
+    return load_builtins(__file__, toml)
 
 
 def is_builtin(name: str) -> bool:
     """A5 / A1: AutoLISP built-ins and COM calls never become call edges."""
-    folded = name.casefold()
-    return folded in _builtins() or folded.startswith(_COM_PREFIXES)
+    return _builtins().is_builtin(name)
 
 
 @lru_cache(maxsize=1)
@@ -63,51 +50,6 @@ def _parser():
         # tree-sitter-commonlisp 0.4.1 returns an int pointer (see commonlisp.py).
         warnings.filterwarnings("ignore", category=DeprecationWarning)
         return Parser(Language(tscl.language()))
-
-
-class _Out:
-    """Node / edge sink for one file: ids, collisions, contains, de-dup."""
-
-    def __init__(self, path: Path) -> None:
-        self.sf = str(path)
-        self.stem = _make_id(_file_stem(path))
-        self.nodes: list[dict] = []
-        self.edges: list[dict] = []
-        self.refs: list[dict] = []
-        self._ids: set[str] = set()
-        self._edge_keys: set[tuple] = set()
-        self.file_nid = self._add(self.stem, path.name, "file", 1)
-
-    def _add(self, nid: str, label: str, kind: str, line: int, confidence: str | None = None) -> str:
-        if nid in self._ids:
-            nid = f"{nid}_l{line}"
-        self._ids.add(nid)
-        node = {"id": nid, "label": label, "file_type": "code", "node_kind": kind,
-                "source_file": self.sf, "source_location": f"L{line}"}
-        if confidence:
-            node["confidence"] = confidence
-        self.nodes.append(node)
-        return nid
-
-    def node(self, kind: str, label: str, line: int, confidence: str | None = None) -> str:
-        nid = self._add(_make_id(self.stem, label.casefold()), label, kind, line, confidence)
-        self.edge(self.file_nid, nid, "contains", line)
-        return nid
-
-    def edge(self, src: str, tgt: str, relation: str, line: int, confidence: str = "EXTRACTED") -> None:
-        if (src, tgt, relation) in self._edge_keys:
-            return
-        self._edge_keys.add((src, tgt, relation))
-        self.edges.append({"source": src, "target": tgt, "relation": relation,
-                           "confidence": confidence, "source_file": self.sf,
-                           "source_location": f"L{line}", "weight": 1.0})
-
-    def ref(self, kind: str, source: str, name: str, line: int, **extra) -> None:
-        self.refs.append({"kind": kind, "source": source, "name": name, "line": line,
-                          "source_file": self.sf, **extra})
-
-    def result(self) -> dict:
-        return {"nodes": self.nodes, "edges": self.edges, "autolisp_refs": self.refs}
 
 
 def _line(node) -> int:
@@ -256,7 +198,7 @@ def action_callees(action: str) -> list[str]:
     return [name for _, name, _ in walker.calls]
 
 
-def _headers(out: _Out, text: str, path: Path) -> None:
+def _headers(out: Sink, text: str, path: Path) -> None:
     module_nid = None
     depends: list[tuple[str, int]] = []
     for m in _HEADER_RE.finditer(text):
@@ -268,9 +210,9 @@ def _headers(out: _Out, text: str, path: Path) -> None:
             depends += [(name, line) for name in re.split(r"[,\s]+", value) if name]
         elif tag == "sidecar":
             target = os.path.normpath(path.parent / value.split()[0])
-            out.ref("sidecar", out.file_nid, target, line)
+            out.ref("sidecar", out.file_nid, line, name=target)
     for name, line in depends:
-        out.ref("depends", module_nid or out.file_nid, name, line)
+        out.ref("depends", module_nid or out.file_nid, line, name=name)
 
 
 def extract_autolisp(path: Path) -> dict:
@@ -281,7 +223,7 @@ def extract_autolisp(path: Path) -> dict:
     except Exception as exc:  # unreadable file or missing grammar
         return {"nodes": [], "edges": [], "error": str(exc)}
     text = source.decode("utf-8", errors="replace")
-    out = _Out(path)
+    out = Sink(path, _builtins())
     _headers(out, text, path)
 
     walker = _Walker(source)
@@ -323,15 +265,15 @@ def extract_autolisp(path: Path) -> dict:
         caller = nids[owner]
         targets = local.get(name.casefold())
         if targets is None:
-            out.ref("call", caller, name, line)
+            out.ref("call", caller, line, name=name)
         elif len(targets) == 1 and targets[0] != caller:
             out.edge(caller, targets[0], "calls", line)
     for owner, name, line, confidence in walker.dialogs:
-        out.ref("dialog", nids[owner], name, line, confidence=confidence)
+        out.ref("dialog", nids[owner], line, name=name, confidence=confidence)
     for owner, key, action, line in walker.actions:
         for callee in action_callees(action):
-            out.ref("action", nids[owner], callee, line, key=key)
-    return out.result()
+            out.ref("action", nids[owner], line, name=callee, key=key)
+    return out.result("autolisp_refs")
 
 
 def extract_dcl(path: Path) -> dict:
@@ -342,7 +284,7 @@ def extract_dcl(path: Path) -> dict:
         return {"nodes": [], "edges": [], "error": str(exc)}
     # Blank comments but keep their newlines so line numbers hold.
     text = _DCL_COMMENT_RE.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)
-    out = _Out(path)
+    out = Sink(path, _builtins("dcl.toml"))
     for m in _DIALOG_RE.finditer(text):
         out.node("dialog", m.group(1), _line_of(text, m.start()))
-    return out.result()
+    return out.result("autolisp_refs")

@@ -242,7 +242,6 @@ def _calls(per_file):
     return {(labels[e["source"]], labels[e["target"]]) for e in edges if e["relation"] == "calls"}
 
 
-@pytest.mark.xfail(strict=True, raises=KeyError, reason="S3-M1: a node-less ref raises")
 def test_s3_m1_stale_cache_ref_degrades(tmp_path):
     """S3-M1 / S3-E1: a pre-S3 AST cache entry (refs carry ``source``, not
     ``node``) degrades that file, never the whole resolver pass. The plugin-set

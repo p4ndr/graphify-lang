@@ -112,15 +112,22 @@ def source_of(node: dict) -> str:
     return str(node.get("_lang_source_file") or node.get("source_file", ""))
 
 
-def resolve_ref_id(res: dict, ref: dict) -> str:
-    """The current id of a ref's source node (salted by now if it collided)."""
-    return res["nodes"][ref["node"]]["id"]
+def resolve_ref_id(res: dict, ref: dict) -> str | None:
+    """The current id of a ref's source node (salted by now if it collided).
+    A ref without a valid ``node`` comes from a pre-S3 AST cache entry (S3-M1):
+    its ``source`` id, or None, so a stale entry degrades one file only."""
+    i = ref.get("node")
+    if isinstance(i, int) and 0 <= i < len(res.get("nodes", ())):
+        return res["nodes"][i]["id"]
+    return ref.get("source")
 
 
 def refs_of(per_file: list, refs_key: str) -> list[dict]:
-    """Every ``refs_key`` ref of the corpus, ``source`` set to its current id."""
-    return [{**r, "source": resolve_ref_id(res, r)} for res in per_file
-            if isinstance(res, dict) and res.get(refs_key) for r in res[refs_key]]
+    """Every ``refs_key`` ref of the corpus, ``source`` set to its current id;
+    a ref whose source cannot be found is dropped."""
+    return [{**r, "source": src} for res in per_file
+            if isinstance(res, dict) and res.get(refs_key) for r in res[refs_key]
+            if (src := resolve_ref_id(res, r))]
 
 
 def pick_by_prefix(found: list[dict], source_file: str) -> tuple[str | None, str]:

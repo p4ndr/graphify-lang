@@ -50,6 +50,8 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
             continue
         for ref in res["ecschema_refs"]:
             src = resolve_ref_id(res, ref)
+            if not src:
+                continue
             if ref["kind"] == "schema":
                 found = schemas.get(ref["schema"], [])
                 same = [n for n in found if _version(n.get("version", "")) == _version(ref["version"])]

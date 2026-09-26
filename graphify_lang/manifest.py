@@ -141,6 +141,8 @@ class LanguageManifest:
         grammar = data.get("grammar", {})
         extract = data.get("extract", {})
 
+        if data.get("schema", 1) not in (1, "v1"):  # the only manifest format so far
+            errors.append("schema must be 1")
         kind = language.get("kind", "language")
         if kind not in _KINDS:
             errors.append(f"language.kind must be one of {', '.join(_KINDS)}")

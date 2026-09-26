@@ -1,16 +1,16 @@
 # Code review: graphify-lang fork layer
 
-Open findings only. Fixed and closed findings move to `cc-CR000.002.md` (plan 05 stage 1 moved H4, E6, L1, L2, L4, N4 and stage 2 moved M7, M8, M9, M10, N6, E9 on 2026-09-26).
+Open findings only. Fixed and closed findings move to `cc-CR000.002.md` (plan 05 stage 1 moved H4, E6, L1, L2, L4, N4, stage 2 moved M7, M8, M9, M10, N6, E9, and stage 3 moved H2, M4, M6, L3, L5, L12, N3, E2, E7, E8 on 2026-09-26).
 
 | Severity | Count |
 |:---------|------:|
 | Critical | 0 |
-| High | 3 |
-| Medium | 8 |
-| Low | 10 |
-| Nit | 4 |
-| **Defects total** | **25** |
-| Enhancements | 7 |
+| High | 2 |
+| Medium | 6 |
+| Low | 7 |
+| Nit | 3 |
+| **Defects total** | **18** |
+| Enhancements | 4 |
 
 - **Date**: 2026-09-26
 - **Mode**: Diff (`git diff upstream/v8...autolisp`), branch `autolisp`, HEAD `013c902` (v0.9.67+lang.3)
@@ -27,13 +27,6 @@ Open findings only. Fixed and closed findings move to `cc-CR000.002.md` (plan 05
 - **Problem**: on an incremental rebuild (`_rebuild_code(changed_paths=...)`, used by the git post-commit hook, the Claude hook flow and `graphify watch`), the resolvers see unchanged files' nodes without `node_kind`, so no target in an unchanged file is found. The changed file's old edges were removed with its re-extraction, so the edges disappear.
 - **Failure scenario (measured)**: corpus `src/app.lsp` `(defun c:go () (libfn))` + `src/lib.lsp` `(defun libfn ...)`. Full build: `src_app_c_go calls src_lib_libfn`. Edit `app.lsp` only, run `graphify.watch._rebuild_code(root, changed_paths=[app.lsp])`: the `calls` edge is gone. Same mechanism for VBA calls, bmake includes/macros, ast-grep util/test links, cc-kb `cites`, ECSchema cross-schema refs.
 - **Fix**: **upstream PR** (generic, small): forward `node_kind` (or a plugin-declared marker list) in the `ctx_node` at `watch.py:1723`. Until then, a plugin-side mitigation: resolvers fall back to classifying context nodes without `node_kind` by id shape or by a marker upstream already forwards (for example the node `type` field, but check `_disambiguate_colliding_node_ids` exempts `type in ("module","namespace")`). Add a test that compares a full build with full-then-incremental for every plugin fixture (E5).
-
-### H2 AutoLISP and VBA resolver refs carry extraction-time ids; same-stem files lose edges
-
-- **Where**: `graphify_lang/autolisp/extract.py:104-106` (`ref` stores `source` id), consumed at `graphify_lang/autolisp/resolve.py:54-60,74-89`; `graphify_lang/vba/extract.py:156-159`, `graphify_lang/vba/resolve.py:89-94`. Upstream dependency: `_disambiguate_colliding_node_ids` (`graphify/extractors/resolution.py:929`) renames colliding node dicts in place at `graphify/extract.py:7944`, before `run_language_resolvers` (`extract.py:8480-8484`).
-- **Problem**: when two files share a stem (the normal AutoCAD layout `foo.lsp` + `foo.mnl` + `foo.dcl`, or a same-named defun in `foo.lsp` and `foo.mnl`), their ids are salted apart before the resolver runs, but the ref still names the old id. The edge is emitted with a dangling source and later pruned, silently. bmake, ecschema and astgrep already avoid this by storing the node index (`bmake/extract.py:132-135`, ltm learning 1477); autolisp and vba do not. The comment at `autolisp/resolve.py:79-80` ("graphify already gives both files one node id") is wrong for the same reason.
-- **Failure scenario (measured)**: `app.lsp` with `(defun helper () (libfn))`, `app.mnl` with its own `helper`, `sub/lib.lsp` with `libfn`: `extract()` emits `app_helper calls sub_lib_libfn` where `app_helper` no longer exists (nodes are `app_lsp_app_helper`, `app_mnl_app_helper`). Sidecar refs from a colliding file node dangle the same way.
-- **Fix**: adopt the bmake pattern in both plugins: store `node` (index into the result's `nodes`) in each ref and read `res["nodes"][ref["node"]]["id"]` in the resolver; keep `dialogs_of` keyed by the current id. Add a same-stem fixture test (`x.lsp` + `x.mnl` + `x.dcl` with cross-file calls and a sidecar).
 
 ### H3 Augment output depends on other files but is cached by this file's content hash
 
@@ -64,24 +57,11 @@ Open findings only. Fixed and closed findings move to `cc-CR000.002.md` (plan 05
 - **Problem**: `.xml` is in neither `CODE_EXTENSIONS` nor `DOC_EXTENSIONS`, so an ECSchema edit produces no watch event at all; `.yml` (ast-grep), `Cargo.toml` (cargo augment) and `.md` (cc-kb augment) edits are treated as doc changes and never trigger the AST rebuild. The git-hook path works (it uses `_HOOK_SOURCE_EXTS`), watch mode does not.
 - **Fix**: **upstream PR** or a registry lookup in `_batch_triggers_rebuild` and the watch filter: treat a path as code when `lang_registry.claims_file(path)` or an augment claims it. Adding the suffixes to `CODE_EXTENSIONS` is not an option (it would classify every `.xml` as code).
 
-### M4 Plugin file-node ids diverge from upstream and become non-portable on collision
-
-- **Where**: every plugin sink uses `self.stem = _make_id(_file_stem(path))` as the file-node id: `autolisp/extract.py:72,78`, `vba/extract.py:132,138`, `bmake/extract.py:97,108`, `ecschema/extract.py:110,116`, `astgrep/extract.py:157,163`, `rules.py:40,48`.
-- **Problem**: upstream file nodes use the full path including the suffix (`extract_python` gives `..._app_py`), so `app.py` and `app.js` never collide. The plugin ids drop the suffix, so `app.lsp`/`app.mnl`/`app.dcl` collide; the salted replacement is built from the old id, which already contains the absolute scan-root path, and the later portable-id remap does not undo it.
-- **Failure scenario (measured)**: file nodes come out as `app_lsp_tmp_claude_1000_home_p4ndr_..._c1_app`: the absolute checkout path is baked into graph ids, so the same repo graphs differently on another machine or path (breaks graph diffs and `graphify global` merges).
-- **Fix**: mint the file-node id the way the built-ins do (`_make_id(str(path))`, suffix included, so upstream's portable remap applies) and keep symbol ids stem-based; re-run the case 004/007 corpus counts. This also removes most of the collisions behind H2.
-
 ### M5 `GRAPHIFY_LANG_PATH` is collected and never used; docs say tests rely on it
 
 - **Where**: `graphify_lang/registry.py:96-108` (paths go into `search_paths`, which nothing reads; when any entry point registered a manifest first, `_STATE` already exists and the list is discarded); `docs/55-SETTLED.md:125` ("Development and tests discover the plugin through `GRAPHIFY_LANG_PATH`"); `docs/35-DONE.md:289`; module docstring `registry.py:1` ("or namespace", not implemented). `_RegistryState.enabled` (`registry.py:30`) is also never read.
 - **Failure scenario**: a user or test sets `GRAPHIFY_LANG_PATH` to a directory with a manifest; nothing is loaded and nothing is logged.
 - **Fix**: delete `_PATH_VAR`, `search_paths` and `enabled` (YAGNI; entry points cover packaging and tests), and correct the two docs and the docstring. Implement path discovery only when a real out-of-tree plugin needs it.
-
-### M6 Declarative rules engine is dead weight (ponytail)
-
-- **Where**: `graphify_lang/rules.py` (132 lines), `queries.py` (133), `regex_rules.py` (101), `builtins.py` (45), `templates/*.toml` (179), `tests/lang/test_rules.py` (259), fixtures `tests/lang/rules_dcl.toml`, plus shipped package data.
-- **Problem**: no plugin calls `rules.build()`; its own docstring says "none depends on it". It also carries an import-by-string hook (`rules.py:86-95`, `post_file = "module:fn"` from TOML). Every shipped plugin duplicates what it would provide (builtins lists, sinks).
-- **Fix**: delete the engine, its tests and the templates (git keeps them), or move them to the `lang-rules` branch until a plugin needs them.
 
 ### M11 README is stale in several load-bearing places
 
@@ -96,16 +76,6 @@ Open findings only. Fixed and closed findings move to `cc-CR000.002.md` (plan 05
 - **Fix**: add one fixture-based test per class above (each a few lines); keep corpus tests but mark them `@pytest.mark.corpus` so skips are explicit.
 
 ## Low
-
-### L3 cc-kb resolver and augment do avoidable linear work
-
-- **Where**: `graphify_lang/cc_kb/resolve.py:80` (`next(n for n in all_nodes if n["id"] == node["id"])` per payload: O(files x nodes); `node` is already the live dict); `graphify_lang/cc_kb/augment.py:64-69` (`_is_root` re-scans `docs/` for every `.md`).
-- **Fix**: use `node` directly (or one `by_id` dict); `functools.lru_cache` on `_is_root`.
-
-### L5 Copy-paste across plugins
-
-- **Where**: `_pick` + `shared` in `autolisp/resolve.py:30-50`, `vba/resolve.py:29-44`, `bmake/resolve.py:32-47`, `astgrep/resolve.py:26-41`; lazy `_file_stem`/`_make_id` shims in 5 extractors; `_Out` sinks in 5 extractors; 7 near-identical `_get_manifest` loaders.
-- **Fix**: E2 (one `graphify_lang/_common.py`). Fixing H2/M4 in one place instead of five is the practical reason.
 
 ### L6 Upper-case suffix variants are redundant
 
@@ -142,11 +112,6 @@ Open findings only. Fixed and closed findings move to `cc-CR000.002.md` (plan 05
 - **Problem**: `Path.is_relative_to` is lexical; `ruleDirs: ["../shared/rules"]` yields no `loads` edges.
 - **Fix**: `posixpath.normpath` both sides first.
 
-### L12 Stale comments and docstrings (SG000.005 rule 9)
-
-- **Where**: `graphify_lang/astgrep/extract.py:18-20,32` (PyYAML "not a graphify dependency": it is one since lang.3, `pyproject.toml:45`; the flat parser `:55-99` and the `_yaml is None` branches are now dead); `graphify_lang/manifest.py:86` (path is `.claude/docs/cc-IP000.001.md`), `:219,223` ("the registry will call runtime.build": it never does); `graphify_lang/autolisp/resolve.py:79` (see H2); `graphify_lang/registry.py:1` ("or namespace").
-- **Fix**: correct or delete; delete the flat YAML parser.
-
 ### L13 Upstream-file edit in `resolver_registry.py`
 
 - **Where**: `graphify/resolver_registry.py:78-80`.
@@ -157,24 +122,20 @@ Open findings only. Fixed and closed findings move to `cc-CR000.002.md` (plan 05
 
 - **N1** `.claude/CLAUDE.md` cites `_DISPATCH` at `graphify/extract.py:5630`; it is at `:6601`. Cite the symbol, not the line.
 - **N2** `docs/plans/00-INDEX.md` and plan headers mark plans 01 and 02 ACTIVE; plan 02 shipped in lang.1 (plan 01 is open only for T10).
-- **N3** Manifest keys that nothing reads: `type`, `grammar.kind`, `language_fn`, `version`, `case_insensitive`, `builtins_file`, `builtins_prefixes` (for example `autolisp/graphify-lang.toml:5,13-17,23-24`); the builtins lists are hard-coded again in `autolisp/extract.py:31-32`. Delete the unread keys or read them.
 - **N5** `[match] filenames` compare case-sensitively (`registry.py:240`): `cargo.toml` on a case-insensitive filesystem is not claimed.
 
 ## Architectural findings
 
-- **Resolver id contract**: three of five resolvers learned to read ids back through the node index (bmake, ecschema, astgrep), two did not (H2). The contract belongs in one shared sink (E2), not in each plugin. — Impact: STRONG
+- **Resolver id contract**: three of five resolvers learned to read ids back through the node index (bmake, ecschema, astgrep), two did not (H2). The contract belongs in one shared sink (E2), not in each plugin. — Impact: STRONG. Done in plan 05 S3 (`graphify_lang/_common.py`, cc-CR000.002 H2, E2).
 - **Purity contract with the AST cache**: extractors and augments must be functions of the file bytes; everything that looks at other files belongs in the resolver (H3, M2). Write it into `README.md` 'Proposed architecture' as a plugin rule. — Impact: STRONG
 - **Upstream seams the fork depends on**: `_disambiguate_colliding_node_ids` ordering, `watch.py` context-node fields (H1), `_reconcile_markdown_links` pruning only `references` (cc-kb relies on `cites` surviving, `cc_kb/resolve.py:30-33`), dict identity between `per_file` and `all_nodes` (bmake/astgrep/cc-kb index reads), `_get_extractor` suffix fallback. Each is untested from the fork side; an upstream refactor breaks them silently. A parity test (E5) covers most. — Impact: AVERAGE
 
 ## Enhancements
 
 - **E1** Plugin-set fingerprint in the AST cache namespace (fixes M2), set from `_apply_registry`. — Effort: LOW | Benefit: HIGH
-- **E2** `graphify_lang/_common.py`: lazy id helpers, one `_Out` sink with index-based refs and suffix-qualified file ids, `pick_by_prefix`, `load_manifest(pkg, toml, **fields)`. — Effort: MODERATE | Benefit: HIGH
 - **E3** Upstream PR: forward `node_kind` (or a registrable marker list) in `watch.py` context nodes (fixes H1 at the root). — Effort: LOW | Benefit: HIGH
 - **E4** `graphify lang list --check`: load every manifest, report load errors per plugin (complements M1). — Effort: LOW | Benefit: NEUTRAL
 - **E5** One parity test: for each plugin fixture, full build == full build then touch-one-file incremental build (edges and ids). — Effort: LOW | Benefit: HIGH
-- **E7** Remove the rules engine and templates (M6). — Effort: TRIVIAL | Benefit: NEUTRAL
-- **E8** `lru_cache` on `cc_kb.augment._is_root` and one `by_id` map in the cc-kb resolver (L3). — Effort: TRIVIAL | Benefit: MINOR
 
 ## Suggestion plan
 

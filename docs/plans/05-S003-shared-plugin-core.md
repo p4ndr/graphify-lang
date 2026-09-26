@@ -2,7 +2,7 @@
 
 Stage 3 of plan 05: one shared module carries the id, sink and resolver contracts that the five plugins now copy, so H2 and M4 are fixed in one place.
 
-- Status: ACTIVE
+- Status: DONE (2026-09-26, `rr-s3` `542f417`..HEAD)
 - Task: T34
 - Hub: `05-review-remediation-cc-cr000-001.md`
 - Branch: `rr-s3` from `rr-s2`
@@ -35,3 +35,23 @@ Stage 3 of plan 05: one shared module carries the id, sink and resolver contract
 | S3.4 | H2 and M4 are complete when S3.3 is done. | The S3.1 tests pass. Write the old-to-new file id form in `docs/testing/case_008_plan05-remediation.md` (new file). |
 | S3.5 | M6, N3, L3, E8, L12. | `graphify lang list` still shows 9 languages; no manifest key remains that nothing reads (a test loads every shipped manifest and checks each key against a list of the keys that are read). |
 | S3.6 | Stage close (hub §3); move the findings to `cc-CR000.002.md`; record E7 as closed per D1. | Hub §3 checks pass. |
+
+## 3. Result
+
+| Step | Result | Commits |
+|:-----|:-------|:--------|
+| S3.1 | 8 red tests, strict xfail with `raises=AssertionError`: H2 autolisp and vba (dangling `calls` edges), M4 per plugin x5 (scan root in ids, or a plugin file id equal to a same-stem `.py` file id), M6 (`evil_hook_mod` imported). Later red tests: N3 (`5287844`), L3 and E8 (`0dea8c6`). | `542f417` |
+| S3.2 | `graphify_lang/_common.py`: `Sink`, `refs_of` / `resolve_ref_id`, `pick_by_prefix`, `load_manifest`, `load_builtins`. bmake moved; BentleyHelp counts and edges unchanged, 2 `PrecompileHeader` ids lose the scan root. | `2c3e6e9` |
+| S3.3 | ecschema, astgrep, vba, autolisp, cc-kb, cargo moved, one commit each; `builtins.py` reads `;` comments (engine commit). Each plugin's tests pass after its commit; corpus counts unchanged except the M4 id changes and the autolisp sidecars (case 008). | `05ddbef`, `569ef3e`, `1d2eb29`, `bbf0a1f`, `67a582c`, `71ab8e8`, `b244901` |
+| S3.4 | H2 and M4 tests pass. Old-to-new id form and before/after corpus counts: `docs/testing/case_008_plan05-remediation.md`. | `afa4015` |
+| S3.5 | M6 `post_file` prefix rule; N3 `schema` read, unread keys deleted, every shipped manifest key has a reader (12 manifests); L3 one node scan (7 -> 1); E8 `_is_root` cached (6 -> 1 scans); L12 comments fixed, flat YAML parser deleted. `graphify lang list`: 9 languages. | `3fa02c2`, `7711700`, `0db2814`, `a5a899c`, `4618429`, `e837ed2` |
+| S3.6 | `pytest tests/ -q`: 6178 passed, 14 skipped (baseline 6154 / 14; +25 new tests, -1 flat-parser test). `git diff upstream/v8...HEAD -- graphify/extractors/` empty; `tests/lang_baseline.txt`, `tests/upstream_tables.json` unchanged. Findings moved to `cc-CR000.002.md`; E7 closed as rejected per D1. | this commit |
+
+Deviations from §1:
+
+- **M6 / D1, where the `Sink` lives.** `Sink` is defined in `_common.py` (E2) and the engine's `rules.Out` subclasses it; the plugins use the engine's `Builtins` filter through `load_builtins`. Defining `Sink` in `rules.py` would import the query and regex tiers at plugin load.
+- **N3, `schema`.** The top-level `schema` key had no reader either; `manifest.py` now rejects any value but `1` / `"v1"`. The templates keep `grammar.language_fn`: the rules engine reads it (`queries.py`), so it is not an unread key there; they had no other unread key.
+- **Shared `Sink.edge` drops self-loops**, as the bmake, vba, ecschema and astgrep sinks did (autolisp callers already excluded them). For `rules.Out` this is new: a recursive definition no longer gets a `calls` edge to itself.
+- **L3** uses one `by_id` map built in the single `all_nodes` pass, not the payload's `node` dict, so the resolver still writes `dangling_cc_refs` on the `all_nodes` dict if the two ever differ.
+- **H2 corpus effect.** Deleting the wrong same-stem skip adds `sidecar_doc` edges (autolithp family 1 -> 63 / 62 / 63), and M4 splits the 61 / 60 / 61 `.lsp` file nodes that had merged with their same-stem `.md` page (case 008).
+- **cargo** also loads its manifest through `load_manifest` (the seventh `_get_manifest` copy).

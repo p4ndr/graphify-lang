@@ -133,6 +133,7 @@ def extract_vba(path: Path) -> dict:
     types: dict[str, str] = {}                    # folded Type / Enum name -> node id
     module_vars: dict[str, str | None] = {}       # folded name -> declared type
     bodies: list[tuple[str, str, str, int, list]] = []  # (nid, name, header rest, line, body)
+    subs: set[str] = set()                        # Sub node ids: no result variable
     owner = None                                  # (nid, kind) of the open block
     for line, s in stmts:
         if owner is not None:
@@ -152,6 +153,8 @@ def extract_vba(path: Path) -> dict:
             out.edge(module, nid, "contains", line)
             members.setdefault(pname.casefold(), []).append((nid, attrs.get("accessor", "")))
             owner = (nid, "property" if accessor else word.casefold(), [])
+            if kind == "sub":
+                subs.add(nid)
             bodies.append((nid, pname, rest, line, owner[2]))
         elif m := _DECLARE_RE.match(s):
             nid = out.add(_make_id(out.stem, m.group(2).casefold()), m.group(2), "declare", line,
@@ -183,7 +186,11 @@ def extract_vba(path: Path) -> dict:
         _uses(out, nid, rest, line, types)
         local = dict(module_vars)
         local.update((v.casefold(), t) for v, t in _variables(_params(rest)))
-        local[pname.casefold()] = None  # `Name = x` in Function / Property Name is its result
+        # `Name = x` in Function / Property Name is its result; `Name(...)` there
+        # and `Name` in a Sub are recursive calls, kept as self-loops (S3-X1).
+        result = "" if nid in subs else pname.casefold()
+        if result:
+            local[result] = None
         for bline, s in body:
             if s[:10].casefold() == "attribute ":
                 continue
@@ -191,7 +198,7 @@ def extract_vba(path: Path) -> dict:
                 if not s.casefold().startswith(("private", "public", "global")):
                     local.update((v.casefold(), t) for v, t in _variables(m.group(1)))
             _uses(out, nid, s, bline, types)
-            _calls(out, nid, s, bline, own, local, members)
+            _calls(out, nid, s, bline, own, local, members, result)
     return out.result("vba_refs")
 
 
@@ -212,7 +219,8 @@ def accessor_match(found: list[tuple[str, str]], accessor: str) -> list[str]:
 
 
 def _calls(out: Sink, src: str, s: str, line: int, own: str,
-           local: dict[str, str | None], members: dict[str, list[tuple[str, str]]]) -> None:
+           local: dict[str, str | None], members: dict[str, list[tuple[str, str]]],
+           result: str = "") -> None:
     skip_after = {"as", "new", "is", "goto", "gosub", "resume"}
     prev = ""
     for m in _CHAIN_RE.finditer(s):
@@ -230,11 +238,12 @@ def _calls(out: Sink, src: str, s: str, line: int, own: str,
         if len(parts) == 1 or head == "me" or head == own:
             name = parts[-1]
             folded = name.casefold()
-            if len(parts) == 1 and folded in local:
+            recursion = folded == result and after.startswith("(")
+            if len(parts) == 1 and folded in local and not recursion:
                 continue
             if folded in members:
                 for target in accessor_match(members[folded], accessor):
-                    out.edge(src, target, "calls", line)
+                    out.edge(src, target, "calls", line, self_loop=True)  # recursion (S3-X1)
             elif len(parts) == 1 and not is_builtin(name):
                 out.ref("call", src, line, name=name, accessor=accessor)
         elif head in local:

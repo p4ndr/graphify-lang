@@ -265,8 +265,8 @@ def extract_autolisp(path: Path) -> dict:
         targets = local.get(name.casefold())
         if targets is None:
             out.ref("call", caller, line, name=name)
-        elif len(targets) == 1 and targets[0] != caller:
-            out.edge(caller, targets[0], "calls", line)
+        elif len(targets) == 1:  # a recursive call is a self-loop, as upstream (S3-X1)
+            out.edge(caller, targets[0], "calls", line, self_loop=True)
     for owner, name, line, confidence in walker.dialogs:
         out.ref("dialog", nids[owner], line, name=name, confidence=confidence)
     for owner, key, action, line in walker.actions:

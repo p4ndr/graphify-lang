@@ -68,7 +68,8 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
             found = [n for n in found if n["id"] in keep]
         target, confidence = _pick(found, ref["source_file"])
         key = (ref["source"], target, relation)
-        if target and target != ref["source"] and key not in seen:
+        # A recursive call is a self-loop, as upstream's built-ins emit it (S3-X1).
+        if target and (target != ref["source"] or relation == "calls") and key not in seen:
             seen.add(key)
             all_edges.append({"source": ref["source"], "target": target, "relation": relation,
                               "confidence": confidence, "source_file": ref["source_file"],

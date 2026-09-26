@@ -37,7 +37,8 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
     seen = {(e.get("source"), e.get("target"), e.get("relation")) for e in all_edges}
 
     def add(src: str, tgt: str | None, confidence: str = "EXTRACTED", *, relation: str, ref: dict, **extra) -> None:
-        if not tgt or tgt == src or (src, tgt, relation) in seen:
+        # A recursive call is a self-loop, as upstream's built-ins emit it (S3-X1).
+        if not tgt or (src, tgt, relation) in seen or (tgt == src and relation != "calls"):
             return
         seen.add((src, tgt, relation))
         all_edges.append({"source": src, "target": tgt, "relation": relation,

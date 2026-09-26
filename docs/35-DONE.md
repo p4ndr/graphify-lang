@@ -202,12 +202,12 @@ This document is a LIVE file containing a list of TASKS that have been carried o
 - `[x]` T17.1 | Fix global variable query to handle multi-pair setq forms (issue: 0 globals vs ~60 expected; see case_001_autolisp-pvcase_results.md line 43-45)
 - `[x]` T17.2 | Add string/number literal extraction rules (issue: 0 literals detected; see case_001_autolisp-pvcase_results.md line 51-53)
 - `[x]` T17.3 | Fix `join_package_lits` in post_file hook (issue: package literals not merged; see case_001_autolisp-pvcase_results.md line 47-49)
-- `[x]` T17.4 | Fix function labels to extract just function name (issue: labels include "defun ..."; see T14-FINAL-REPORT.md line 57-59)
-- `[x]` T17.5 | Implement module population logic (issue: all show "N/A"; see T14-FINAL-REPORT.md line 61-62)
-- `[x]` T17.6 | Add source location capture (issue: all show "None"; see T14-FINAL-REPORT.md line 64-65)
+- `[x]` T17.4 | Fix function labels to extract just function name (issue: labels include "defun ..."; see T14-FINAL-REPORT.md line 57-59, deleted in plan 05 S2.3; see git history before `1f8a2e4`)
+- `[x]` T17.5 | Implement module population logic (issue: all show "N/A"; see T14-FINAL-REPORT.md line 61-62, deleted in plan 05 S2.3; see git history before `1f8a2e4`)
+- `[x]` T17.6 | Add source location capture (issue: all show "None"; see T14-FINAL-REPORT.md line 64-65, deleted in plan 05 S2.3; see git history before `1f8a2e4`)
 - `[x]` T17.7 | Verify builtins.txt coverage for Visual LISP functions (issue: builtins not classified; see case_001_autolisp-pvcase_results.md line 59-61)
 
-**Sources:** docs/testing/case_001_autolisp-pvcase.md, docs/testing/T14-FINAL-REPORT.md, docs/testing/T14-COMPLETE.md, docs/testing/case_001_autolisp-pvcase_SUMMARY.md
+**Sources:** docs/testing/case_001_autolisp-pvcase.md, docs/testing/T14-FINAL-REPORT.md and docs/testing/T14-COMPLETE.md (deleted in plan 05 S2.3; see git history before `1f8a2e4`), docs/testing/case_001_autolisp-pvcase_SUMMARY.md
 
 **Completion:** 2026-09-23
 - `graphify_lang/regex_rules.py`: Added `kind == "regex"` filter to from_manifest() to avoid processing query rules with empty patterns

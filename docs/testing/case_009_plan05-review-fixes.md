@@ -17,7 +17,7 @@ before it. `git diff upstream/v8...HEAD -- graphify/extractors/` empty;
 | Id | Status | Commit(s) | Note |
 |:--|:--|:--|:--|
 | S1-H1 | actioned | `548b209` test, `b282fce` fix | A non-scalar `id` skips the document; `testDir` kept only when `str`/`int`. |
-| S1-M1 | actioned | `4bf2374` test, `79ca519` fix | One pass over indented keys per document; 20 000 utils 18.93 s -> under 2 s; llm-linter-tool 82 YAML files output identical. |
+| S1-M1 | actioned | `4bf2374` test, `79ca519` fix, `8065360` test (scaling ratio, not wall clock) | One pass over indented keys per document; 20 000 utils 18.93 s -> 0.94 s locally; llm-linter-tool 82 YAML files output identical. |
 | S1-L1 | actioned | `59909c2` test, `b0b4af3` fix | `action_callees` returns no callees on `RecursionError`. |
 | S1-L2 | actioned | `401de76` test, `3c4de2d` fix | `yaml.YAMLError` keeps "document skipped (YAML does not parse)"; any other exception is logged by type with "nodes added before it are kept". Partial nodes are kept, not rolled back. |
 | S1-L3 | actioned | `6580837` | Docstring states the fallback loss; test pins `contains`-only edges and no refs. |

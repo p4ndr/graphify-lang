@@ -126,8 +126,6 @@ def test_l9_outer_workspace_ignored(tmp_path):
     assert next(n for n in g["nodes"] if n["id"] == "pkg_r")["external_deps"] == ["foo"]
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="cc-CR000.001 L11: is_relative_to is lexical, ../ never matches")
 def test_l11_dotdot_ruledirs(tmp_path):
     files = _write(tmp_path, {
         "proj/sgconfig.yml": "ruleDirs:\n  - ../shared/rules\n",

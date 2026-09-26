@@ -15,6 +15,7 @@ as INFERRED; a tie is dropped (the AutoLISP, VBA and bmake resolvers' rule).
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from graphify.resolver_registry import LanguageResolver
@@ -61,9 +62,11 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
                 util, conf = _pick(utils.get(ref["name"], []), ref["source_file"])
                 add(owner["id"], util, "references", conf, ref)
             elif kind == "dir":
-                base = Path(source_of(owner)).parent / ref["name"]
+                # normpath both sides: is_relative_to is lexical, so
+                # ``../shared/rules`` never matched (L11)
+                base = os.path.normpath(str(Path(source_of(owner)).parent / ref["name"]))
                 for f in files:
-                    if Path(source_of(f)).is_relative_to(base):
+                    if Path(os.path.normpath(source_of(f))).is_relative_to(base):
                         add(owner["id"], f["id"], "loads", "EXTRACTED", ref)
 
 

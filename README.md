@@ -237,8 +237,9 @@ settles open question 3 below. The code is `graphify_lang/registry.py`
   optional `RESOLVER` and `WATCH`. A plugin that fails to load is logged and
   skipped; `GRAPHIFY_LANG_DISABLE=1` turns discovery off.
 - **`graphify watch` and augments.** An edit of a file an augment claims
-  rebuilds the graph when the augment's `watch` predicate says so (cc-kb: the
-  page mentions another cc id, or names a file under its harness root); an
+  rebuilds the graph when the augment's `watch` predicate says so (cc-kb: any
+  `docs/cc-*.md` by name, or a page that mentions another cc id or names a
+  file under its harness root); an
   augment with no predicate rebuilds whenever it adds anything to the file.
 
 The three design questions the first version of this README left open are

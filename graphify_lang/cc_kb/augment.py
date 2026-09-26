@@ -159,15 +159,19 @@ def augment_cc_kb(path: Path, base: dict) -> dict:
 
 
 def watch_cc_kb(path: Path) -> bool:
-    """``graphify watch`` predicate (S5-M2): True when the page mentions a cc
-    id other than its own, or names a code path that is a file under its
-    harness root (the first ``up`` folder whose ``docs/`` holds a ``cc-*.md``,
-    as the resolver picks it). A page with only Markdown links or out-of-scope
-    path spans stays a doc. Reads the disk, which the augment may not (H3):
-    watch results are not cached. Known limit: an edit that removes a page's
+    """``graphify watch`` predicate (S5-M2): True for any ``docs/cc-*.md`` by
+    its name alone (owner rule: a ``docs/`` folder holding a ``cc-*.md`` is a
+    harness root, and a new spoke must refresh its hub -> spoke edges), and
+    for any other page that mentions a cc id other than its own, or names a
+    code path that is a file under its harness root (the first ``up`` folder
+    whose ``docs/`` holds a ``cc-*.md``, as the resolver picks it). Any other
+    page stays a doc. Reads the disk, which the augment may not (H3): watch
+    results are not cached. Known limit: an edit that removes a non-doc page's
     last mention and last in-scope path does not rebuild, so its old ``cites``
     edges stay until the next rebuild."""
     path = Path(path)
+    if path.parent.name == "docs" and path.name.startswith("cc-") and path.suffix == ".md":
+        return True
     refs = augment_cc_kb(path, {"nodes": [{"id": "page", "node_kind": "page"}]}).get("cc_kb_refs")
     if not refs:
         return False

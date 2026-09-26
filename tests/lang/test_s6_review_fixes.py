@@ -30,8 +30,6 @@ def test_s6_l4_manifest_has_no_fixture_field():
     assert "fixture" not in {f.name for f in dataclasses.fields(LanguageManifest)}
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S5-M2 owner rule: docs/cc-*.md is claimed by name alone")
 def test_s6_cc_kb_watch_claims_cc_docs_by_name(tmp_path):
     import graphify.extract  # noqa: F401  (applies the registry)
     import graphify.lang_registry as core

@@ -509,7 +509,7 @@ def test_s5_m2_watch_claims_cc_mention_or_in_scope_path(tmp_path):
                core.watch_claims(p) for p in [*h.values(), *plain.glob("*.md")]
                if p.suffix == ".md"}
     assert claimed == {
-        "docs/cc-XX000.001.md": False,       # a cc doc with no mention
+        "docs/cc-XX000.001.md": True,        # a cc doc, by name (owner, S6)
         "agents/in-scope.md": True,          # names a file under its harness root
         "agents/missing.md": False,          # names no file
         "agents/mention.md": True,

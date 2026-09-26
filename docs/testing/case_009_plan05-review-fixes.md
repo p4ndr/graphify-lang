@@ -30,3 +30,45 @@ before it. `git diff upstream/v8...HEAD -- graphify/extractors/` empty;
 | S1-N4 | actioned | `0b8e5ba` | `_timed` runs without `check=True` and fails with the child's stderr. |
 | S1-E1 | actioned | `548b209` | Bombs at rule `id`, test `id` and `testConfigs[].testDir`; shared `matches:` credited once. |
 | S1-E2 | actioned | `954a22b` test, `e5d5c99` fix | Documents over 1 000 000 characters skipped with a warning. |
+
+## S002
+
+**Tests:** `.venv/bin/python -m pytest tests/ -q`: before 6252 passed, 14 skipped;
+after 6263 passed, 14 skipped (11 new: `tests/lang/test_ci_workflows.py` 10,
+`test_s3_shared_core.py::test_s2_n5_one_tomllib_shim` 1). Red-first as in S001;
+the E2 parse guard is green by design (a regression guard). `git diff
+upstream/v8...HEAD -- graphify/extractors/` empty; `tests/lang_baseline.txt`
+and `tests/upstream_tables.json` unchanged; `publish.yml` / `release-graph.yml`
+keep only their one guard line against `upstream/v8`.
+
+**CI:** push run 36228277830 on `cc729db` green (3.10 6258/19, 3.12 and 3.13
+6257/20; security-scan gating steps pass: `pip-audit --skip-editable` "No known
+vulnerabilities found", `bandit -r graphify_lang -ll` 0 issues). Dispatch run
+36228295041 exercised the `wheel` job: built `graphifyy-0.9.67+lang.3`, installed
+into a clean venv, `graphify lang list --check` 9 languages ok.
+
+**Warnings (S001 saw 39 vs 19):** diffed the warning sets of `rr-s6` `5dad25c`
+(`git archive` into a scratch dir, `PYTHONPATH` to it, imports confirmed to
+resolve there) against HEAD, same `.venv`. No fork-caused new warning. HEAD
+in the repo: 20 in 4 of 5 runs, 40 in 1. The extra ones in the 39/40 runs are
+the nondeterministic `multiprocessing/popen_fork.py` "multi-threaded, use of
+fork()" DeprecationWarning (upstream tests; the scratch baseline also hit it,
+plus 11 git-dependent `test_skillgen` failures a non-git tree causes). 19 -> 20:
+hypothesis' "Skipping collection of '.hypothesis'" UserWarning, from the local
+untracked `.hypothesis/` dir and upstream's `norecursedirs`. Pre-existing and
+fork-owned but not new: `graphify_lang/queries.py:96` "int argument support is
+deprecated" (7 tests; a grammar binding returns an int; upstream
+`solidity.py:81` has the same).
+
+| Id | Status | Commit(s) | Note |
+|:--|:--|:--|:--|
+| S2-M1 | actioned | `89b12ff` test, `2352a06` lock, `3a8f0dc` fix, `cc729db` docs | `pip-audit --skip-editable`, gating, job syncs all extras. Lock bump cleared all 14 advisories: anyio 4.15.1, cryptography 50.0.1, pip 26.2.1, soupsieve 2.10 (typing-extensions 4.16.0 came with anyio); none left unbumped. Full locked set (`uv export --all-extras` + `pip-audit -r --no-deps`) clean. "security-scan success" corrected in `cc-CR000.002.md` M8 and spoke S2.5. |
+| S2-M2 | actioned | `89b12ff` test, `644cc9c` fix | Gating `bandit -r graphify_lang -ll`; combined scan kept informational. |
+| S2-L1 | actioned | `89b12ff` test, `50363e0` fix | `fail-fast: false`. |
+| S2-N1 | actioned | `89b12ff` test, `50363e0` fix | Top-level `permissions: {contents: read}`. SHA pinning not done: the reviewer's own condition (no secrets, read token) still holds. |
+| S2-N2 | actioned | `89b12ff` test, `50363e0` fix | `tags: ['v*\+lang.*']`. |
+| S2-N3 | actioned | `39fce02` | Suggestion plan and Metrics show open findings only (all 0). |
+| S2-N4 | actioned | `6614b24` | T17.4-T17.6 and Sources marked deleted in S2.3 (`1f8a2e4`). |
+| S2-N5 | actioned | `333a33d` test, `b12630a` engine, `76cbe8f` cargo | One shim in `manifest.py`, bound as `tomllib`; kept there, not `_common.py`, because `_common` imports `manifest` (circular otherwise). |
+| S2-E1 | actioned | `89b12ff` test, `3232862` fix | `wheel` job on tags (and `workflow_dispatch`): `uv build --wheel`, clean `uv venv`, `graphify lang list --check`. |
+| S2-E2 | actioned | `89b12ff` | `test_s2_e2_every_workflow_parses` over all 4 workflows. |

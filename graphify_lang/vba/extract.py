@@ -16,19 +16,9 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-
-def _file_stem(path):
-    # Lazy: graphify.extractors at plugin load re-enters graphify.detect (see autolisp).
-    from graphify.extractors.base import _file_stem as f
-    return f(path)
+from graphify_lang._common import Sink, _make_id, load_builtins
 
 
-def _make_id(*parts):
-    from graphify.extractors.base import _make_id as f
-    return f(*parts)
-
-
-_BUILTINS_FILE = Path(__file__).parent / "data" / "builtins.txt"
 _MODULE_KIND = {".bas": "module", ".cls": "class", ".frm": "form"}
 
 _NAME_RE = re.compile(r'^attribute\s+vb_name\s*=\s*"([^"]+)"', re.I)
@@ -50,14 +40,14 @@ _PARENS_RE = re.compile(r"\([^()]*\)")
 
 
 @lru_cache(maxsize=1)
-def _builtins() -> frozenset[str]:
-    lines = _BUILTINS_FILE.read_text(encoding="utf-8").splitlines()
-    return frozenset(s.strip().casefold() for s in lines if s.strip() and not s.startswith(";"))
+def _builtins():
+    """The manifest's builtins filter (``builtins_file``, ``case_insensitive``)."""
+    return load_builtins(__file__, "graphify-lang.toml")
 
 
 def is_builtin(name: str) -> bool:
     """VBA keywords, intrinsic types and VBA-library routines never become refs."""
-    return name.casefold() in _builtins()
+    return _builtins().is_builtin(name)
 
 
 def decode(raw: bytes) -> str:
@@ -124,41 +114,6 @@ def _variables(decl: str) -> list[tuple[str, str | None]]:
     return out
 
 
-class _Out:
-    """Node / edge / ref sink for one file."""
-
-    def __init__(self, path: Path) -> None:
-        self.sf = str(path)
-        self.stem = _make_id(_file_stem(path))
-        self.nodes: list[dict] = []
-        self.edges: list[dict] = []
-        self.refs: list[dict] = []
-        self._ids: set[str] = set()
-        self._edge_keys: set[tuple] = set()
-        self.file_nid = self.add(self.stem, path.name, "file", 1)
-
-    def add(self, nid: str, label: str, kind: str, line: int, **attrs) -> str:
-        if nid in self._ids:
-            nid = f"{nid}_l{line}"
-        self._ids.add(nid)
-        self.nodes.append({"id": nid, "label": label, "file_type": "code", "node_kind": kind,
-                           "source_file": self.sf, "source_location": f"L{line}", **attrs})
-        return nid
-
-    def edge(self, src: str, tgt: str, relation: str, line: int) -> None:
-        if src == tgt or (src, tgt, relation) in self._edge_keys:
-            return
-        self._edge_keys.add((src, tgt, relation))
-        self.edges.append({"source": src, "target": tgt, "relation": relation,
-                           "confidence": "EXTRACTED", "source_file": self.sf,
-                           "source_location": f"L{line}", "weight": 1.0})
-
-    def ref(self, kind: str, source: str, name: str, line: int,
-            qualifier: str | None = None, accessor: str = "get") -> None:
-        self.refs.append({"kind": kind, "source": source, "name": name, "line": line,
-                          "qualifier": qualifier, "accessor": accessor, "source_file": self.sf})
-
-
 def extract_vba(path: Path) -> dict:
     """Extract one VBA module, class module or form (plan 04 §3.4)."""
     try:
@@ -167,7 +122,7 @@ def extract_vba(path: Path) -> dict:
         return {"nodes": [], "edges": [], "error": str(exc)}
     path = Path(path)
     stmts = statements(text)
-    out = _Out(path)
+    out = Sink(path, _builtins())
     name = next((m.group(1) for _, s in stmts if (m := _NAME_RE.match(s))), path.stem)
     module = out.add(_make_id(out.stem, name), name,
                      _MODULE_KIND.get(path.suffix.lower(), "module"), 1)
@@ -212,7 +167,7 @@ def extract_vba(path: Path) -> dict:
             owner = (nid, kind, [])
             bodies.append((nid, m.group(3), "", line, owner[2]))
         elif m := _IMPLEMENTS_RE.match(s):
-            out.ref("implements", module, m.group(1), line)
+            out.ref("implements", module, line, name=m.group(1))
         elif m := _DECL_RE.match(s):
             for var, vtype in _variables(m.group(1)):
                 module_vars[var.casefold()] = vtype
@@ -237,10 +192,10 @@ def extract_vba(path: Path) -> dict:
                     local.update((v.casefold(), t) for v, t in _variables(m.group(1)))
             _uses(out, nid, s, bline, types)
             _calls(out, nid, s, bline, own, local, members)
-    return {"nodes": out.nodes, "edges": out.edges, "vba_refs": out.refs}
+    return out.result("vba_refs")
 
 
-def _uses(out: _Out, src: str, s: str, line: int, types: dict[str, str]) -> None:
+def _uses(out: Sink, src: str, s: str, line: int, types: dict[str, str]) -> None:
     for m in _TYPE_REF_RE.finditer(s):
         tname = m.group(1)
         if "." in tname or is_builtin(tname):
@@ -248,7 +203,7 @@ def _uses(out: _Out, src: str, s: str, line: int, types: dict[str, str]) -> None
         if tname.casefold() in types:
             out.edge(src, types[tname.casefold()], "uses", line)
         else:
-            out.ref("uses", src, tname, line)
+            out.ref("uses", src, line, name=tname)
 
 
 def accessor_match(found: list[tuple[str, str]], accessor: str) -> list[str]:
@@ -256,7 +211,7 @@ def accessor_match(found: list[tuple[str, str]], accessor: str) -> list[str]:
     return [nid for nid, acc in found if not acc or acc == accessor]
 
 
-def _calls(out: _Out, src: str, s: str, line: int, own: str,
+def _calls(out: Sink, src: str, s: str, line: int, own: str,
            local: dict[str, str | None], members: dict[str, list[tuple[str, str]]]) -> None:
     skip_after = {"as", "new", "is", "goto", "gosub", "resume"}
     prev = ""
@@ -281,9 +236,9 @@ def _calls(out: _Out, src: str, s: str, line: int, own: str,
                 for target in accessor_match(members[folded], accessor):
                     out.edge(src, target, "calls", line)
             elif len(parts) == 1 and not is_builtin(name):
-                out.ref("call", src, name, line, accessor=accessor)
+                out.ref("call", src, line, name=name, accessor=accessor)
         elif head in local:
             if local[head] and "." not in local[head]:  # obj.Method, obj declared As Class
-                out.ref("call", src, parts[1], line, qualifier=local[head], accessor=accessor)
+                out.ref("call", src, line, name=parts[1], qualifier=local[head], accessor=accessor)
         elif not is_builtin(parts[0]):
-            out.ref("call", src, parts[1], line, qualifier=parts[0], accessor=accessor)  # Module.Proc
+            out.ref("call", src, line, name=parts[1], qualifier=parts[0], accessor=accessor)  # Module.Proc

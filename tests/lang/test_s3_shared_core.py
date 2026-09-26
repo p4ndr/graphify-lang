@@ -71,8 +71,6 @@ def test_h2_same_stem_lsp_mnl_dcl(tmp_path):
     assert _has(g, _node(g, "app/x.lsp", "x.lsp"), "sidecar_doc", _node(g, "app/x.md", "x.md"))
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="cc-CR000.001 H2: vba refs carry extraction-time ids")
 def test_h2_vba_same_stem(tmp_path):
     g = _build(tmp_path, {
         "app/x.bas": 'Attribute VB_Name = "XB"\nPublic Sub Helper()\n    LibFn\nEnd Sub\n',
@@ -96,7 +94,7 @@ _M4 = {
 }
 
 
-_M4_OPEN = {"autolisp", "vba"}  # each plugin move closes its own
+_M4_OPEN = {"autolisp"}  # each plugin move closes its own
 
 
 @pytest.mark.parametrize("plugin", [

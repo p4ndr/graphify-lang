@@ -1,0 +1,8 @@
+id: no-bare-assert
+language: python
+severity: warning
+rule:
+  all:
+    - kind: assert_statement
+    - not:
+        matches: has-message

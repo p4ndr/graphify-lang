@@ -151,15 +151,18 @@ def test_lang_list_row():
     assert rows["bmake"] == ["bmake", ".mke", ".mki", "-", "-", "bmake"]
 
 
-def test_bentleyhelp_includes():
+@pytest.mark.parametrize("repo", [
+    pytest.param(FIXTURE, id="sample"),
+    pytest.param(Path(os.path.expanduser(f"~{getpass.getuser()}")) / "repos/BentleyHelp",
+                 marks=pytest.mark.corpus, id="BentleyHelp"),
+])
+def test_bentleyhelp_includes(repo, corpus_ls):
     """Plan 04 S9: every non-comment %include line in the corpus gives an edge or
-    an unresolved_includes entry; `grep -c %include` also counts comment lines."""
-    home = Path(os.path.expanduser(f"~{getpass.getuser()}"))  # conftest sandboxes HOME
-    repo = home / "repos/BentleyHelp"
-    if not (repo / ".git").exists():
-        pytest.skip("BentleyHelp corpus not on this host")
-    names = subprocess.run(["git", "-C", str(repo), "ls-files", "*.mki", "*.mke"],
-                           capture_output=True, text=True, check=True).stdout.split()
+    an unresolved_includes entry; `grep -c %include` also counts comment lines.
+    The checked-in sample runs in CI; the private corpus is marked `corpus`."""
+    if not repo.exists():
+        pytest.skip(f"corpus: {repo.name} not on this host")
+    names = corpus_ls(repo, "*.mki", "*.mke")
     files = [repo / n for n in names]
     directives = sum(1 for f in files for line in f.read_bytes().decode("utf-8", "replace").splitlines()
                      if re.match(r"\s*%include\b", line))

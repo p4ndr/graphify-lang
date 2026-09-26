@@ -1,0 +1,6 @@
+id: no-console
+language: javascript
+severity: warning
+message: Remove console calls.
+rule:
+  pattern: console.$METHOD($$$ARGS)

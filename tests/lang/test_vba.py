@@ -161,12 +161,17 @@ def test_lang_list_rows():
     assert rows["vba-cls"] == ["vba-cls", ".cls*", "-", "sniff", "vba"]
 
 
-def test_bim_chk_this_workbook():
-    """Plan 04 §1 start point: 1 node from extract_apex; the plugin sees the class."""
-    home = Path(os.path.expanduser(f"~{getpass.getuser()}"))  # conftest sandboxes HOME
-    path = home / "repos/bim-chk/src/document/ThisWorkbook.cls"
+@pytest.mark.parametrize("path", [
+    pytest.param(Path(__file__).parent / "fixtures/corpus/vba/ThisWorkbook.cls", id="sample"),
+    pytest.param(Path(os.path.expanduser(f"~{getpass.getuser()}"))
+                 / "repos/bim-chk/src/document/ThisWorkbook.cls",
+                 marks=pytest.mark.corpus, id="bim-chk"),
+])
+def test_bim_chk_this_workbook(path):
+    """Plan 04 §1 start point: 1 node from extract_apex; the plugin sees the class.
+    The synthetic sample is a CRLF document-module export, like bim-chk's."""
     if not path.is_file():
-        pytest.skip("bim-chk corpus not on this host")
+        pytest.skip("corpus: bim-chk not on this host")
     result = _get_extractor(path)(path)
     assert len(result["nodes"]) > 1
     assert Counter(n["node_kind"] for n in result["nodes"])["class"] == 1

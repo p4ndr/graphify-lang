@@ -1,0 +1,5 @@
+id: no-console
+valid:
+  - 'log(1)'
+invalid:
+  - 'console.log(1)'

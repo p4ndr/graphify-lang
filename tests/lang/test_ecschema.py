@@ -28,7 +28,9 @@ FIXTURE = Path(__file__).parent / "fixtures" / "ecschema"
 CLAIMED = ["Base.01.00.00.ecschema.xml", "Broken.01.00.ecschema.xml",
            "Legacy.01.00.ecschema.xml", "sub/Domain.xml"]
 UPSTREAM = ["Dtd.ecschema.xml", "commands.xml", "settings.xml", "maml.xsd"]
-CORPORA = [Path.home() / "repos" / r for r in ("BentleyHelp", "bentley-pyplace")]
+CORPORA = [pytest.param(FIXTURE, id="sample")] + [
+    pytest.param(Path.home() / "repos" / r, marks=pytest.mark.corpus, id=r)
+    for r in ("BentleyHelp", "bentley-pyplace")]
 _CLASS_TAGS = {"ECClass", "ECEntityClass", "ECStructClass", "ECCustomAttributeClass",
                "ECRelationshipClass"}
 
@@ -179,12 +181,11 @@ def _truth(path: Path) -> int | None:
     return sum(1 for c in root if c.tag.rpartition("}")[2] in _CLASS_TAGS and c.get("typeName"))
 
 
-@pytest.mark.parametrize("corpus", CORPORA, ids=lambda p: p.name)
-def test_corpus_class_count(tmp_path, corpus):
-    if not (corpus / ".git").exists():
-        pytest.skip(f"{corpus.name} not present")
-    ls = subprocess.run(["git", "-C", str(corpus), "ls-files", "*.xml"],
-                        capture_output=True, text=True, check=True).stdout.split()
+@pytest.mark.parametrize("corpus", CORPORA)
+def test_corpus_class_count(tmp_path, corpus, corpus_ls):
+    if not corpus.exists():
+        pytest.skip(f"corpus: {corpus.name} not on this host")
+    ls = corpus_ls(corpus, "*.xml")
     files = [corpus / p for p in ls if classify_file(corpus / p) is not None]
     assert files
     graph = extract(files, cache_root=tmp_path, root=corpus)

@@ -1,0 +1,5 @@
+id: no-bare-assert
+valid:
+  - 'assert x, "why"'
+invalid:
+  - 'assert x'

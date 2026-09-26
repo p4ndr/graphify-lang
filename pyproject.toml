@@ -168,6 +168,10 @@ graphify_lang = ["autolisp/graphify-lang.toml", "autolisp/dcl.toml", "autolisp/d
 
 [tool.pytest.ini_options]
 addopts = "-m 'not perf'"
+markers = [
+    "perf: slow performance tests, deselected by default",
+    "corpus: needs a private corpus under ~/repos; skipped where it is absent (CI)",
+]
 testpaths = ["tests"]
 norecursedirs = [
     "graphify-benchmark", "graphify_eval", "graphify_test",

@@ -160,12 +160,16 @@ def test_get_extractor_uses_router(clean_registry, tmp_path, monkeypatch):
     assert extract._get_extractor(apex)(apex) == extract_apex(apex)
 
 
-def test_measured_start_point_vba_is_not_apex(clean_registry):
+@pytest.mark.parametrize("path", [
+    pytest.param(Path(__file__).parent / "lang/fixtures/corpus/vba/ThisWorkbook.cls", id="sample"),
+    pytest.param(Path(os.path.expanduser(f"~{getpass.getuser()}"))
+                 / "repos/bim-chk/src/document/ThisWorkbook.cls",
+                 marks=pytest.mark.corpus, id="bim-chk"),
+])
+def test_measured_start_point_vba_is_not_apex(clean_registry, path):
     """A real exported workbook class goes to the plugin (plan 04 §1)."""
-    home = Path(os.path.expanduser(f"~{getpass.getuser()}"))  # conftest sandboxes HOME
-    path = home / "repos/bim-chk/src/document/ThisWorkbook.cls"
     if not path.is_file():
-        pytest.skip("bim-chk corpus not on this host")
+        pytest.skip("corpus: bim-chk not on this host")
     result = _router(_real_vba_cls())(path)
     assert _is_vba(result) and len(result["nodes"]) > 1
 

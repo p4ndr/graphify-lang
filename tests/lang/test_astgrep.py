@@ -23,7 +23,10 @@ from graphify.lang_registry import format_languages
 from graphify_lang.astgrep.extract import extract_astgrep
 
 FIXTURE = Path(__file__).parent / "fixtures" / "astgrep"
-CORPUS = Path.home() / "repos" / "llm-linter-tool"
+CORPORA = [
+    pytest.param(Path(__file__).parent / "fixtures" / "corpus" / "astgrep", id="sample"),
+    pytest.param(Path.home() / "repos" / "llm-linter-tool", marks=pytest.mark.corpus,
+                 id="llm-linter-tool")]
 DOCS = [".github/workflows/ci.yml", "config/app.yml", "rules/notes.yml"]
 
 
@@ -118,16 +121,17 @@ def test_malformed_yaml_warns_and_keeps_file_node(caplog):
     assert "YAML does not parse" in caplog.text
 
 
-@pytest.mark.skipif(not (CORPUS / "sgconfig.yml").is_file(), reason="llm-linter-tool not present")
-def test_corpus_rules_and_tests(tmp_path):
-    ls = subprocess.run(["git", "-C", str(CORPUS), "ls-files", "*.yml", "*.yaml"],
-                        capture_output=True, text=True, check=True).stdout.split()
-    files = [CORPUS / p for p in ls]
+@pytest.mark.parametrize("corpus", CORPORA)
+def test_corpus_rules_and_tests(tmp_path, corpus, corpus_ls):
+    if not (corpus / "sgconfig.yml").is_file():
+        pytest.skip(f"corpus: {corpus.name} not on this host")
+    ls = corpus_ls(corpus, "*.yml", "*.yaml")
+    files = [corpus / p for p in ls]
     assert all(classify_file(p).value == "code" for p in files)
-    graph = extract(files, cache_root=tmp_path, root=CORPUS)
+    graph = extract(files, cache_root=tmp_path, root=corpus)
     rules = [n for n in graph["nodes"] if n.get("node_kind") == "rule"]
     with_id = [p for p in ls if p.startswith("rules/")
-               and re.search(r"^id:", (CORPUS / p).read_text(encoding="utf-8"), re.M)]
+               and re.search(r"^id:", (corpus / p).read_text(encoding="utf-8"), re.M)]
     assert len(rules) == len(with_id)
     tests = {n["astgrep_id"] for n in graph["nodes"] if n.get("astgrep_role") == "test"}
     per_rule = Counter(e["source"] for e in graph["edges"] if e["relation"] == "tested_by")

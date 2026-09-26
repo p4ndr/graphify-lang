@@ -1,0 +1,7 @@
+# ast-grep project configuration (synthetic corpus sample, plan 05 S6.1).
+ruleDirs:
+  - rules
+testConfigs:
+  - testDir: rule-tests
+utilDirs:
+  - utils

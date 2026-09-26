@@ -1,0 +1,4 @@
+id: has-message
+language: python
+rule:
+  has: {kind: string, stopBy: end}

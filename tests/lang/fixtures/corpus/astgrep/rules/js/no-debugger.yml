@@ -1,0 +1,5 @@
+id: no-debugger
+language: javascript
+severity: error
+rule:
+  kind: debugger_statement

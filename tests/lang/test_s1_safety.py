@@ -56,9 +56,7 @@ def _rule_file(tmp_path: Path, text: str) -> Path:
     return path
 
 
-@pytest.mark.parametrize("levels", [6, pytest.param(9, marks=pytest.mark.xfail(
-    strict=True, raises=pytest.fail.Exception,
-    reason="cc-CR000.001 H4: alias expansion is 10^levels"))])
+@pytest.mark.parametrize("levels", [6, 9])
 def test_h4_alias_bomb_bounded(tmp_path, levels):
     path = _rule_file(tmp_path, _bomb(levels))
     assert len(_bomb(levels).encode()) < 500
@@ -67,8 +65,6 @@ def test_h4_alias_bomb_bounded(tmp_path, levels):
     assert nodes == 2  # file + rule
 
 
-@pytest.mark.xfail(strict=True, raises=RecursionError,
-                   reason="cc-CR000.001 H4: a self-referencing alias recurses forever")
 def test_h4_self_alias_keeps_file_node(tmp_path):
     path = _rule_file(tmp_path, "id: loop\nlanguage: python\nrule: &a {any: [*a]}\n")
     result = extract_astgrep(path)
@@ -76,8 +72,6 @@ def test_h4_self_alias_keeps_file_node(tmp_path):
     assert kinds == ["file", "rule"]
 
 
-@pytest.mark.xfail(strict=True, raises=RecursionError,
-                   reason="cc-CR000.001 H4/E6: _rule_doc runs outside the per-document try")
 def test_e6_rule_doc_error_keeps_file_node(tmp_path, monkeypatch):
     def boom(*_args, **_kwargs):
         raise RecursionError("maximum recursion depth exceeded")
@@ -88,9 +82,19 @@ def test_e6_rule_doc_error_keeps_file_node(tmp_path, monkeypatch):
     assert result["nodes"][0]["source_file"] == str(path)
 
 
+@pytest.fixture
+def py_default_recursion_limit():
+    """graphify.extract raises the limit to 10 000 on import; pin Python's
+    default so the review's 1200 levels overflow whatever test ran first."""
+    limit = sys.getrecursionlimit()
+    sys.setrecursionlimit(1000)
+    yield
+    sys.setrecursionlimit(limit)
+
+
 @pytest.mark.xfail(strict=True, raises=RecursionError,
                    reason="cc-CR000.001 L1: the walker recurses per list level")
-def test_l1_deep_nesting_falls_back(tmp_path):
+def test_l1_deep_nesting_falls_back(tmp_path, py_default_recursion_limit):
     depth = 1200
     path = tmp_path / "deep.lsp"
     path.write_text("(defun deep ()\n  " + "(list " * depth + "1" + ")" * depth + ")\n"

@@ -2,8 +2,8 @@
 
 - Status: DRAFT. Not opened on GitHub; opening it needs owner approval.
 - Plan: 01 T10 (roadmap phase 6); plan 05 hub D2.
-- Base: upstream `v8` at `4000de1` (release 0.9.68). The diff applies with `git apply` and its test passes there (verified 2026-09-26, plan 05 S6.3).
-- Fork finding: M3 (`cc-CR000.001`, fixed in the fork by `32d4618`, `227c194` on `rr-s5`).
+- Base: upstream `v8` at `4000de1` (release 0.9.68). The diff applies with `git apply` and its test passes there (verified 2026-09-26, plan 05 S6.3; re-verified after the cc-CR000.003 S6 review fixes).
+- Fork finding: M3 (`cc-CR000.001`, fixed in the fork by `f8219a1` (`watch_claims`), `ae768d4` (`watch.py` lookup) on `rr-s6`).
 
 ## Problem
 
@@ -21,13 +21,16 @@ and the graph goes stale.
 `watch.py` gets `register_code_path_claim(claim)` and a module list of
 `claim(path) -> bool` predicates. The three suffix checks also accept a path
 that a registered claim returns true for. A claim that raises counts as no
-claim (logged at debug level). With no claim registered nothing changes.
+claim (logged at debug level). In the event handler the claim runs after
+the `.graphifyignore`, dot-folder and `graphify-out` filters, because a claim
+may open the file: a write under `.git/` never reaches it. With no claim
+registered nothing changes.
 
 ## Diff
 
 ```diff
 diff --git a/graphify/watch.py b/graphify/watch.py
-index d1100a7..12e29e3 100644
+index d1100a7..f944ab2 100644
 --- a/graphify/watch.py
 +++ b/graphify/watch.py
 @@ -282,6 +282,27 @@ from graphify.detect import (
@@ -79,21 +82,32 @@ index d1100a7..12e29e3 100644
      has_deletion = any(not p.exists() for p in batch)
      return has_code or has_deletion
  
-@@ -2383,7 +2407,7 @@ def watch(watch_path: Path, debounce: float = 3.0) -> None:
+@@ -2383,8 +2407,7 @@ def watch(watch_path: Path, debounce: float = 3.0) -> None:
              # relative_to guard, so a stray symlinked event won't raise.
              if ignore_patterns and _is_ignored(path, watch_root_for_ignore, ignore_patterns):
                  return
 -            if path.suffix.lower() not in _WATCHED_EXTENSIONS:
-+            if path.suffix.lower() not in _WATCHED_EXTENSIONS and not _claimed_as_code(path):
-                 return
+-                return
++            watched = path.suffix.lower() in _WATCHED_EXTENSIONS
              try:
                  filter_parts = path.relative_to(watch_root_for_ignore).parts
+             except ValueError:
+@@ -2393,6 +2416,9 @@ def watch(watch_path: Path, debounce: float = 3.0) -> None:
+                 return
+             if _GRAPHIFY_OUT in filter_parts:
+                 return
++            # A claim may read the file, so it runs after the cheap filters.
++            if not watched and not _claimed_as_code(path):
++                return
+             last_trigger = time.monotonic()
+             pending = True
+             changed.add(path)
 diff --git a/tests/test_watch_code_path_claims.py b/tests/test_watch_code_path_claims.py
 new file mode 100644
-index 0000000..5ac4422
+index 0000000..3f4c470
 --- /dev/null
 +++ b/tests/test_watch_code_path_claims.py
-@@ -0,0 +1,55 @@
+@@ -0,0 +1,66 @@
 +"""A registered claim makes watch treat a non-code suffix as code."""
 +import threading
 +import time
@@ -134,21 +148,32 @@ index 0000000..5ac4422
 +    assert watch._batch_triggers_rebuild([schema]) is False
 +
 +
-+def test_watch_handler_passes_claimed_file(claimed, tmp_path, monkeypatch):
++def test_watch_handler_passes_claimed_file(tmp_path, monkeypatch):
++    """A claimed .xml write reaches _rebuild_code; a .git object write never
++    reaches a claim (the dot-folder filter runs first)."""
 +    pytest.importorskip("watchdog")
++    seen: list[Path] = []
++
++    def claim(path: Path) -> bool:
++        seen.append(path)
++        return _schema(path)
++
++    monkeypatch.setattr(watch, "_CODE_PATH_CLAIMS", [claim])
 +    root = tmp_path / "corpus"
-+    root.mkdir()
++    (root / ".git" / "objects" / "ab").mkdir(parents=True)
 +    calls: list[Path] = []
 +    monkeypatch.setattr(watch, "_rebuild_code", lambda p, **kw: calls.append(p) or True)
 +    monkeypatch.setattr(watch, "_notify_only", lambda p: None)
 +    threading.Thread(target=watch.watch, args=(root,), kwargs={"debounce": 0.2},
 +                     daemon=True).start()
 +    time.sleep(0.5)
++    (root / ".git" / "objects" / "ab" / "cdef0123").write_bytes(b"x")
 +    (root / "Base.ecschema.xml").write_text("<ECSchema/>\n", encoding="utf-8")
 +    deadline = time.monotonic() + 5.0
 +    while time.monotonic() < deadline and not calls:
 +        time.sleep(0.1)
 +    assert calls, "a claimed .xml write should trigger _rebuild_code"
++    assert not [p for p in seen if ".git" in p.parts], "a .git write reached a claim"
 ```
 
 ## Test
@@ -160,16 +185,22 @@ index 0000000..5ac4422
   plain `settings.xml` is unchanged.
 - `test_failing_claim_is_not_a_claim`.
 - `test_watch_handler_passes_claimed_file` (needs `watchdog`): `watch()` on a
-  temporary folder calls `_rebuild_code` when a claimed `.xml` is written.
+  temporary folder calls `_rebuild_code` when a claimed `.xml` is written, and
+  a write under `.git/objects/` never reaches the claim (it fails with the
+  claim at the suffix filter).
 
-Measured on the base: 1 failed and 2 errors without the diff, 3 passed with
-it. Full suite with the diff: 5991 passed, 14 skipped.
+Measured on the base: 2 failed and 1 error without the diff, 3 passed with
+it; the handler test fails with the claim at the suffix filter. Full suite
+with the diff: 5991 passed, 14 skipped (review-fix pass, cc-CR000.003 S6-L2).
 
 ## Fork side
 
 The fork calls `graphify.lang_registry.watch_claims` from a `_lang_claims`
-helper at the same three sites. Its claim for augments (cc-kb claims `.md`)
-counts a file only when the augment adds something, so a plain doc edit does
-not rebuild; that rule stays in the plugin's predicate. With this PR merged
+helper at the same three sites (its handler check sits at the suffix filter,
+to keep the fork's edit to one upstream line). An augment claims a file when
+its `watch` predicate says so; cc-kb's (`watch_cc_kb`) claims a
+`docs/cc-*.md` by name, and any other `.md` only when it mentions another cc
+id or names a file under its harness root, so a plain doc edit does not
+rebuild. That rule stays in the plugin's predicate. With this PR merged
 the fork would register `watch_claims` through `register_code_path_claim`
 and drop its three edited lines.

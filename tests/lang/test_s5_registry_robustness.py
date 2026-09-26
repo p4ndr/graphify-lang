@@ -259,7 +259,6 @@ def test_m3_watch_handler_sees_claimed_xml(tmp_path, monkeypatch):
 
 # --- L6, L8, L10, L13, N5 ---------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="L6: upper() suffix variants in the core tables")
 def test_l6_no_upper_variants(tmp_path):
     import graphify.extract as extract
     import graphify.lang_registry as core

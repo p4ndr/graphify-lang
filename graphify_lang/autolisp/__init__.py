@@ -7,19 +7,14 @@
 """
 from __future__ import annotations
 
-from dataclasses import replace
-from pathlib import Path
-
+from graphify_lang._common import load_manifest
 from graphify_lang.autolisp.extract import extract_autolisp, extract_dcl
 from graphify_lang.autolisp.resolve import RESOLVER
 from graphify_lang.manifest import LanguageManifest
 
 
 def _load(toml_name: str, extract) -> LanguageManifest:
-    manifest, errors = LanguageManifest.from_toml(Path(__file__).parent / toml_name)
-    if errors:
-        raise ValueError(f"{toml_name}: {errors}")
-    return replace(manifest, extract=extract, resolver=RESOLVER)
+    return load_manifest(__file__, toml_name, extract=extract, resolver=RESOLVER)
 
 
 def _get_autolisp_manifest() -> LanguageManifest:

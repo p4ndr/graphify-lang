@@ -7,8 +7,8 @@ extractors and may call this; none depends on it. Two tiers feed one sink:
   ``@definition.<kind>`` / ``@name`` / ``@reference.<relation>``;
 - regex tier (``regex_rules.py``): ``[[rule]]`` tables, ctags-optlib scopes.
 
-Emission contract (plan 01 S005, ``.claude/docs/cc-IP000.001.md``): a file
-node from ``_file_stem``; every node carries ``label``, ``source_file``,
+Emission contract (plan 01 S005, ``.claude/docs/cc-IP000.001.md``; the shared
+``graphify_lang._common.Sink``): a file node ``_make_id(str(path))``; every node carries ``label``, ``source_file``,
 ``file_type = "code"`` and ``node_kind``; symbol ids ``_make_id(stem, label)``
 with the definition line appended on a clash (the ``extract_markdown``
 recipe); a ``contains`` edge per symbol; reference edges resolved within the
@@ -24,7 +24,7 @@ import logging
 from pathlib import Path
 from typing import Any, Callable
 
-from graphify.extractors.base import _file_stem, _make_id
+from graphify_lang._common import Sink, _make_id
 from graphify_lang.builtins import Builtins
 from graphify_lang.queries import QueryRules
 from graphify_lang.regex_rules import RegexRules
@@ -32,51 +32,30 @@ from graphify_lang.regex_rules import RegexRules
 log = logging.getLogger(__name__)
 
 
-class Out:
-    """Node / edge sink for one file."""
+class Out(Sink):
+    """The shared sink plus in-file resolution of reference names."""
 
     def __init__(self, path: Path, builtins: Builtins) -> None:
-        self.sf = str(path)
-        self.stem = _make_id(_file_stem(path))
-        self.builtins = builtins
-        self.nodes: list[dict] = []
-        self.edges: list[dict] = []
-        self._ids: set[str] = set()
+        super().__init__(path, builtins)
         self._by_label: dict[str, str] = {}
-        self._refs: list[tuple[str, str, str, int]] = []
-        self._edge_keys: set[tuple[str, str, str]] = set()
-        self.file_nid = self._add(self.stem, path.name, "file", 1)
-
-    def _add(self, nid: str, label: str, kind: str, line: int) -> str:
-        self._ids.add(nid)
-        self.nodes.append({"id": nid, "label": label, "file_type": "code", "node_kind": kind,
-                           "source_file": self.sf, "source_location": f"L{line}"})
-        return nid
+        self._names: list[tuple[str, str, str, int]] = []
 
     def node(self, kind: str, label: str, line: int) -> str:
         nid = _make_id(self.stem, label)
         if nid in self._ids:
             nid = _make_id(self.stem, label, str(line))
-        self._add(nid, label, kind, line)
+        self.add(nid, label, kind, line)
         self._by_label.setdefault(self.builtins.fold(label), nid)
         self.edge(self.file_nid, nid, "contains", line)
         return nid
 
     def ref(self, source: str, name: str, relation: str, line: int) -> None:
         if not self.builtins.is_builtin(name):
-            self._refs.append((source, name, relation, line))
-
-    def edge(self, src: str, tgt: str, relation: str, line: int) -> None:
-        if (src, tgt, relation) in self._edge_keys:
-            return
-        self._edge_keys.add((src, tgt, relation))
-        self.edges.append({"source": src, "target": tgt, "relation": relation,
-                           "confidence": "EXTRACTED", "source_file": self.sf,
-                           "source_location": f"L{line}", "weight": 1.0})
+            self._names.append((source, name, relation, line))
 
     def result(self) -> dict:
         # ponytail: in-file resolution only; a cross-file ref needs a plugin resolver.
-        for src, name, relation, line in self._refs:
+        for src, name, relation, line in self._names:
             tgt = self._by_label.get(self.builtins.fold(name))
             if tgt:
                 self.edge(src, tgt, relation, line)

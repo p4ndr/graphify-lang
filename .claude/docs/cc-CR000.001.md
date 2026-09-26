@@ -1,14 +1,16 @@
 # Code review: graphify-lang fork layer
 
+Open findings only. Fixed and closed findings move to `cc-CR000.002.md` (plan 05 stage 1 moved H4, E6, L1, L2, L4, N4 on 2026-09-26).
+
 | Severity | Count |
 |:---------|------:|
 | Critical | 0 |
-| High | 4 |
+| High | 3 |
 | Medium | 12 |
-| Low | 13 |
-| Nit | 6 |
-| **Defects total** | **35** |
-| Enhancements | 9 |
+| Low | 10 |
+| Nit | 5 |
+| **Defects total** | **30** |
+| Enhancements | 8 |
 
 - **Date**: 2026-09-26
 - **Mode**: Diff (`git diff upstream/v8...autolisp`), branch `autolisp`, HEAD `013c902` (v0.9.67+lang.3)
@@ -39,13 +41,6 @@
 - **Problem**: the extractor contract behind the AST cache is "output is a function of the file's bytes". These augments break it, so a cached result survives changes elsewhere.
 - **Failure scenario (measured)**: workspace `members = ["crates/*"]` with crate `a`: `has_member -> pkg_a`. Add `crates/b/Cargo.toml` (root manifest unchanged) and rebuild with the same cache: still only `pkg_a`; a fresh cache gives `pkg_a, pkg_b`. For cc-kb: a doc that mentions `` `scripts/new.ps1` `` before the script exists never gains its `cites` edge until the cache is cleared.
 - **Fix**: keep augments pure. Emit the raw payload (member globs and `exclude` relative to the manifest dir; renamed/workspace deps by key; every path-like code span) and let the resolver, which runs every build over the whole corpus, match against graphed nodes (`pkg_*` nodes by their `source_file` dir; file nodes by normalised path). This also removes the filesystem reads from extraction.
-
-### H4 ast-grep YAML alias expansion: unbounded time and recursion on crafted input (security, DoS)
-
-- **Where**: `graphify_lang/astgrep/extract.py:106-116` (`_matches` walks the `yaml.safe_load` tree), called outside the per-document `try` at `extract.py:205,251`.
-- **Problem**: `safe_load` shares aliased subtrees, but `_matches` traverses every reference, so N levels of 10 aliases cost 10^N visits; a self-referencing alias (`rule: &a {any: [*a]}`) recurses until `RecursionError`. graphify is run on arbitrary third-party repos, and the file only needs to sit under `rules/`, `utils/` or `rule-tests/` with `id:` plus one body key to be claimed.
-- **Failure scenario (measured)**: a 377-byte `rules/bomb.yml` with 6 alias levels takes 0.59 s; each extra level multiplies by 10 (9 levels, under 500 bytes, is about 10 minutes; 10 levels about 100 minutes), hanging `graphify update`. The recursive alias raises `RecursionError`; upstream then skips the whole file ("recursion limit exceeded"), losing even its file node.
-- **Fix**: memoise by object identity in `_matches` (a `seen: set[int]` of `id(obj)` for dicts/lists; return on revisit). That bounds work to the number of distinct YAML nodes and ends the recursion. Also wrap `_rule_doc` in the per-document `try` so a malformed document keeps the file node, as the module docstring promises.
 
 ## Medium
 
@@ -126,27 +121,10 @@
 
 ## Low
 
-### L1 AutoLISP walker recursion overflows on deep nesting
-
-- **Where**: `graphify_lang/autolisp/extract.py:150-234` (`_Walker.walk` / `walk_list` recurse per list level), called outside the `try` at `extract.py:275-277`.
-- **Failure scenario (measured)**: a defun with 1200 nested `(list ...)` raises `RecursionError`; upstream skips the whole file. Rare in hand-written code, possible in generated LISP.
-- **Fix**: an explicit stack, or catch `RecursionError` in `extract_autolisp` and fall back to the regex path already used for `root.has_error` (`extract.py:293-304`).
-
-### L2 Quadratic edge de-duplication in two sinks
-
-- **Where**: `graphify_lang/ecschema/extract.py:127-132` and `graphify_lang/astgrep/extract.py:174-179` scan `self.edges` linearly per edge.
-- **Problem**: O(E²) per file; a large ECSchema (tens of thousands of properties) costs minutes. The other sinks use an `_edge_keys` set.
-- **Fix**: use the `_edge_keys` set as `bmake/extract.py:119-125` does.
-
 ### L3 cc-kb resolver and augment do avoidable linear work
 
 - **Where**: `graphify_lang/cc_kb/resolve.py:80` (`next(n for n in all_nodes if n["id"] == node["id"])` per payload: O(files x nodes); `node` is already the live dict); `graphify_lang/cc_kb/augment.py:64-69` (`_is_root` re-scans `docs/` for every `.md`).
 - **Fix**: use `node` directly (or one `by_id` dict); `functools.lru_cache` on `_is_root`.
-
-### L4 Manifest validation can still raise and does not normalise suffixes
-
-- **Where**: `graphify_lang/manifest.py:131-133,135-206` (`data.get("language", {})` then `.get` on it: a TOML `language = "x"` raises `AttributeError`, contradicting "never an exception" at `:116`); `:164` accepts a non-string `name` (later `re.sub` in `registry.py:392` fails); `:245-247` checks the leading dot but not case, so `.LSP` in a manifest never matches (`registry.py:381,422` lower-case the path suffix).
-- **Fix**: check each section `isinstance(..., dict)`; require `isinstance(name, str)`; lower-case `suffixes`, `augments`, `overrides`, `hook_suffixes`.
 
 ### L5 Copy-paste across plugins
 
@@ -204,7 +182,6 @@
 - **N1** `.claude/CLAUDE.md` cites `_DISPATCH` at `graphify/extract.py:5630`; it is at `:6601`. Cite the symbol, not the line.
 - **N2** `docs/plans/00-INDEX.md` and plan headers mark plans 01 and 02 ACTIVE; plan 02 shipped in lang.1 (plan 01 is open only for T10).
 - **N3** Manifest keys that nothing reads: `type`, `grammar.kind`, `language_fn`, `version`, `case_insensitive`, `builtins_file`, `builtins_prefixes` (for example `autolisp/graphify-lang.toml:5,13-17,23-24`); the builtins lists are hard-coded again in `autolisp/extract.py:31-32`. Delete the unread keys or read them.
-- **N4** `text.count("\n", 0, m.start())` per match is quadratic (`autolisp/extract.py:252,298,304,331`, `astgrep/extract.py:132`); use a `bisect` over newline offsets if a large file shows up.
 - **N5** `[match] filenames` compare case-sensitively (`registry.py:240`): `cargo.toml` on a case-insensitive filesystem is not claimed.
 - **N6** `docs/30-TODO.md:46` and `docs/35-DONE.md:270` mark T9.5 done with "(TODO: run manually)" inside it; resolve with M10.
 
@@ -221,7 +198,6 @@
 - **E3** Upstream PR: forward `node_kind` (or a registrable marker list) in `watch.py` context nodes (fixes H1 at the root). — Effort: LOW | Benefit: HIGH
 - **E4** `graphify lang list --check`: load every manifest, report load errors per plugin (complements M1). — Effort: LOW | Benefit: NEUTRAL
 - **E5** One parity test: for each plugin fixture, full build == full build then touch-one-file incremental build (edges and ids). — Effort: LOW | Benefit: HIGH
-- **E6** Visited-set memoisation in `astgrep._matches` (the H4 fix). — Effort: TRIVIAL | Benefit: HIGH
 - **E7** Remove the rules engine and templates (M6). — Effort: TRIVIAL | Benefit: NEUTRAL
 - **E8** `lru_cache` on `cc_kb.augment._is_root` and one `by_id` map in the cc-kb resolver (L3). — Effort: TRIVIAL | Benefit: MINOR
 - **E9** CI on `autolisp`, `lang-*`, `v*` tags with `bandit` over `graphify_lang` (M8). — Effort: TRIVIAL | Benefit: HIGH

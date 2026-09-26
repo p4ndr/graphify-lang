@@ -1714,6 +1714,11 @@ def _rebuild_code(
                 }
                 ctx_live -= deleted_source_identities
                 ctx_live.discard(None)
+                try:  # graphify-lang: plugin resolver fields (cc-CR000.001 H1)
+                    from graphify.lang_registry import context_fields
+                    lang_fields = context_fields()
+                except Exception:
+                    lang_fields = ()
                 for node in ctx_graph.get("nodes", []):
                     if not node.get("id") or not _is_ast_tier(node):
                         continue
@@ -1736,6 +1741,10 @@ def _rebuild_code(
                     ):
                         if node.get(marker):
                             ctx_node[marker] = node[marker]
+                    if lang_fields:
+                        ctx_node.update((k, node[k]) for k in lang_fields
+                                        if k in node and k not in ctx_node)
+                        ctx_node["_lang_source_file"] = ctx_paths.identity(source_file)
                     metadata = node.get("metadata")
                     if isinstance(metadata, dict):
                         fwd_metadata = {

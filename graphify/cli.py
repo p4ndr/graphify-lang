@@ -3866,6 +3866,11 @@ def dispatch_command(cmd: str) -> None:
                     }
                     _ctx_live.discard(None)
                     _ctx_live.difference_update(_ctx_identity(p) for p in code_files)
+                    try:  # graphify-lang: plugin resolver fields (cc-CR000.001 H1)
+                        from graphify.lang_registry import context_fields
+                        _lang_fields = context_fields()
+                    except Exception:
+                        _lang_fields = ()
                     for _node in _ctx_graph.get("nodes", []):
                         if not _node.get("id") or not _ctx_is_ast_tier(_node):
                             continue
@@ -3887,6 +3892,10 @@ def dispatch_command(cmd: str) -> None:
                         ):
                             if _node.get(_marker):
                                 _ctx_node[_marker] = _node[_marker]
+                        if _lang_fields:
+                            _ctx_node.update((k, _node[k]) for k in _lang_fields
+                                             if k in _node and k not in _ctx_node)
+                            _ctx_node["_lang_source_file"] = _ctx_identity(_sf)
                         _metadata = _node.get("metadata")
                         if isinstance(_metadata, dict):
                             _fwd_metadata = {

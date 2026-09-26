@@ -177,12 +177,16 @@ class _Walker:
 
 
 def action_callees(action: str) -> list[str]:
-    """Non-builtin list heads in an ``action_tile`` string, parsed as AutoLISP."""
+    """Non-builtin list heads in an ``action_tile`` string, parsed as AutoLISP;
+    none when the string nests deeper than the stack (S1-L1)."""
     walker = _Walker(action.encode("utf-8"))
     root = _parser().parse(walker.src).root_node
     owner = walker.define("", 1)
-    for child in _kids(root):
-        walker.walk(child, owner)
+    try:
+        for child in _kids(root):
+            walker.walk(child, owner)
+    except RecursionError:
+        return []
     return [name for _, name, _ in walker.calls]
 
 

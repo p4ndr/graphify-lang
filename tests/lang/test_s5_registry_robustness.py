@@ -481,8 +481,6 @@ def _harness(root: Path) -> dict[str, Path]:
     return {rel: root / rel for rel in pages}
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S5-M2: any .md with a relative link or path span is claimed")
 def test_s5_m2_watch_claims_cc_mention_or_in_scope_path(tmp_path):
     import graphify.extract  # noqa: F401  (applies the registry)
     import graphify.lang_registry as core

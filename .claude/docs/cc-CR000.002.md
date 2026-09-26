@@ -1,6 +1,6 @@
 # Code review: graphify-lang fork layer, resolved findings
 
-Findings moved out of `cc-CR000.001.md` once fixed or closed. Each entry keeps the original text and adds the resolution.
+Findings moved out of `cc-CR000.001.md` once fixed or closed. Each entry keeps the original text and adds the resolution. Hashes up to stage 5 are on the `rr-s1`..`rr-s5` refs; `rr-s6` was rebased onto `upstream/v8` `4000de1` (plan 05 S6.0), so the same commits have new hashes there.
 
 | Finding | Severity | Status | Commit | Stage |
 |:--|:--|:--|:--|:--|
@@ -43,6 +43,11 @@ Findings moved out of `cc-CR000.001.md` once fixed or closed. Each entry keeps t
 | N5 | Nit | Fixed | `b80a115` | plan 05 S5 |
 | L10 | Low | Closed: accepted (measured) | - | plan 05 S5 |
 | L13 | Low | Closed: kept per D2, pinned | `ef2012a` (test) | plan 05 S5 |
+| M12 | Medium | Fixed | `842a67d` (and the per-stage tests) | plan 05 S6 (`rr-s6`) |
+| M11 | Medium | Fixed | `acdac5f` | plan 05 S6 |
+| N1 | Nit | Fixed | `acdac5f` | plan 05 S6 |
+| N2 | Nit | Fixed | `acdac5f` | plan 05 S6 |
+| E3 | Enhancement | Done (PR draft, not opened) | `31db078` | plan 05 S6 |
 
 ## High
 
@@ -153,6 +158,20 @@ Findings moved out of `cc-CR000.001.md` once fixed or closed. Each entry keeps t
 - **Fix**: delete `_PATH_VAR`, `search_paths` and `enabled` (YAGNI; entry points cover packaging and tests), and correct the two docs and the docstring. Implement path discovery only when a real out-of-tree plugin needs it.
 - **Resolution (2026-09-26, plan 05 S5.2)**: implemented per hub D4 (not deleted) in `4071b40`: each `GRAPHIFY_LANG_PATH` folder's `*.toml` manifests load after the entry points; `[extract] runtime` is imported with the folder first on `sys.path` for that import only and must expose `extract` (or `augment`) and may expose `RESOLVER`; a missing folder, a bad manifest or a taken name logs one warning and is skipped. Loaded folders join the E1 fingerprint. `_RegistryState.enabled` (and the unread `warned_builtins`) deleted; module docstring fixed. Tests `test_m5_lang_path_loads_plugin`, `test_m5_missing_dir_warns`, `test_m5_bad_path_manifest_isolated`, `test_m5_path_plugin_in_cache_fingerprint`.
 
+### M11 README is stale in several load-bearing places
+
+- **Where**: `README.md:460-463` ("## Status: No code yet"); `README.md:417-437` (says the pipx venv is `graphifyy 0.9.55` and "left alone", plans `~/.venvs/graphify-lang`, "`uv` is not installed") versus `README.md:439-458` (pipx runs the fork; release uses `uv build`) and `.claude/CLAUDE.md` (develop in repo `.venv`); `README.md:342-363` roadmap without per-phase status and citing `cli.py:881`; `README.md:367` "Planned directories are marked" (none are).
+- **Problem**: the entry document contradicts itself; a reader following 'Development setup' installs into the wrong venv.
+- **Fix**: replace 'Status' with the current state (released `0.9.67+lang.3`, 7 plugins, `graphify lang list`); rewrite 'Development setup' to the repo `.venv` + `uv sync`; mark roadmap phases done/open (phase 6 = T10, open).
+- **Resolution (2026-09-26, plan 05 S6.2)**: fixed in `acdac5f`. 'Status' gives the released `v0.9.67+lang.3`, the 9 plugins and `graphify lang list`; 'Development setup' is the repo `.venv` + `uv sync` (the pipx `0.9.55` / `~/.venvs/graphify-lang` / "uv is not installed" text is gone); roadmap phases 1-5 marked done, phase 6 open (T10); core-table line citations replaced by symbol names (the dated 'The problem' section keeps its `c9f9901` line numbers, labelled as such); "Planned directories are marked" deleted; new 'Plugin contract' (pure extractors and augments, index refs, `[resolve] context_fields`, `source_of`, `GRAPHIFY_LANG_PATH`, `lang list --check`), known limits (incremental builds miss edges into newly added files; toggling `GRAPHIFY_LANG_DISABLE` re-extracts once) and 'Upstream seams the fork depends on'. Check: `git grep -n "No code yet\|0.9.55\|~/.venvs/graphify-lang\|extract.py:5630" -- README.md .claude/CLAUDE.md` finds nothing.
+
+### M12 Test suite misses the failure classes above
+
+- **Where**: `tests/lang/*`, `tests/test_lang_*.py`.
+- **Problem**: no test covers incremental rebuild (H1), same-stem collisions for autolisp/vba (H2), augment cache coherence (H3, M2), hostile YAML (H4), or a failing plugin (M1). Four corpus tests (`test_vba.py:166-169`, `test_bmake.py:157-160`, `test_ecschema.py:31,184-185`, `test_astgrep.py:26,139`, `test_lang_sniff.py:165-168`) depend on private repos under `~/repos` and always skip in CI, so CI exercises only the small fixtures. `test_rules.py` (259 lines) tests the dead engine (M6).
+- **Fix**: add one fixture-based test per class above (each a few lines); keep corpus tests but mark them `@pytest.mark.corpus` so skips are explicit.
+- **Resolution (2026-09-26, plan 05 S6.1)**: fixed. The per-class tests landed in stages 1-5 (H1/E5 `test_s4_build_coherence.py`, H2 `test_s3_shared_core.py`, H3/M2 `test_s4_build_coherence.py`, H4 `test_s1_safety.py`, M1 `test_s5_registry_robustness.py`); `test_rules.py` tests an engine with users (M6 closed per D1). `842a67d`: a `corpus` marker in `pyproject.toml`; the five corpus tests are parametrized, the private-repo cases marked `corpus` and skipping with a `corpus:` reason, and each has a checked-in sample case that always runs (bmake and ecschema reuse their fixture trees; a synthetic CRLF `ThisWorkbook.cls` and a synthetic ast-grep project under `tests/lang/fixtures/corpus/`). `pytest -m "not corpus and not perf" tests/ -q`: 6232 passed, 14 skipped, 6 deselected.
+
 ## Low
 
 ### L1 AutoLISP walker recursion overflows on deep nesting
@@ -254,6 +273,11 @@ Findings moved out of `cc-CR000.001.md` once fixed or closed. Each entry keeps t
 - **N5** `[match] filenames` compare case-sensitively (`registry.py:240`): `cargo.toml` on a case-insensitive filesystem is not claimed.
 - **Resolution (2026-09-26, plan 05 S5.4)**: fixed in `b80a115` (`casefold()` on both sides). Test `test_n5_cargo_toml_casefold`.
 
+- **N1** `.claude/CLAUDE.md` cites `_DISPATCH` at `graphify/extract.py:5630`; it is at `:6601`. Cite the symbol, not the line.
+- **Resolution (2026-09-26, plan 05 S6.2)**: fixed in `acdac5f`: `.claude/CLAUDE.md` names `_DISPATCH`, `CODE_EXTENSIONS` and `_HOOK_SOURCE_EXTS` with their files, no line numbers.
+- **N2** `docs/plans/00-INDEX.md` and plan headers mark plans 01 and 02 ACTIVE; plan 02 shipped in lang.1 (plan 01 is open only for T10).
+- **Resolution (2026-09-26, plan 05 S6.2)**: fixed in `acdac5f`: plan 02 DONE; plan 01 `ACTIVE (open only for T10, the upstream PRs; drafts in docs/upstream/)`; `docs/plans/00-INDEX.md` regenerated with the `manifest` verb.
+
 ## Enhancements
 
 - **E6** Visited-set memoisation in `astgrep._matches` (the H4 fix). — Effort: TRIVIAL | Benefit: HIGH
@@ -272,3 +296,5 @@ Findings moved out of `cc-CR000.001.md` once fixed or closed. Each entry keeps t
 - **Resolution (2026-09-26, plan 05 S4.1-S4.2)**: done: `test_e5_incremental_parity` over autolisp (2 trees), vba, bmake, cargo, astgrep, ecschema, cc-kb, every plugin file touched in turn; red `a5961fe`, green `cd55efb`.
 - **E4** `graphify lang list --check`: load every manifest, report load errors per plugin (complements M1). — Effort: LOW | Benefit: NEUTRAL
 - **Resolution (2026-09-26, plan 05 S5.2)**: done in `a05bc8b` (engine `check_languages`) and `cb21e7e` (`cli.py` `lang` branch): one row per plugin, `ok` or `error: <reason>`, exit 1 when any plugin failed; 9 `ok` rows on this tree. Test `test_e4_lang_list_check`.
+- **E3** Upstream PR: forward `node_kind` (or a registrable marker list) in `watch.py` context nodes (fixes H1 at the root). — Effort: LOW | Benefit: HIGH. Fork side done in `2adf7bc` (plan 05 S4.2); open until the upstream PR draft is written in S006.
+- **Resolution (2026-09-26, plan 05 S6.3)**: done in `31db078`: `docs/upstream/pr-02-resolver-context-fields.md` (a `context_fields` field on `LanguageResolver`, forwarded with `_abs_source_file` by both context-node builders), plus drafts for the entry-point registry lookups, watch code-path claims (M3) and the resolver suffix case-fold (L13). Each diff applies to `upstream/v8` `4000de1` and its test passes there (2 / 3 / 3 / 2 passed; full upstream suite green with each). Not opened on GitHub.

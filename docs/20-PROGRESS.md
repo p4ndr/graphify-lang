@@ -15,6 +15,20 @@ This document is a LIVE running changelog for all work in the repo.
 
 ## 3. CURRENT SESSION
 
+### 2026-09-26 13:52 (UTC+10)
+
+- bash: grep -n "04" docs/plans/00-INDEX.md | head; pwsh -NoProfile -File ~/.claude/skills/repo-docs/scripts/repo-docs.ps1 mani…, rtk grep -c "| DONE |" docs/plans/00-INDEX.md; grep "04-content" docs/plans/00-INDEX.md | rtk grep -o "| [A-Z]* |$"; rt…, graphify --version; graphify lang list | cut -c1-20 | tr '\n' ' '; echo; cd ~/repos/graphify-lang && git log --oneline …, cd ~/repos/graphify-lang && git remote -v | cat && git push origin autolisp lang-sniff lang-rules lang-vba lang-bmake l…, cd ~/.claude && rtk git add CLAUDE.md && git commit -q -m "docs(CLAUDE): graphify fork now graphs VBA, bmake, Cargo, as…, git fetch -q upstream 2>&1 | tail -2; git diff --stat upstream/v8...autolisp | tail -80; rtk ls .claude/docs/ (+105 more)
+- edit: .claude/docs/cc-CR000.001.md, docs/plans/05-review-remediation-cc-cr000-001.md, docs/plans/05-S001-security-and-crash-safety.md, docs/plans/05-S002-repo-and-ci-hygiene.md, docs/plans/05-S003-shared-plugin-core.md, docs/plans/05-S004-build-coherence.md (+4 more)
+- T32.1 done: 1e678c5 029c35e: 13 red tests, strict xfail
+- T32.2 done: f3357fb: 9 alias levels >30 s -> 0.04 s
+- T32.3 done: 10f235b: 20k props 25.1 s -> 0.18 s; corpora byte-identical
+- T32.4 done: d498a6f (engine): 9 languages load
+- T32.5 done: 141b63f: 6154 passed/14 skipped; findings in cc-CR000.002
+- T32 done (all steps): P05-S001 (rr-s1) Security and crash safety — H4 E6 L1 L2 L4 N4
+- T32 (plan 05 S1, branch rr-s1) done: H4, E6, L1, L2, L4, N4 fixed test-first; commits 1e678c5 029c35e f3357fb 10f235b d498a6f 141b63f; pytest 6154 passed / 14 skipped; corpus graphs byte-identical to autolisp; findings moved to .claude/docs/cc-CR000.002.md. Note: `git diff upstream/v8 -- graphify/extractors/` is non-empty from upstream drift (25 commits since merge-base); fork diff vs merge-base is empty.
+
+## 4. LAST SESSION
+
 ### 2026-09-25 18:08 (UTC+10)
 
 - T31 done (plan 04 S15-S17): 27c85f2 release 0.9.67+lang.3 (pyyaml runtime dep), autolisp fast-forwarded, local tag v0.9.67+lang.3 (nothing pushed), pipx venv on the lang.3 wheel with [mcp,commonlisp] extras; 12 graphs rebuilt with plugin nodes; learnings 1481-1484; CLAUDE.md graphify paragraph updated; plan 04 DONE.
@@ -167,7 +181,7 @@ This document is a LIVE running changelog for all work in the repo.
 - Settled P16 as option 2 (D-008): repair the regex rules runtime as a fallback/utility; plugins use their own extractors
 - Plan 04 ACTIVE; tasks T27-T31 added
 
-## 4. LAST SESSION
+## 5. EARLIER SESSIONS
 
 ### 2026-09-24 14:42 (UTC+10)
 
@@ -183,24 +197,3 @@ This document is a LIVE running changelog for all work in the repo.
 - T8.1 done: graphify_lang/autolisp/dcl.toml is a second manifest in the same package (autolisp-dcl, markup, .dcl, grammar regex, runtime extract_dcl); `graphify lang list` shows it.
 - T8.3 done: dcl_references come from new_dialog (EXTRACTED) and wrapper string args (INFERRED, D-005a); dcl_action comes from action_tile strings, re-parsed as AutoLISP. Pinned by test_autolisp_plan02.py::test_dcl_references and test_dcl_action.
 - T8.5 done: .mnl is claimed in graphify-lang.toml. New test_mnl_and_defun_q_authored: an authored acad.mnl dispatches to the walker without error and gives its functions and a call. SC6b: 1 dcl_references into lithp_mgr in autolithp (measure_autolisp, D-005a INFERRED); manager.dcl gives dialog lithp_mgr (test_manager_dcl_dialog).
-
-### 2026-09-24 14:40 (UTC+10)
-
-- bash: rtk read graphify_lang/rules.py; sed -n 1,60p graphify_lang/queries.py; sed -n 1,50p graphify_lang/regex_rules.py; sed …, sed -n 40,135p graphify_lang/manifest.py; rtk grep -n "def test" tests/lang/test_rules.py tests/lang/test_autolisp_node…, S=/tmp/claude-1000/-home-p4ndr-repos-graphify-lang/rt && mkdir -p $S && cat > $S/tags.scm <<'EOF'
-  (list_lit . (sym_lit)…, rtk read tests/lang/corpus_files.txt --max-lines 8; rtk grep -vc '^#' tests/lang/corpus_files.txt; git -C ~/repos/autol…, F=$(git -C ~/repos/autolithp ls-tree -r --name-only d5a20743b007431521c4f9a0507560d5feb94b27 -- src tests Import-Refact…, python3 - <<'EOF'
-  p='tests/lang/test_rules.py'
-  s=open(p).read()
-  old='    assert len(lines) > 0, "corpus_files.txt shoul… (+24 more)
-- edit: tests/lang/test_autolisp_corpus_fixtures.py, graphify_lang/autolisp/extract.py
-- T5.1 done: tests/lang/corpus_files.txt regenerated from `git ls-tree d5a2074 -- src tests Import-Refactor build` (the old file listed 42 of 84): 81 .lsp + 3 .dcl + 0 .mnl, with the regenerate command in its header; test_rules.py::test_corpus_file_list_count now pins 84.
-- T6.1 done: Already there: graphify_lang/autolisp/graphify-lang.toml (.lsp .mnl, overrides .lsp, case_insensitive, tree_sitter_commonlisp 0.4.1, extra commonlisp; runtime = the plan 02 walker) and pyproject.toml:97 `commonlisp = ["tree-sitter-commonlisp>=0.4.1,<0.5"]` (v8 has no specifier). Fixed: graphify_lang/manifest.py imported tomli unconditionally, which is only a dependency below 3.11; it now uses stdlib tomllib first. Measured with tomli blocked: registry still lists autolisp and autolisp-dcl.
-- T6.3 done: data/builtins.txt and data/LICENSE.AutoLispExt were already there, but package-data left the licence out of the wheel. Added "autolisp/data/LICENSE.*"; `uv build --wheel` now ships graphify_lang/autolisp/data/LICENSE.AutoLispExt. The stale ignored build/ still carries autolisp/queries/tags.scm into wheels; not deleted.
-- T6.5 done: tests/lang/fixtures/src/core/{err,ldr}.lsp and src/ui/manager.dcl are byte-identical to autolithp d5a2074 (cmp), but no test used them. New tests/lang/test_autolisp_corpus_fixtures.py extracts them with root=tests/lang/fixtures, so ids and source_file are src/core/err.lsp, the same as on the corpus.
-- T6.6 done: Checked in tests/lang/fixtures/collision_set.tsv, measured with extract_autolisp over corpus_files.txt: 11 groups, 5 pkg:name/pkg:_name and 6 repeated *error* (pltrn.lsp has 39, not the 24 in the plan). The tests derive SC4 instead of asserting it: 27 = the defun regex over the real err.lsp = distinct function ids, and the err.lsp collision group matches the TSV. SC5: C:LITHP, C:LITHP-MGR and C:LITHP-INIT are command nodes from ldr.lsp. Corpus: 0 missed defuns (measure_autolisp).
-- T7.1 done: Plan 02 §3 defines the contract as `autolisp_refs` (kind=call, source, name, line, source_file) on each extractor result. graphify_lang/autolisp/resolve.py binds them case-insensitively (D-005b nearest copy) and drops what is left unbound. Tested by test_autolisp_plan02.py::test_calls_exact and test_cross_file_call_is_extracted.
-- T7.2 done: The walker already skipped the defun/lambda headers (params), setq targets and quoted data. Added: cond clause heads are test values, not calls (extract.py walk_list). This changes nothing on the corpus (autolithp calls 15,017 before and after) and is pinned by test_cond_clause_head_is_not_a_call.
-- T7.3 done: Quoted 'fn, (quote fn) and (function fn) are call candidates in the walker (plan 02 A6), covered by test_autolisp_plan02 calls pins. The `:vlr-*` dotted-pair clause is not built: there are 0 quoted-literal instances in corpus code (7 grep hits, all in comments of src/modules/rxn/mod.lsp).
-- T7.5 done: resolve.py RESOLVER is a LanguageResolver for .lsp/.mnl/.dcl, registered once by the registry (test_resolver_registered_once). The resolver_registry casefold fix covers upper-case suffixes; new test_upper_case_suffix_resolves_cross_file: ERR.LSP gets its cross-file call.
-- T7.6 done: analyze.god_nodes(build_from_json(extract(corpus_files.txt, root=autolithp))) top 10 are all AutoLISP defuns, no COM or built-ins: pltrn:rget 714, pltrn:_fn 513, pltrn:_int 438, pltrn:_real 285, pltrn:_str 255, pltrn_nc pltrn:rget 174, pltrn:_fn2 152, pltrn_nc pltrn:_fn 148, pltrn:get 147, C:PLTRNTEST 145 (SC7). SC6a: err:trap has 88 inbound cross-file calls (measure_autolisp).
-
-## 5. EARLIER SESSIONS

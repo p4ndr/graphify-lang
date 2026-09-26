@@ -13,6 +13,25 @@ This document is an ARCHIVE of session progress cut-over from `20-PROGRESS.md`.
 
 ## 3. SESSION HISTORY
 
+### 2026-09-24 14:40 (UTC+10)
+
+- bash: rtk read graphify_lang/rules.py; sed -n 1,60p graphify_lang/queries.py; sed -n 1,50p graphify_lang/regex_rules.py; sed …, sed -n 40,135p graphify_lang/manifest.py; rtk grep -n "def test" tests/lang/test_rules.py tests/lang/test_autolisp_node…, S=/tmp/claude-1000/-home-p4ndr-repos-graphify-lang/rt && mkdir -p $S && cat > $S/tags.scm <<'EOF'
+  (list_lit . (sym_lit)…, rtk read tests/lang/corpus_files.txt --max-lines 8; rtk grep -vc '^#' tests/lang/corpus_files.txt; git -C ~/repos/autol…, F=$(git -C ~/repos/autolithp ls-tree -r --name-only d5a20743b007431521c4f9a0507560d5feb94b27 -- src tests Import-Refact…, python3 - <<'EOF'
+  p='tests/lang/test_rules.py'
+  s=open(p).read()
+  old='    assert len(lines) > 0, "corpus_files.txt shoul… (+24 more)
+- edit: tests/lang/test_autolisp_corpus_fixtures.py, graphify_lang/autolisp/extract.py
+- T5.1 done: tests/lang/corpus_files.txt regenerated from `git ls-tree d5a2074 -- src tests Import-Refactor build` (the old file listed 42 of 84): 81 .lsp + 3 .dcl + 0 .mnl, with the regenerate command in its header; test_rules.py::test_corpus_file_list_count now pins 84.
+- T6.1 done: Already there: graphify_lang/autolisp/graphify-lang.toml (.lsp .mnl, overrides .lsp, case_insensitive, tree_sitter_commonlisp 0.4.1, extra commonlisp; runtime = the plan 02 walker) and pyproject.toml:97 `commonlisp = ["tree-sitter-commonlisp>=0.4.1,<0.5"]` (v8 has no specifier). Fixed: graphify_lang/manifest.py imported tomli unconditionally, which is only a dependency below 3.11; it now uses stdlib tomllib first. Measured with tomli blocked: registry still lists autolisp and autolisp-dcl.
+- T6.3 done: data/builtins.txt and data/LICENSE.AutoLispExt were already there, but package-data left the licence out of the wheel. Added "autolisp/data/LICENSE.*"; `uv build --wheel` now ships graphify_lang/autolisp/data/LICENSE.AutoLispExt. The stale ignored build/ still carries autolisp/queries/tags.scm into wheels; not deleted.
+- T6.5 done: tests/lang/fixtures/src/core/{err,ldr}.lsp and src/ui/manager.dcl are byte-identical to autolithp d5a2074 (cmp), but no test used them. New tests/lang/test_autolisp_corpus_fixtures.py extracts them with root=tests/lang/fixtures, so ids and source_file are src/core/err.lsp, the same as on the corpus.
+- T6.6 done: Checked in tests/lang/fixtures/collision_set.tsv, measured with extract_autolisp over corpus_files.txt: 11 groups, 5 pkg:name/pkg:_name and 6 repeated *error* (pltrn.lsp has 39, not the 24 in the plan). The tests derive SC4 instead of asserting it: 27 = the defun regex over the real err.lsp = distinct function ids, and the err.lsp collision group matches the TSV. SC5: C:LITHP, C:LITHP-MGR and C:LITHP-INIT are command nodes from ldr.lsp. Corpus: 0 missed defuns (measure_autolisp).
+- T7.1 done: Plan 02 §3 defines the contract as `autolisp_refs` (kind=call, source, name, line, source_file) on each extractor result. graphify_lang/autolisp/resolve.py binds them case-insensitively (D-005b nearest copy) and drops what is left unbound. Tested by test_autolisp_plan02.py::test_calls_exact and test_cross_file_call_is_extracted.
+- T7.2 done: The walker already skipped the defun/lambda headers (params), setq targets and quoted data. Added: cond clause heads are test values, not calls (extract.py walk_list). This changes nothing on the corpus (autolithp calls 15,017 before and after) and is pinned by test_cond_clause_head_is_not_a_call.
+- T7.3 done: Quoted 'fn, (quote fn) and (function fn) are call candidates in the walker (plan 02 A6), covered by test_autolisp_plan02 calls pins. The `:vlr-*` dotted-pair clause is not built: there are 0 quoted-literal instances in corpus code (7 grep hits, all in comments of src/modules/rxn/mod.lsp).
+- T7.5 done: resolve.py RESOLVER is a LanguageResolver for .lsp/.mnl/.dcl, registered once by the registry (test_resolver_registered_once). The resolver_registry casefold fix covers upper-case suffixes; new test_upper_case_suffix_resolves_cross_file: ERR.LSP gets its cross-file call.
+- T7.6 done: analyze.god_nodes(build_from_json(extract(corpus_files.txt, root=autolithp))) top 10 are all AutoLISP defuns, no COM or built-ins: pltrn:rget 714, pltrn:_fn 513, pltrn:_int 438, pltrn:_real 285, pltrn:_str 255, pltrn_nc pltrn:rget 174, pltrn:_fn2 152, pltrn_nc pltrn:_fn 148, pltrn:get 147, C:PLTRNTEST 145 (SC7). SC6a: err:trap has 88 inbound cross-file calls (measure_autolisp).
+
 ### 2026-09-24 14:34 (UTC+10)
 
 - T26.2 done: graphify/detect.py rebuilt from `git show v8:graphify/detect.py` plus the 6-line try-wrapped registry lookup after CODE_EXTENSIONS: `git diff v8 -- graphify/detect.py` = +6 -0. classify_file gives CODE for .lisp .cl .asd .cls .trigger .robot .resource (and .lsp .dcl .mnl). SC2 snapshot identical under GRAPHIFY_LANG_DISABLE=1. extract.py @doc markers untouched (D-004).

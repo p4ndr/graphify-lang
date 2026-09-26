@@ -2,6 +2,7 @@
 suffixes are case-normalised (cc-CR000.001 L4)."""
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -44,3 +45,29 @@ def test_l4_augments_lower_cased(tmp_path):
                              'augments = [".MD"]\n' + _EXTRACT)
     assert errors == []
     assert manifest.augments == frozenset({".md"})
+
+
+@pytest.fixture
+def py_default_recursion_limit():
+    """Pin Python's default limit: an extraction elsewhere in the run raises it
+    to 10 000, which 5000 nested arrays would not overflow."""
+    limit = sys.getrecursionlimit()
+    sys.setrecursionlimit(1000)
+    yield
+    sys.setrecursionlimit(limit)
+
+
+@pytest.mark.parametrize("data", [
+    pytest.param(b'[language]\nname = "caf\xe9"\nsuffixes = [".x"]\n',
+                 marks=pytest.mark.xfail(strict=True, raises=UnicodeDecodeError,
+                                         reason="S1-L4: non-UTF-8 manifest"), id="latin-1"),
+    pytest.param(b"x = " + b"[" * 5000 + b"]" * 5000 + b"\n",
+                 marks=pytest.mark.xfail(strict=True, raises=RecursionError,
+                                         reason="S1-L4: deep TOML arrays"), id="deep-arrays"),
+])
+def test_s1_l4_undecodable_or_deep_manifest_never_raises(tmp_path, data, py_default_recursion_limit):
+    path = tmp_path / "m.toml"
+    path.write_bytes(data)
+    manifest, errors = LanguageManifest.from_toml(path)
+    assert len(errors) == 1 and "\n" not in errors[0]
+    assert manifest.name == ""

@@ -7,6 +7,7 @@ type = "programming"
 suffixes = [".bas", ".frm"]
 hook_suffixes = [".bas", ".cls", ".frm"]
 priority = 10
+case_insensitive = true
 
 [grammar]
 kind = "regex"

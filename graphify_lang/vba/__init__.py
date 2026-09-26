@@ -8,19 +8,14 @@
 """
 from __future__ import annotations
 
-from dataclasses import replace
-from pathlib import Path
-
+from graphify_lang._common import load_manifest
 from graphify_lang.manifest import LanguageManifest
 from graphify_lang.vba.extract import extract_vba
 from graphify_lang.vba.resolve import RESOLVER
 
 
 def _load(toml_name: str) -> LanguageManifest:
-    manifest, errors = LanguageManifest.from_toml(Path(__file__).parent / toml_name)
-    if errors:
-        raise ValueError(f"{toml_name}: {errors}")
-    return replace(manifest, extract=extract_vba, resolver=RESOLVER)
+    return load_manifest(__file__, toml_name, extract=extract_vba, resolver=RESOLVER)
 
 
 def _get_manifest() -> list[LanguageManifest]:

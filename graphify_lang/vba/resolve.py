@@ -16,32 +16,13 @@ AutoLISP resolver's rule). Unresolved names are dropped.
 """
 from __future__ import annotations
 
-from pathlib import Path
-
 from graphify.resolver_registry import LanguageResolver
+from graphify_lang._common import pick_by_prefix as _pick, refs_of
 from graphify_lang.vba.extract import accessor_match
 
 _OUR_SUFFIXES = (".bas", ".cls", ".frm")
 _MODULES = ("module", "class", "form")
 _MEMBERS = ("sub", "function", "property", "declare")
-
-
-def _pick(found: list[dict], source_file: str) -> tuple[str | None, str]:
-    if len(found) <= 1:
-        return (found[0]["id"] if found else None), "EXTRACTED"
-    caller = Path(source_file).parts
-
-    def shared(node: dict) -> int:
-        n = 0
-        for a, b in zip(caller, Path(str(node.get("source_file", ""))).parts):
-            if a != b:
-                break
-            n += 1
-        return n
-    scores = sorted(((shared(n), n["id"]) for n in found), reverse=True)
-    if scores[0][0] == scores[1][0]:
-        return None, "EXTRACTED"
-    return scores[0][1], "INFERRED"
 
 
 def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
@@ -72,7 +53,7 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
                 public.setdefault(label, []).append(n)
 
     seen = {(e.get("source"), e.get("target"), e.get("relation")) for e in all_edges}
-    refs = [r for res in per_file if isinstance(res, dict) for r in res.get("vba_refs", ())]
+    refs = refs_of(per_file, "vba_refs")
     for ref in refs:
         name = ref["name"].casefold()
         if ref["kind"] == "call":

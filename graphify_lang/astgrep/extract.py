@@ -16,7 +16,8 @@ same document has that id. Everything cross-file is left on the result as
 snapshot's rule id, and the ``ruleDirs`` / ``utilDirs`` of an sgconfig.
 
 PyYAML (a runtime dependency) parses each document. A document that does not
-parse keeps the file node only and logs a warning.
+parse adds nothing; any other error stops the document, keeps what it added
+so far and logs the exception type (S1-L2).
 """
 from __future__ import annotations
 
@@ -124,7 +125,7 @@ def _rule_doc(out: Sink, doc: dict, text: str, first: int, role: str, line_of) -
 
 
 def _document(out: Sink, path: Path, chunk: str, first: int) -> None:
-    """One ``---``-separated document; any error skips it (the caller logs)."""
+    """One ``---``-separated document; an error stops it (the caller logs)."""
     doc = yaml.safe_load(chunk)
     if not isinstance(doc, dict):
         return
@@ -164,8 +165,11 @@ def extract_astgrep(path: Path) -> dict:
     for first, chunk in _documents(text):
         try:
             _document(out, path, chunk, first)
+        except yaml.YAMLError as exc:  # nothing added yet
+            _LOG.warning("astgrep: %s line %d: document skipped (YAML does not parse): %s",
+                         path, first, (str(exc).splitlines() or [""])[0])
         except Exception as exc:  # keep the file node, never crash (H4)
-            _LOG.warning("astgrep: %s line %d: document skipped (YAML does not parse"
-                         " or is malformed): %s", path, first,
-                         str(exc).splitlines()[0] if str(exc) else exc)
+            _LOG.warning("astgrep: %s line %d: document stopped at %s: %s; nodes added"
+                         " before it are kept (S1-L2)", path, first, type(exc).__name__,
+                         (str(exc).splitlines() or [""])[0])
     return out.result("astgrep_refs")

@@ -174,7 +174,6 @@ def test_s1_m1_many_utils_linear(tmp_path):
     assert (nodes, edges) == (n + 2, n + 1)
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S1-L2: log blames the YAML")
 def test_s1_l2_document_error_names_its_type(tmp_path, monkeypatch, caplog):
     """A bug midway through a document is logged by type, and the log says the
     nodes added before it stay (they do: rule and util)."""

@@ -2,7 +2,7 @@
 
 Stage 5 of plan 05: one bad plugin cannot take down the others, plugin files trigger every rebuild path, and the registry has one clear loading path.
 
-- Status: ACTIVE
+- Status: DONE (2026-09-26, `rr-s5` `ef2012a`..HEAD)
 - Task: T36
 - Hub: `05-review-remediation-cc-cr000-001.md`
 - Branch: `rr-s5` from `rr-s4`
@@ -37,3 +37,23 @@ Stage 5 of plan 05: one bad plugin cannot take down the others, plugin files tri
 | S5.3 | M3 watch hooks (core registry-lookup commit). | `test_m3_*` passes; upstream `tests/test_watch.py` passes unchanged. |
 | S5.4 | L6, L8, L10, N5. | Their tests pass; `tests/upstream_tables.json` changes only by the removed upper-case variants (L6), with the cause written here. |
 | S5.5 | Stage close (hub §3); move the findings to `cc-CR000.002.md`. | Hub §3 checks pass. |
+
+## 3. Result
+
+| Step | Result | Commits |
+|:-----|:-------|:--------|
+| S5.1 | 14 tests in `tests/lang/test_s5_registry_robustness.py`: 12 red, strict xfail with `raises=` pinned (M1 `ValueError` escapes `registered_names()`; the others `AssertionError`: L7 two groups scanned, M5 x4 nothing loaded or logged, E4 no `--check`, M3 x2 `.xml` / `.yml` / `Cargo.toml` / cc-kb `.md` do not rebuild, L6 upper variants, L8 no log record, N5 `cargo.toml` not claimed). L10 and L13 pass: they pin behaviour. | `ef2012a` |
+| S5.2 | M1, L7, M5 (engine): per-plugin `try`, `load_errors()`, one group, `GRAPHIFY_LANG_PATH` folders loaded after the entry points, loaded folders in the E1 fingerprint (a toml or code edit in a path plugin moves the namespace: 3 distinct values in the test). E4: `check_languages` (engine), then the `cli.py` `lang` branch. `graphify lang list --check`: 9 `ok` rows, exit 0. | `4071b40`, `a05bc8b`, `cb21e7e` |
+| S5.3 | M3: engine `watch_claims`, then one try-wrapped lookup (`_lang_claims`) at three `watch.py` sites (the filter, `_batch_triggers_rebuild`, `_has_non_code`). Upstream `tests/test_watch.py` unchanged, 181 passed. | `32d4618`, `227c194` |
+| S5.4 | L6 upper variants dropped; L8 nine hook sites log at debug level; N5 case-folded `[match] filenames`; L10 closed as accepted (measured below); L13 pinned. `tests/upstream_tables.json` unchanged (cause below). Also a fork test fix: `test_graphify_lang_disable` now resets the registry it emptied. | `7d9fbf8`, `34510f8`, `b80a115`, `728c6a3` |
+| S5.5 | `pytest tests/ -q`: 6209 passed, 14 skipped (baseline 6195 / 14; +14 in `test_s5_registry_robustness.py`). `git diff upstream/v8...HEAD -- graphify/extractors/` empty; `tests/lang_baseline.txt`, `tests/upstream_tables.json`, `tests/test_watch.py` unchanged. M1, M3, M5, L6, L7, L8, L10, L13, N5, E4 moved to `cc-CR000.002.md`. | this commit |
+
+Deviations from §1:
+
+- **L6 and `tests/upstream_tables.json`.** The file did not change at all: `test_sc2_no_plugin_tables_match_upstream_snapshot` takes the snapshot with `GRAPHIFY_LANG_DISABLE=1`, so the upper-case variants were never in it.
+- **M3 augment claim.** cc-kb's `[match]` claims every `.md`, so "an augment claims it" means the augment adds something to the built-in's result for that file (`watch_claims` runs the wrapped and the plain extractor and compares). A plain `.md` still takes the doc path, so upstream `test_batch_modified_doc_only_does_not_rebuild` passes unchanged. Known limit: an edit that removes a doc's last cc mention does not rebuild until the next code event (the `needs_update` flag is still written). A deleted file counts by suffix (`[match]` or augment suffix), so the rebuild's reconcile drops it.
+- **M3 third site.** `_has_non_code` also asks the registry (language claims only): an `.xml` or `.yml` a plugin claims no longer writes the `needs_update` flag with the "semantic re-extraction requires LLM" message.
+- **M5 contract.** The runtime module exposes `extract` (or `augment` for an augment) and an optional `RESOLVER`, the names entry-point packages already use internally. A path manifest whose name is already registered is rejected (logged, skipped); a manifest registered directly (tests) keeps the old overwrite behaviour. `LanguageManifest` gained a `runtime` field (the `[extract] runtime` value). The unread `warned_builtins` went with `enabled`.
+- **L8 scope.** The two S4 `context_fields` fallbacks in `cli.py` and `watch.py` log too (nine sites, not seven).
+- **L10 measured.** No built-in claims `.yml`, `.yaml` or `.xml`, and `_get_extractor` finds extractors only in `_DISPATCH`, so dropping the routers would stop claimed files being extracted: kept. Cost on this repo: `collect_files` returns 27 `.yml` / `.xml` files, 16 unclaimed, 0.1 ms of router time in total (the glob fails before any read).
+- **Order-dependent fork test.** Run before `tests/lang/test_astgrep.py`, `test_graphify_lang_disable` left an empty cached registry and 6 astgrep tests failed (reproduced at `ef2012a`, before any S5 fix); `728c6a3` adds the missing `registry.reset()`.

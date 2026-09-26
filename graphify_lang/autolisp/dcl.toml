@@ -2,14 +2,9 @@ schema = 1
 
 [language]
 name = "autolisp-dcl"
-type = "markup"
 suffixes = [".dcl"]
 priority = 5
 case_insensitive = true
-
-[grammar]
-kind = "regex"
-language_fn = "dcl"
 
 # graphify_lang.autolisp.extract:extract_dcl — file node + one dialog node per
 # `name : dialog {`; controls are not nodes (plan 02 §3).

@@ -2,7 +2,6 @@ schema = 1
 
 [language]
 name = "autolisp"
-type = "programming"
 suffixes = [".lsp", ".mnl"]
 overrides = [".lsp"]
 hook_suffixes = [".lsp", ".mnl", ".dcl"]
@@ -10,11 +9,8 @@ priority = 10
 case_insensitive = true
 
 [grammar]
-kind = "tree-sitter"
 module = "tree_sitter_commonlisp"
-language_fn = "language()"
 extra = "commonlisp"
-version = "0.4.1"
 
 # The extractor is a purpose-built walker (plan 02 §3), not query rules:
 # graphify_lang.autolisp.extract:extract_autolisp, resolver in resolve.py.

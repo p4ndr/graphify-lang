@@ -6,7 +6,6 @@ schema = 1
 # .yml stays a document, exactly as upstream classifies it.
 [language]
 name = "astgrep"
-type = "data"
 suffixes = [".yml", ".yaml"]
 hook_suffixes = [".yml", ".yaml"]
 

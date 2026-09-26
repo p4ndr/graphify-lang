@@ -42,39 +42,95 @@ _PARITY = {
 }
 
 
-def _graph(root: Path) -> tuple[set, set]:
+# Keys that differ between builds by design: provenance and clustering.
+_VOLATILE = {"_origin", "community", "weight"}
+# (plugin, path): the CLI path runs ``--code-only``, which skips ``.md``.
+_PATHS = [(p, how) for p in _PARITY for how in ("watch", "cli") if (p, how) != ("cc-kb", "cli")]
+
+
+def _graph(root: Path) -> tuple[dict, list]:
+    """Node dicts by id and sorted edge dicts, minus ``_VOLATILE``."""
     g = json.loads((root / "graphify-out" / "graph.json").read_text(encoding="utf-8"))
-    ids = {n["id"] for n in g["nodes"]}
-    edges = {(e["source"], e["target"], e["relation"]) for e in g["links"]
-             if e["source"] in ids and e["target"] in ids}
-    return ids, edges
+    nodes = {n["id"]: {k: v for k, v in n.items() if k not in _VOLATILE} for n in g["nodes"]}
+    edges = sorted(json.dumps({k: v for k, v in e.items() if k not in _VOLATILE}, sort_keys=True)
+                   for e in g.get("links", g.get("edges", []))
+                   if e["source"] in nodes and e["target"] in nodes)
+    return nodes, edges
 
 
-def _clean(root: Path) -> tuple[set, set]:
+def _run(how: str, root: Path, changed: list[Path] | None = None, monkeypatch=None) -> None:
+    """A clean (``changed=None``, no graph) or incremental build by ``how``:
+    ``watch._rebuild_code`` or ``graphify extract --code-only`` (cli.py)."""
+    if how == "watch":
+        from graphify.watch import _rebuild_code
+        assert _rebuild_code(root, changed_paths=changed, no_cluster=True, acquire_lock=False)
+        return
+    from graphify.cli import dispatch_command
+    monkeypatch.setattr(sys, "argv", ["graphify", "extract", str(root), "--code-only", "--no-cluster"])
+    try:
+        dispatch_command("extract")
+    except SystemExit as done:
+        assert done.code in (0, None)
+
+
+def _clean(how: str, root: Path, monkeypatch=None) -> tuple[dict, list]:
     shutil.rmtree(root / "graphify-out", ignore_errors=True)
-    from graphify.watch import _rebuild_code
-    assert _rebuild_code(root, no_cluster=True, acquire_lock=False)
+    _run(how, root, None, monkeypatch)
     return _graph(root)
 
 
-@pytest.mark.parametrize("plugin", list(_PARITY))
-def test_e5_incremental_parity(plugin, tmp_path):
-    from graphify.watch import _rebuild_code
-
+@pytest.mark.parametrize("plugin,how", _PATHS)
+def test_e5_incremental_parity(plugin, how, tmp_path, monkeypatch):
+    """S4-L2: both hooked paths; each plugin file gets a byte appended (a real
+    content change) and the incremental graph must equal a clean build of the
+    edited tree, whole node and edge dicts."""
     folder, claims = _PARITY[plugin]
     root = tmp_path / folder
     shutil.copytree(FIXTURES / folder, root)
     files = sorted(p for p in root.rglob("*")
                    if p.is_file() and (p.suffix in claims or p.name in claims))
     assert files
-    clean = _clean(root)
-    assert clean[1], "the fixture graphs edges"
+    assert _clean(how, root, monkeypatch)[1], "the fixture graphs edges"
     for f in files:
-        f.write_bytes(f.read_bytes())
-        assert _rebuild_code(root, changed_paths=[f], no_cluster=True, acquire_lock=False)
-        ids, edges = _graph(root)
-        assert (sorted(clean[0] - ids), sorted(edges ^ clean[1])) == ([], []), f.name
-        _clean(root)
+        with f.open("ab") as fh:
+            fh.write(b"\n")
+        _run(how, root, [f], monkeypatch)
+        incremental = _graph(root)
+        assert incremental == _clean(how, root, monkeypatch), f.name
+
+
+# S4-E1: an unchanged file's edge to a newly added target.
+# case -> (files before, file added, the relation the incremental build misses)
+_ADD = {
+    "cargo": ({"Cargo.toml": '[workspace]\nmembers = ["crates/*"]\n',
+               "crates/a/Cargo.toml": '[package]\nname = "a"\nversion = "0.1.0"\n'},
+              {"crates/b/Cargo.toml": '[package]\nname = "b"\nversion = "0.1.0"\n'}, "has_member"),
+    "cc-kb": ({"docs/cc-XX000.000.md": "# Hub\n\nSee cc-XX000.001.\n"},
+              {"docs/cc-XX000.001.md": "# Spoke\n"}, "cites"),
+    "autolisp": ({"a.lsp": "(defun c:go () (helper))\n"}, {"b.lsp": "(defun helper () 1)\n"}, "calls"),
+    "python": ({"a.py": "from b import helper\n\n\ndef go():\n    return helper()\n"},
+               {"b.py": "def helper():\n    return 1\n"}, "calls"),
+}
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S4-E1 known limit: an unchanged file's edge to an added target "
+                          "appears on the next full or cached build only (upstream semantics)")
+@pytest.mark.parametrize("case", list(_ADD))
+def test_s4_e1_add_file_limit(case, tmp_path):
+    before, added, relation = _ADD[case]
+    root = tmp_path / "r"
+    _write(root, before)
+    _clean("watch", root)
+    new = _write(root, added)
+    _run("watch", root, new)
+
+    def rel(edges: list) -> list:
+        return [e for e in edges if json.loads(e)["relation"] == relation]
+    incremental = rel(_graph(root)[1])
+    clean = rel(_clean("watch", root)[1])
+    assert clean, "a clean build has the edge"
+    assert incremental == clean
 
 
 def _write(root: Path, files: dict[str, str]) -> list[Path]:
@@ -209,4 +265,111 @@ def test_h1_context_fields_union():
     from graphify.lang_registry import context_fields
 
     assert {"node_kind", "astgrep_scope", "astgrep_role", "visibility", "accessor", "ec_schema",
-            "version", "bmake_includes", "cc_kb_links"} <= set(context_fields())
+            "version", "bmake_includes", "cc_kb_links", "cargo_ws_deps"} <= set(context_fields())
+
+
+# --- plan 05 review-fix, S004 section of cc-CR000.003 ----------------------------
+
+@pytest.mark.xfail(strict=True, raises=RuntimeError,
+                   reason="S4-M1: the fingerprint scans every distribution")
+def test_s4_m1_no_packages_distributions(monkeypatch):
+    """S4-M1: the plugin distributions come from their entry points; the
+    full-environment ``packages_distributions()`` scan (~130 ms) is not run."""
+    import importlib.metadata
+
+    import graphify.cache as cache
+    import graphify.lang_registry as core
+    from graphify_lang import registry
+
+    def scan():
+        raise RuntimeError("packages_distributions() called")
+
+    monkeypatch.setattr(importlib.metadata, "packages_distributions", scan)
+    monkeypatch.setattr(cache, "_EXTRACTOR_VERSION", cache._EXTRACTOR_VERSION)
+    core._fingerprint.cache_clear()
+    try:
+        core._namespace_ast_cache(registry)
+    finally:
+        core._fingerprint.cache_clear()
+    assert "-lang" in cache._EXTRACTOR_VERSION
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S4-M1: a single-file plugin hashes its whole folder")
+def test_s4_m1_single_file_plugin_hashes_own_file(tmp_path, monkeypatch):
+    """S4-M1: a plugin shipped as a top-level module (``site-packages/x.py``)
+    hashes that file, not its folder (all of ``site-packages``)."""
+    import graphify.lang_registry as core
+
+    (tmp_path / "s4m1_single.py").write_text("X = 1\n")
+    (tmp_path / "neighbour.py").write_text("Y = 1\n")
+    monkeypatch.syspath_prepend(str(tmp_path))
+    __import__("s4m1_single")
+    fp = core._fingerprint.__wrapped__
+    first = fp(("x",), ("s4m1_single",))
+    (tmp_path / "neighbour.py").write_text("Y = 2\n")
+    assert fp(("x",), ("s4m1_single",)) == first
+    (tmp_path / "s4m1_single.py").write_text("X = 2\n")
+    assert fp(("x",), ("s4m1_single",)) != first
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S4-L1: a failed fingerprint leaves the plain namespace")
+def test_s4_l1_fingerprint_failure_fails_closed(monkeypatch):
+    """S4-L1: a failed fingerprint lands in a ``-langerr`` namespace, never the
+    plain ``v<version>-s<schema>`` one a pre-S3 build wrote."""
+    import graphify.cache as cache
+    import graphify.lang_registry as core
+
+    def boom(*_args):
+        raise OSError("plugin file unreadable")
+
+    monkeypatch.setattr(core, "_fingerprint", boom)
+    monkeypatch.setattr(cache, "_EXTRACTOR_VERSION", cache._EXTRACTOR_VERSION)
+    core._apply_registry()
+    assert cache._EXTRACTOR_VERSION == f"{core._BASE_CACHE_VERSION}-langerr"
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S4-L3: a failed context hook logs at debug only")
+def test_s4_l3_hook_failure_is_logged(tmp_path, monkeypatch, caplog):
+    """S4-L3: a registry failure in the incremental context hook reverts H1, so
+    it is logged as a warning, not swallowed."""
+    import logging
+
+    from graphify_lang import registry
+
+    root = tmp_path / "p"
+    files = _write(root, {"a.lsp": "(defun c:go () (helper))\n", "b.lsp": "(defun helper () 1)\n"})
+    _clean("watch", root)
+
+    def boom(*_args):
+        raise RuntimeError("context boom")
+
+    monkeypatch.setattr(registry, "context_fields", boom)
+    with caplog.at_level(logging.WARNING, logger="graphify.lang_registry"):
+        _run("watch", root, [files[0]])
+    assert any("context boom" in r.getMessage() and r.levelno >= logging.WARNING
+               for r in caplog.records)
+
+
+@pytest.mark.xfail(strict=True, raises=ImportError,
+                   reason="S4-N4: every context node gets every manifest's fields")
+def test_s4_n4_context_fields_scoped_per_manifest():
+    """S4-N4: a context node gets the fields of the manifests that claim its
+    suffix only: cargo's ``pkg_*`` node keeps no ``version`` (ecschema's)."""
+    from graphify.lang_registry import enrich_context
+
+    persisted = {"nodes": [
+        {"id": "pkg_a", "source_file": "a/Cargo.toml", "version": "0.1.0", "cargo_ws_deps": ["x=y"]},
+        {"id": "s_s", "source_file": "s.ecschema.xml", "version": "01.00", "node_kind": "schema"},
+    ]}
+    ctx = [{"id": "pkg_a", "source_file": "a/Cargo.toml"},
+           {"id": "s_s", "source_file": "s.ecschema.xml"}]
+    enrich_context(ctx, persisted, lambda sf: "/r/" + sf)
+    assert ctx == [
+        {"id": "pkg_a", "source_file": "a/Cargo.toml", "cargo_ws_deps": ["x=y"],
+         "_lang_source_file": "/r/a/Cargo.toml"},
+        {"id": "s_s", "source_file": "s.ecschema.xml", "version": "01.00", "node_kind": "schema",
+         "_lang_source_file": "/r/s.ecschema.xml"},
+    ]

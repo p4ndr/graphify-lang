@@ -26,25 +26,9 @@ from pathlib import Path
 
 from graphify.resolver_registry import LanguageResolver
 
+from graphify_lang._common import pick_by_prefix as _pick, refs_of
+
 _OUR_SUFFIXES = (".mki", ".mke")
-
-
-def _pick(found: list[dict], source_file: str) -> tuple[str | None, str]:
-    if len(found) <= 1:
-        return (found[0]["id"] if found else None), "EXTRACTED"
-    caller = Path(source_file).parts
-
-    def shared(node: dict) -> int:
-        n = 0
-        for a, b in zip(caller, Path(str(node.get("source_file", ""))).parts):
-            if a != b:
-                break
-            n += 1
-        return n
-    scores = sorted(((shared(n), n["id"]) for n in found), reverse=True)
-    if scores[0][0] == scores[1][0]:
-        return None, "EXTRACTED"
-    return scores[0][1], "INFERRED"
 
 
 def _reach(start: str, graph: dict[str, set[str]]) -> set[str]:
@@ -82,11 +66,7 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
                               "source_location": f"L{ref['line']}", "weight": 1.0})
         return True
 
-    refs = []
-    for res in per_file:
-        if isinstance(res, dict) and res.get("bmake_refs"):
-            for r in res["bmake_refs"]:  # current id: colliding file ids are salted by now
-                refs.append({**r, "source": res["nodes"][r["node"]]["id"]})
+    refs = refs_of(per_file, "bmake_refs")
     down: dict[str, set[str]] = {}             # file id -> included file ids
     up: dict[str, set[str]] = {}
     unresolved: dict[str, list[str]] = {}

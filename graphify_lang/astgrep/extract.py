@@ -27,23 +27,14 @@ from bisect import bisect_left
 from functools import lru_cache
 from pathlib import Path
 
+from graphify_lang._common import Sink, _make_id
+
 _LOG = logging.getLogger(__name__)
 
 try:
     import yaml as _yaml
 except ImportError:  # not a graphify dependency (upstream treats it as optional too)
     _yaml = None
-
-
-def _file_stem(path):
-    # Lazy: graphify.extractors at plugin load re-enters graphify.detect (see autolisp).
-    from graphify.extractors.base import _file_stem as f
-    return f(path)
-
-
-def _make_id(*parts):
-    from graphify.extractors.base import _make_id as f
-    return f(*parts)
 
 
 _DOC_SPLIT_RE = re.compile(r"^---[ \t]*(?:#.*)?$", re.MULTILINE)
@@ -172,45 +163,7 @@ def _dirs(value) -> list[str]:
     return [str(v) for v in items if isinstance(v, (str, int)) and str(v)]
 
 
-class _Out:
-    """Node / edge / ref sink for one file (the bmake plugin's shape)."""
-
-    def __init__(self, path: Path) -> None:
-        self.sf = str(path)
-        self.stem = _make_id(_file_stem(path))
-        self.nodes: list[dict] = []
-        self.edges: list[dict] = []
-        self.refs: list[dict] = []
-        self._ids: set[str] = set()
-        self._order: dict[str, int] = {}
-        self._edge_keys: set[tuple[str, str, str]] = set()
-        self.file_nid = self.add(self.stem, path.name, "file", 1)
-
-    def add(self, nid: str, label: str, kind: str, line: int, **attrs) -> str:
-        if nid in self._ids:
-            nid = f"{nid}_l{line}"
-        self._ids.add(nid)
-        self._order[nid] = len(self.nodes)
-        self.nodes.append({"id": nid, "label": label, "file_type": "code", "node_kind": kind,
-                           "source_file": self.sf, "source_location": f"L{line}", **attrs})
-        return nid
-
-    def edge(self, src: str, tgt: str, relation: str, line: int) -> None:
-        if src == tgt or (src, tgt, relation) in self._edge_keys:
-            return
-        self._edge_keys.add((src, tgt, relation))
-        self.edges.append({"source": src, "target": tgt, "relation": relation,
-                           "confidence": "EXTRACTED", "source_file": self.sf,
-                           "source_location": f"L{line}", "weight": 1.0})
-
-    def ref(self, kind: str, source: str, name: str, line: int) -> None:
-        # The resolver reads the source id back through the node index (ids may be
-        # salted apart before resolvers run; see bmake).
-        self.refs.append({"kind": kind, "node": self._order[source], "name": name,
-                          "line": line, "source_file": self.sf})
-
-
-def _rule_doc(out: _Out, doc: dict, text: str, first: int, role: str) -> None:
+def _rule_doc(out: Sink, doc: dict, text: str, first: int, role: str) -> None:
     rid = str(doc["id"])
     line = _key_line(text, first, r"^id:")
     attrs = {k: str(doc[k]) for k in ("language", "severity") if isinstance(doc.get(k), (str, int))}
@@ -234,10 +187,10 @@ def _rule_doc(out: _Out, doc: dict, text: str, first: int, role: str) -> None:
             if name in local:
                 out.edge(src, local[name], "references", ln)
             else:
-                out.ref("util", src, name, ln)
+                out.ref("util", src, name=name, line=ln)
 
 
-def _document(out: _Out, path: Path, chunk: str, first: int) -> None:
+def _document(out: Sink, path: Path, chunk: str, first: int) -> None:
     """One ``---``-separated document; any error skips it (the caller logs)."""
     doc = _load(chunk)
     if not isinstance(doc, dict):
@@ -250,7 +203,7 @@ def _document(out: _Out, path: Path, chunk: str, first: int) -> None:
         test_dirs = [str(t["testDir"]) for t in tests if isinstance(t, dict) and t.get("testDir")]
         for key in ("ruleDirs", "utilDirs"):
             for d in _dirs(doc.get(key)):
-                out.ref("dir", out.file_nid, d, _key_line(chunk, first, rf"^{key}:"))
+                out.ref("dir", out.file_nid, name=d, line=_key_line(chunk, first, rf"^{key}:"))
         out.nodes[0].update({"rule_dirs": _dirs(doc.get("ruleDirs")),
                              "util_dirs": _dirs(doc.get("utilDirs")),
                              "test_dirs": test_dirs})
@@ -259,7 +212,7 @@ def _document(out: _Out, path: Path, chunk: str, first: int) -> None:
         return
     if role in ("test", "snapshot"):
         out.nodes[0].setdefault("astgrep_id", str(doc["id"]))
-        out.ref(role, out.file_nid, str(doc["id"]), _key_line(chunk, first, r"^id:"))
+        out.ref(role, out.file_nid, name=str(doc["id"]), line=_key_line(chunk, first, r"^id:"))
         return
     _rule_doc(out, doc, chunk, first, role)
 
@@ -271,7 +224,7 @@ def extract_astgrep(path: Path) -> dict:
         text = path.read_bytes().decode("utf-8", errors="replace")
     except OSError as exc:
         return {"nodes": [], "edges": [], "error": str(exc)}
-    out = _Out(path)
+    out = Sink(path)
     for first, chunk in _documents(text):
         try:
             _document(out, path, chunk, first)
@@ -279,4 +232,4 @@ def extract_astgrep(path: Path) -> dict:
             _LOG.warning("astgrep: %s line %d: document skipped (YAML does not parse"
                          " or is malformed): %s", path, first,
                          str(exc).splitlines()[0] if str(exc) else exc)
-    return {"nodes": out.nodes, "edges": out.edges, "astgrep_refs": out.refs}
+    return out.result("astgrep_refs")

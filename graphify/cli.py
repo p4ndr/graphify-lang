@@ -3224,11 +3224,17 @@ def dispatch_command(cmd: str) -> None:
             print("Usage: graphify global [add|remove|list|path]", file=sys.stderr); sys.exit(1)
 
     elif cmd == "lang":
-        if (sys.argv[2] if len(sys.argv) > 2 else "") != "list":
-            print("Usage: graphify lang list", file=sys.stderr); sys.exit(1)
+        if sys.argv[2:] not in (["list"], ["list", "--check"]):
+            print("Usage: graphify lang list [--check]", file=sys.stderr); sys.exit(1)
         try:
             import graphify.lang_registry
-            print(graphify.lang_registry.format_languages())
+            if sys.argv[3:] == ["--check"]:
+                _table, _ok = graphify.lang_registry.check_languages()
+                print(_table)
+                if not _ok:
+                    sys.exit(1)
+            else:
+                print(graphify.lang_registry.format_languages())
         except Exception as exc:
             print(f"error: language registry unavailable: {exc}", file=sys.stderr); sys.exit(1)
 

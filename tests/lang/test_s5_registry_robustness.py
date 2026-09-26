@@ -179,7 +179,6 @@ def _lang_check(env_path: str | None) -> subprocess.CompletedProcess:
                           capture_output=True, text=True, env=env)
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="E4: no --check mode")
 def test_e4_lang_list_check(tmp_path):
     clean = _lang_check(None)
     rows = [line.split() for line in clean.stdout.splitlines()]

@@ -20,3 +20,8 @@ globs = ["*.md"]
 # graphify_lang.cc_kb.augment:augment_cc_kb, resolver in resolve.py.
 [extract]
 runtime = "graphify_lang.cc_kb.augment"
+
+# Node fields the resolver reads on other files' nodes; an incremental
+# build keeps them on the context nodes of unchanged files (H1).
+[resolve]
+context_fields = ["node_kind", "cc_kb_links"]

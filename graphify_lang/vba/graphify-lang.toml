@@ -13,3 +13,8 @@ case_insensitive = true
 [extract]
 runtime = "graphify_lang.vba.extract"
 builtins_file = "data/builtins.txt"
+
+# Node fields this resolver reads on other files' nodes; an incremental
+# build keeps them on the context nodes of unchanged files (H1).
+[resolve]
+context_fields = ["node_kind", "visibility", "accessor"]

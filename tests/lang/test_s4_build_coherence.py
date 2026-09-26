@@ -28,8 +28,6 @@ import pytest
 from graphify.extract import extract
 
 FIXTURES = Path(__file__).parent / "fixtures"
-_H1 = pytest.mark.xfail(strict=True, raises=AssertionError,
-                        reason="cc-CR000.001 H1: context nodes drop plugin fields")
 
 # plugin -> (fixture folder, the suffixes or file names of its files)
 _PARITY = {
@@ -59,8 +57,7 @@ def _clean(root: Path) -> tuple[set, set]:
     return _graph(root)
 
 
-@pytest.mark.parametrize("plugin", [
-    pytest.param(p, marks=() if p == "cargo" else _H1) for p in _PARITY])
+@pytest.mark.parametrize("plugin", list(_PARITY))
 def test_e5_incremental_parity(plugin, tmp_path):
     from graphify.watch import _rebuild_code
 
@@ -219,3 +216,10 @@ def test_e1_pre_stage3_entries_unreachable(tmp_path):
     g = extract(files, cache_root=cache, root=root)
     by_label = {n["label"]: n["id"] for n in g["nodes"]}
     assert (by_label["c:go"], by_label["helper"]) in _edges(g, "calls")
+
+
+def test_h1_context_fields_union():
+    from graphify.lang_registry import context_fields
+
+    assert {"node_kind", "astgrep_scope", "astgrep_role", "visibility", "accessor", "ec_schema",
+            "version", "bmake_includes", "cc_kb_links"} <= set(context_fields())

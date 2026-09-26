@@ -19,7 +19,7 @@ from pathlib import Path
 
 from graphify.resolver_registry import LanguageResolver
 
-from graphify_lang._common import pick_by_prefix as _pick
+from graphify_lang._common import pick_by_prefix as _pick, source_of
 
 _OUR_SUFFIXES = (".yml", ".yaml")
 _RELATION = {"test": "tested_by", "snapshot": "has_snapshot", "util": "references"}
@@ -61,9 +61,9 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
                 util, conf = _pick(utils.get(ref["name"], []), ref["source_file"])
                 add(owner["id"], util, "references", conf, ref)
             elif kind == "dir":
-                base = Path(str(owner.get("source_file", ""))).parent / ref["name"]
+                base = Path(source_of(owner)).parent / ref["name"]
                 for f in files:
-                    if Path(str(f.get("source_file", ""))).is_relative_to(base):
+                    if Path(source_of(f)).is_relative_to(base):
                         add(owner["id"], f["id"], "loads", "EXTRACTED", ref)
 
 

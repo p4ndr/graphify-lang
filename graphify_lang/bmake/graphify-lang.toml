@@ -11,3 +11,8 @@ priority = 10
 # graphify_lang.bmake.extract:extract_bmake (a line scanner), resolver in resolve.py.
 [extract]
 runtime = "graphify_lang.bmake.extract"
+
+# Node fields the resolver reads on other files' nodes; an incremental
+# build keeps them on the context nodes of unchanged files (H1).
+[resolve]
+context_fields = ["node_kind", "bmake_includes"]

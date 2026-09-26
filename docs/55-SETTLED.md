@@ -116,6 +116,7 @@ This document is a LIVE file containing items that have been settled and are no 
 **Settled:** 2026-09-21
 
 - Owner answer: The fork uses `uv` for development (`.venv`), not the pipx venv. MCP registration is a manual step via `scripts/install-mcp.sh --help`.
+- Note (plan 05 S2.4, M10): `scripts/install-mcp.sh` was deleted; hook suffixes come from the registry (`graphify/cli.py`), so there is no MCP registration step.
 - Item source: `cc-RS000.001.md` §1.4 Q7; `cc-IP000.001.md` §S009 Q7.
 
 ### `[S]` P2 | SRS §1.4, F18.2 — Is the global `.lsp` claim an accepted loss?

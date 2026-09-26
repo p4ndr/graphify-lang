@@ -30,8 +30,10 @@ at `docs/UPSTREAM-README.md`.
 
 ## Tracking upstream
 
-- `v8` mirrors `upstream/v8` and only ever fast-forwards. Work on branches
-  off `v8`.
+- `v8` (local and `origin`) mirrors `upstream/v8` and only ever
+  fast-forwards: `git rev-list --left-right --count v8...upstream/v8` is
+  `0 0`. After a fetch, `git branch -f v8 upstream/v8` (fast-forward only)
+  and push it to `origin`. Work on branches off `v8`.
 - Update with `git fetch upstream && git rebase upstream/v8`. Rebase, never
   merge.
 - Never edit an existing language extractor, `graphify/extractors/engine.py`,

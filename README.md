@@ -115,10 +115,10 @@ the next rebase harder.
 
 ## Design goals for the extension layer
 
-1. **Plugin discovery outside the core.** A language package is found either
+1. **Plugin discovery outside the core.** A language package is found
    through a Python entry point (`importlib.metadata.entry_points`, one
-   group name) or by being a module under a `graphify_lang/` namespace
-   package. No import of a language package from core code.
+   group name), or as a manifest in a `GRAPHIFY_LANG_PATH` folder. No
+   import of a language package from core code.
 2. **One manifest per language.** The package declares its suffixes, its
    grammar dependency (a tree-sitter module name or a hand-written parser),
    its extractor, an optional cross-file resolver, and the suffixes that
@@ -128,8 +128,8 @@ the next rebase harder.
    [the six-edit table](#adding-a-language-costs-six-edits-across-five-files)
    gain one lookup each. No table is rewritten, no existing entry moves.
 4. **Zero behaviour change for existing languages.** Every upstream test in
-   `tests/` passes unchanged. The registry starts empty; with no language
-   package installed the fork behaves as upstream.
+   `tests/` passes unchanged. With discovery off (`GRAPHIFY_LANG_DISABLE=1`)
+   the fork behaves as upstream; the wheel itself ships nine plugins.
 5. **Upstream's `MIGRATION.md` invariants are respected.** The extractor split
    in `graphify/extractors/MIGRATION.md` (invariants at lines 36-51) forbids
    importing `graphify.extract` from inside `graphify/extractors/`, requires
@@ -501,15 +501,18 @@ Phases, each with an exit criterion and its state. No dates.
 ## Working with upstream
 
 Upstream's default branch is `v8` (`git remote show upstream`). The fork's
-`v8` is at the same commit as `upstream/v8` (`git rev-list --count
-upstream/v8..v8` is 0). Upstream's `main` is stale (last commit
+`v8`, local and on `origin`, is at the same commit as `upstream/v8`: `git
+rev-list --left-right --count v8...upstream/v8` prints `0 0` (both
+directions; checking one misses a `v8` that is behind). Upstream's `main` is stale (last commit
 2026-05-14) and is not the branch to track.
 
 To update:
 
 ```bash
 git fetch upstream
-git rebase upstream/v8
+git merge-base --is-ancestor v8 upstream/v8 && git branch -f v8 upstream/v8
+git push origin v8                 # fast-forward only
+git rebase upstream/v8             # on the work branch
 ```
 
 Rules:
@@ -541,7 +544,7 @@ Develop and test in the repo's own `.venv`, managed by `uv`, as CI does:
 ```bash
 uv sync --all-extras
 .venv/bin/python -m pytest tests/ -q
-.venv/bin/python -m pytest tests/ -q -m "not corpus and not perf"   # what CI can run
+.venv/bin/python -m pytest tests/ -q -m 'not perf'   # what CI runs; corpus cases skip where the private repos are absent
 .venv/bin/graphify lang list --check
 ```
 
@@ -562,7 +565,7 @@ release a new version:
 
 ```bash
 git fetch upstream && git rebase upstream/v8        # on autolisp; then pytest tests/ -q
-# bump version in pyproject.toml to <upstream version>+lang.<n>, commit
+# bump version in pyproject.toml to <upstream version>+lang.<n>, run uv lock, commit both
 git tag -a v<version> -m "graphify-lang <version>" && git push origin autolisp v<version>
 rm -rf dist && uv build --wheel
 cp dist/*.whl ~/.local/share/graphify-lang/wheels/

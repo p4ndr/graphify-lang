@@ -200,3 +200,17 @@ def test_e8_cc_kb_augment_reads_no_other_file(monkeypatch):
     for doc, base in zip(docs, bases):
         augment.augment_cc_kb(doc, base)
     assert calls == []
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S2-N5 red")
+def test_s2_n5_one_tomllib_shim():
+    import re
+
+    import graphify_lang.manifest as manifest
+
+    shim = re.compile(r"^\s*import tomli\b", re.M)
+    root = Path(__file__).resolve().parents[2]
+    shims = sorted(str(p.relative_to(root)) for d in ("graphify_lang", "tests/lang")
+                   for p in (root / d).rglob("*.py") if shim.search(p.read_text(encoding="utf-8")))
+    assert shims == ["graphify_lang/manifest.py"]
+    assert hasattr(manifest, "tomllib") and not hasattr(manifest, "tomli")

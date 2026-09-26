@@ -62,3 +62,6 @@ artifacts/
 transcripts/
 docs/inbox/*
 !docs/inbox/README.md
+
+# graphify-lang: comment-sidecar tool cache (plan 05 M9)
+.sidecar-cache/

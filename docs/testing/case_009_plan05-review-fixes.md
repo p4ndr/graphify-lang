@@ -84,6 +84,9 @@ upstream `solidity.py:81` keeps it). `git diff upstream/v8...HEAD --
 graphify/extractors/` empty; `tests/lang_baseline.txt` and
 `tests/upstream_tables.json` unchanged.
 
+**CI:** push run 36229683521 on `d9910c1` green (3.10 6270/19, 3.12 and 3.13
+6269/20, security-scan success; 12 more passed than S002's run).
+
 **Corpus (S3-E2 script):** `.venv/bin/python tools/compare_corpus.py --before
 9d8cda4 --after HEAD autolisp=~/repos/autolithp vba=~/repos/bim-chk`
 (autolithp `d5a2074`, 254 files: 10691 nodes / 10691 ids / 25584 edges / 1

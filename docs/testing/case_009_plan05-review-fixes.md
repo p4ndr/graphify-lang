@@ -1,6 +1,6 @@
 # Case 009 — plan 05 review-fix pass
 
-Review report: `.claude/docs/cc-CR000.003.md` (plan 05 spoke reviews). One H2
+Review report: `docs/reviews/03-code-review-cc-cr000-003.md` (plan 05 spoke reviews). One H2
 section per spoke; each lists every finding id with its status, for a later
 part to copy into the report.
 

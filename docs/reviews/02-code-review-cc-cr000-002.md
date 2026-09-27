@@ -1,4 +1,10 @@
-# Code review: graphify-lang fork layer, resolved findings
+# Code review (was .claude/docs/cc-CR000.002.md)
+
+Review moved here from .claude/docs/cc-CR000.002.md by repo-docs migrate-reviews (plan 03, T2); the body below is unchanged.
+
+- Status: DONE
+- Created: 2026-09-26
+
 
 Findings moved out of `cc-CR000.001.md` once fixed or closed. Each entry keeps the original text and adds the resolution. Hashes up to stage 5 are on the `rr-s1`..`rr-s5` refs; `rr-s6` was rebased onto `upstream/v8` `4000de1` (plan 05 S6.0), so the same commits have new hashes there.
 

@@ -1,4 +1,10 @@
-# Code review: graphify-lang fork layer
+# Code review (was .claude/docs/cc-CR000.001.md)
+
+Review moved here from .claude/docs/cc-CR000.001.md by repo-docs migrate-reviews (plan 03, T2); the body below is unchanged.
+
+- Status: OPEN
+- Created: 2026-09-26
+
 
 Open findings only. Fixed and closed findings move to `cc-CR000.002.md` (plan 05 stage 1 moved H4, E6, L1, L2, L4, N4, stage 2 moved M7, M8, M9, M10, N6, E9, stage 3 moved H2, M4, M6, L3, L5, L12, N3, E2, E7, E8, stage 4 moved H1, H3, M2, L9, L11, E1, E5, stage 5 moved M1, M3, M5, L6, L7, L8, L10, L13, N5, E4, and stage 6 moved M11, M12, N1, N2, E3 on 2026-09-26).
 

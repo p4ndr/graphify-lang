@@ -34,5 +34,9 @@ When a CONDITION is TRUE, execute the tasks listed under that CONDITION.
 ## 3. REVIEWS
 
 <!-- MANIFEST-START -->
-_No documents yet._
+| File | Title | Purpose | Type / Status |
+|---|---|---|---|
+| `01-code-review-cc-cr000-001.md` | Code review (was .claude/docs/cc-CR000.001.md) | Review moved here from .claude/docs/cc-CR000.001.md by repo-docs migrate-reviews (plan 03, T2); the body below is unchanged. | OPEN |
+| `02-code-review-cc-cr000-002.md` | Code review (was .claude/docs/cc-CR000.002.md) | Review moved here from .claude/docs/cc-CR000.002.md by repo-docs migrate-reviews (plan 03, T2); the body below is unchanged. | DONE |
+| `03-code-review-cc-cr000-003.md` | Code review (was .claude/docs/cc-CR000.003.md) | Review moved here from .claude/docs/cc-CR000.003.md by repo-docs migrate-reviews (plan 03, T2); the body below is unchanged. | OPEN |
 <!-- MANIFEST-END -->

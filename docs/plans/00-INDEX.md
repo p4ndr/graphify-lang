@@ -47,5 +47,5 @@ When a CONDITION is TRUE, execute the tasks listed under that CONDITION.
 | `05-S004-build-coherence.md` | Plan 05 S004: build coherence | Stage 4 of plan 05: an incremental build, a cached build and a clean build give the same graph. | DONE |
 | `05-S005-registry-robustness.md` | Plan 05 S005: registry robustness | Stage 5 of plan 05: one bad plugin cannot take down the others, plugin files trigger every rebuild path, and the registry has one clear loa… | DONE |
 | `05-S006-tests-docs-and-release.md` | Plan 05 S006: tests, docs and release | Stage 6 of plan 05: the test suite shows what CI really covers, the docs describe the fork as it is, the upstream PR drafts exist, and `v0.… | DONE |
-| `05-review-remediation-cc-cr000-001.md` | Review remediation (cc-CR000.001) | A six-stage fix of all 35 defects (4 High, 12 Medium, 13 Low, 6 Nit) and the 9 enhancements in `.claude/docs/cc-CR000.001.md`, released as … | DONE |
+| `05-review-remediation-cc-cr000-001.md` | Review remediation (cc-CR000.001) | A six-stage fix of all 35 defects (4 High, 12 Medium, 13 Low, 6 Nit) and the 9 enhancements in `docs/reviews/01-code-review-cc-cr000-001.md… | DONE |
 <!-- MANIFEST-END -->

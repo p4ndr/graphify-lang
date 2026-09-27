@@ -1,4 +1,10 @@
-# Plan 05 spoke reviews
+# Code review (was .claude/docs/cc-CR000.003.md)
+
+Review moved here from .claude/docs/cc-CR000.003.md by repo-docs migrate-reviews (plan 03, T2); the body below is unchanged.
+
+- Status: OPEN
+- Created: 2026-09-26
+
 
 Review record for the six spokes of plan 05 (hub `docs/plans/05-review-remediation-cc-cr000-001.md`). One H2 section per spoke. Finding ids are `S<n>-<sev><k>`: `C` Critical, `H` High, `M` Medium, `L` Low, `N` Nit, `E` Enhancement. A builder marks an item actioned by appending `- **Actioned**: <commit> <one line>` under it and setting the spoke's Status to `actioned` once every item is closed. Closed out 2026-09-26: every item carries its status from `docs/testing/case_009_plan05-review-fixes.md`.
 
@@ -81,7 +87,7 @@ None.
 
 ### Nit
 
-- **S1-N1** `tests/lang/test_s1_safety.py:85-87`; `.claude/docs/cc-CR000.002.md` (L1 resolution) - "graphify.extract raises the limit to 10 000 on import" is wrong. The limit is raised by `_raise_recursion_limit()` (`graphify/extract.py:180-182`) when extraction runs; measured: after `import graphify.extract` the limit is still 1000. The fixture is still needed (an earlier test that ran extraction leaves 10 000); correct the wording in both places.
+- **S1-N1** `tests/lang/test_s1_safety.py:85-87`; `docs/reviews/02-code-review-cc-cr000-002.md` (L1 resolution) - "graphify.extract raises the limit to 10 000 on import" is wrong. The limit is raised by `_raise_recursion_limit()` (`graphify/extract.py:180-182`) when extraction runs; measured: after `import graphify.extract` the limit is still 1000. The fixture is still needed (an earlier test that ran extraction leaves 10 000); correct the wording in both places.
   - **Actioned**: `0b8e5ba` (fixture), `0d1f41d` (`cc-CR000.002.md`) — The limit is raised by `_raise_recursion_limit()` when extraction runs, not on import. (case 009)
 - **S1-N2** `graphify_lang/autolisp/extract.py:117-125`, `graphify_lang/astgrep/extract.py:142-150` - `_newlines` / `_line_of` are duplicated, and the module-level `lru_cache(maxsize=4)` keeps up to four whole file texts (the cache keys) and their offset tuples alive for the life of the process. Compute the offsets once as a local in `extract_autolisp` / `extract_dcl` and pass them down, or move one helper into the stage 3 shared core (S003) together with the third copy of the `_edge_keys` sink.
   - **Actioned**: `3782129` — `_common.line_index(text)`, built per extraction and passed down; no module `lru_cache`. (case 009)
@@ -143,7 +149,7 @@ None.
   - **Actioned**: `89b12ff` test, `50363e0` fix — Top-level `permissions: {contents: read}`. (case 009)
 - **S2-N2** `.github/workflows/graphify-lang-ci.yml:6` - `tags: ["v*"]` also matches every upstream release tag (`v0.9.68`, `v1.0.0` are in the local tag list). Pushing one of them to `origin` runs the fork CI on upstream code. Narrow it to the fork's scheme, `'v*\+lang.*'` (`+` is a filter metacharacter and needs the escape).
   - **Actioned**: `89b12ff` test, `50363e0` fix — `tags: ['v*\+lang.*']`. (case 009)
-- **S2-N3** `.claude/docs/cc-CR000.001.md` `## Metrics`, `## Suggestion plan` item 6 - Still lists M7-M10, E9 and N6, and the stage 1 items, as open. The Metrics table (Nit 6, Enhancements 9, Style/docs/CI 6) contradicts the header table (Nit 4, Enhancements 7). This file's rule is "open findings only": recount the Metrics table and the category line, and drop the closed items from the plan.
+- **S2-N3** `docs/reviews/01-code-review-cc-cr000-001.md` `## Metrics`, `## Suggestion plan` item 6 - Still lists M7-M10, E9 and N6, and the stage 1 items, as open. The Metrics table (Nit 6, Enhancements 9, Style/docs/CI 6) contradicts the header table (Nit 4, Enhancements 7). This file's rule is "open findings only": recount the Metrics table and the category line, and drop the closed items from the plan.
   - **Actioned**: `39fce02` — Suggestion plan and Metrics show open findings only (all 0). (case 009)
 - **S2-N4** `docs/35-DONE.md:179-184` - T17.4-T17.6 and the `**Sources:**` line cite `docs/testing/T14-FINAL-REPORT.md` and `T14-COMPLETE.md`, both now deleted. The S2.3 acceptance grep (`testing/archive`) does not match these paths. Append "(deleted in plan 05 S2.3; see git history before `1f8a2e4`)".
   - **Actioned**: `6614b24` — T17.4-T17.6 and Sources marked deleted in S2.3 (`1f8a2e4`). (case 009)

@@ -1,3 +1,14 @@
+<!-- TEMPLATE-VERSION: 2026-09-19-001 -->
+<!-- DOC-TYPE: LIVE -->
+<!-- TEMPLATE-START -->
+# CLAUDE.md
+
+This file is loaded by Claude Code and by OMP.
+
+- Read `docs/10-READ-FIRST.md` at the start of each session, and again after each compaction. Follow it.
+- Keep this file short. Put rules in `docs/10-READ-FIRST.md`, not here.
+<!-- TEMPLATE-END -->
+
 # CLAUDE.md
 
 Project instructions for Claude Code in the `graphify-lang` fork.

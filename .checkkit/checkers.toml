@@ -1,0 +1,2 @@
+# checkkit repo config (_reorg plan 11 J5). Run: checkkit run .  (packs: ag-toolbox harness/shared/packs)
+# Add [[checker]] entries with pack = "<id>" to replace a pack entry of the same id, or to add one.

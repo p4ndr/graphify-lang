@@ -54,10 +54,3 @@ This document is a LIVE file containing a list of TASKS to be carried out.
 - `[ ]` T10.5 | Expect to carry the registry indefinitely; plan accordingly
 
 ### `[ ]` T39 | cc-kb incremental asymmetry: a changed doc gets a `cites` edge whose reverse an unchanged doc already holds (pair dedupe is undirected; the reverse edge is not in the resolver's all_edges); measured ~/.claude cc-IP000.012 -> cc-CR000.001 (case_008 §6)
-
-### `[~]` T45 | Plan 06 S6-S8: re-measure, hand-offs, release wheel
-
-- `[x]` T45.1 | S6 re-measure ust and autolisp-htt against §5
-- `[x]` T45.2 | S7 hand-off texts + PENDING items
-- `[ ]` T45.3 | S8 bump version, tag, build wheel, pipx install, verify
-- Needs: T41, T42, T43, T44

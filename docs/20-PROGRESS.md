@@ -15,6 +15,13 @@ This document is a LIVE running changelog for all work in the repo.
 
 ## 3. CURRENT SESSION
 
+### 2026-11-06 15:14 (UTC+10)
+
+- edit: tests/lang/test_plan06.py
+- T45.3 done: proof: tag v0.9.68+lang.6 pushed; pipx graphifyy 0.9.68+lang.6; graphify lang list and graphify query run
+- T45 done (all steps): Plan 06 S6-S8: re-measure, hand-offs, release wheel
+- P6 ACTIVE -> DONE
+
 ### 2026-11-06 15:12 (UTC+10)
 
 - edit: tests/lang/test_plan06.py

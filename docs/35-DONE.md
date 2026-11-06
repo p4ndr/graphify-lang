@@ -15,6 +15,13 @@ This document is a LIVE file containing a list of TASKS that have been carried o
 
 ## 3. TASK LIST
 
+### `[x]` T45 | Plan 06 S6-S8: re-measure, hand-offs, release wheel
+
+- `[x]` T45.1 | S6 re-measure ust and autolisp-htt against §5
+- `[x]` T45.2 | S7 hand-off texts + PENDING items
+- `[x]` T45.3 | S8 bump version, tag, build wheel, pipx install, verify
+- Needs: T41, T42, T43, T44
+
 ### `[x]` T44 | Plan 06 S5: global read/write edges and load/autoload edges
 
 - `[x]` T44.1 | reads_global / writes_global edges

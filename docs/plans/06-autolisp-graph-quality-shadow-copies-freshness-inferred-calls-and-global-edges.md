@@ -3,7 +3,7 @@
 This plan makes AutoLISP graphs give one clear answer per symbol: stale copies of a module are marked, a stale graph is
 named, cross-file calls are EXTRACTED when they can be, and global variables and `load` calls get edges.
 
-- Status: ACTIVE
+- Status: DONE
 - Created: 2026-11-06
 - Tasks: T40, T41, T42, T43, T44, T45
 - Stages: S1=T40; S2=T41; S3=T42; S4=T43; S5=T44; S6=T45

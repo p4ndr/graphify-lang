@@ -111,6 +111,17 @@ def _shadow_section(G: nx.Graph) -> list[str]:
     return lines
 
 
+def _unresolved_loads_section(G: nx.Graph) -> list[str]:
+    """``## Unresolved loads``: string-literal loads a plugin found no file for
+    (node attribute ``unresolved_loads``)."""
+    rows = sorted((str(d.get("source_file", nid)), name) for nid, d in G.nodes(data=True)
+                  for name in d.get("unresolved_loads") or ())
+    if not rows:
+        return []
+    return ["", f"## Unresolved loads ({len(rows)})"] + [f"- `{sf}` loads `{name}`: no such file in the graph"
+                                                        for sf, name in rows]
+
+
 def generate(
     G: nx.Graph,
     communities: dict[int, list[str]],
@@ -285,6 +296,7 @@ def generate(
             lines.append("- None detected.")
 
     lines += _shadow_section(G)
+    lines += _unresolved_loads_section(G)
 
     hyperedges = G.graph.get("hyperedges", [])
     if hyperedges:

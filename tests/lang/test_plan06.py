@@ -194,3 +194,66 @@ def test_cli_query_prints_the_staleness_line(tmp_path):
     out = subprocess.run([sys.executable, "-m", "graphify", "query", "ust:rget", "--graph", str(gp)],
                          capture_output=True, text=True, cwd=tmp_path)
     assert "graph built at 00000000, HEAD is " in out.stdout, out.stdout + out.stderr
+
+
+def _build(tmp_path, files: dict[str, str]) -> tuple[dict, dict]:
+    for rel, text in files.items():
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text(text)
+    res = extract(sorted(tmp_path.rglob("*.lsp")), cache_root=tmp_path / ".cache", root=tmp_path)
+    return res, {n["id"]: n for n in res["nodes"]}
+
+
+def _rel(res: dict, nodes: dict, relation: str) -> list[tuple]:
+    return sorted((nodes[e["source"]]["label"], nodes[e["target"]]["label"], e["confidence"])
+                  for e in res["edges"] if e["relation"] == relation)
+
+
+def test_global_reads_and_writes(tmp_path):
+    res, nodes = _build(tmp_path, {
+        "a.lsp": "(setq *cfg* nil)\n(defun a:get () (car *cfg*))\n",
+        "b.lsp": "(defun b:set (v) (setq *cfg* v *only* 1) (list *cfg* 'x))\n",
+    })
+    assert _rel(res, nodes, "reads_global") == [("a:get", "*cfg*", "EXTRACTED"), ("b:set", "*cfg*", "EXTRACTED")]
+    assert _rel(res, nodes, "writes_global") == [("b:set", "*cfg*", "EXTRACTED"), ("b:set", "*only*", "EXTRACTED")]
+    only = [n for n in nodes.values() if n.get("label") == "*only*"]
+    assert len(only) == 1 and only[0]["node_kind"] == "global" and only[0].get("confidence") == "INFERRED"
+    targets = {nodes[e["target"]]["source_file"] for e in res["edges"] if e["relation"] == "reads_global"}
+    assert targets == {"a.lsp"}
+
+
+def test_load_and_autoload_edges(tmp_path):
+    res, nodes = _build(tmp_path, {
+        "main.lsp": '(load "lib/util")\n(autoload "tools.fas" \'("TL"))\n(load "gone.lsp")\n'
+                    "(defun m:go (f) (load f))\n",
+        "lib/util.lsp": "(defun u:x () 1)\n",
+        "tools.lsp": "(defun t:x () 1)\n",
+    })
+    deps = sorted((nodes[e["source"]]["source_file"], nodes[e["target"]]["source_file"])
+                  for e in res["edges"] if e["relation"] == "module_depends")
+    assert deps == [("main.lsp", "lib/util.lsp"), ("main.lsp", "tools.lsp")]
+    main = next(n for n in nodes.values() if n["source_file"] == "main.lsp" and n.get("node_kind") == "file")
+    assert main.get("unresolved_loads") == ["gone.lsp"]
+
+
+def test_report_lists_unresolved_loads():
+    from graphify.report import _unresolved_loads_section, generate
+
+    G = nx.Graph()
+    G.add_node("m", source_file="main.lsp", unresolved_loads=["gone.lsp"])
+    assert _unresolved_loads_section(G) == ["", "## Unresolved loads (1)",
+                                            "- `main.lsp` loads `gone.lsp`: no such file in the graph"]
+    text = generate(G, {}, {}, {}, [], [], {"total_files": 1, "total_words": 1}, {"input": 0, "output": 0}, "/r")
+    assert "## Unresolved loads (1)" in text
+
+
+def test_defun_set_global_in_two_sibling_files_still_links(tmp_path):
+    res, nodes = _build(tmp_path, {
+        "x/a.lsp": "(defun a:set () (setq *g* 1))\n",
+        "x/b.lsp": "(defun b:set () (setq *g* 2))\n",
+        "x/c.lsp": "(defun c:get () *g*)\n",
+    })
+    writes = sorted((nodes[e["source"]]["label"], nodes[e["target"]]["source_file"])
+                    for e in res["edges"] if e["relation"] == "writes_global")
+    assert writes == [("a:set", "x/a.lsp"), ("b:set", "x/b.lsp")]
+    assert _rel(res, nodes, "reads_global") == [("c:get", "*g*", "INFERRED")]

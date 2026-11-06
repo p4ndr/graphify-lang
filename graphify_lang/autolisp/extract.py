@@ -2,10 +2,13 @@
 
 One purpose-built walker over the tree-sitter-commonlisp parse (plan 02 §3):
 nodes are the file, each ``defun`` (``function`` / ``command``), each top-level
-``*global*`` and each ``@module``; every one hangs off the file by ``contains``.
-Calls whose target is defined in the same file become ``calls`` edges here;
-everything that needs the whole corpus (cross-file calls, dialogs, ``@depends``,
-``@sidecar``) is left on the result as ``autolisp_refs`` for ``resolve.py``.
+``*global*`` (and, INFERRED, a ``*global*`` only a defun sets) and each
+``@module``; every one hangs off the file by ``contains``.
+Calls and ``*global*`` reads / writes whose target is in the same file become
+``calls`` / ``reads_global`` / ``writes_global`` edges here; everything that needs
+the whole corpus (cross-file calls and globals, dialogs, ``@depends``, ``@sidecar``,
+string-literal ``load`` / ``autoload``) is left on the result as ``autolisp_refs``
+for ``resolve.py`` (plan 06 §3.4).
 """
 from __future__ import annotations
 
@@ -69,6 +72,8 @@ class _Walker:
         self.calls: list[tuple[int, str, int]] = []      # (defun index, callee, line)
         self.dialogs: list[tuple[int, str, int, str]] = []  # (defun index, name, line, confidence)
         self.actions: list[tuple[int, str, str, int]] = []  # (defun index, key, action source, line)
+        self.uses: list[tuple[int, str, str, int]] = []  # (defun index, "read" | "write", *global*, line)
+        self.loads: list[tuple[str, int]] = []           # string-literal load / autoload targets
 
     def text(self, node) -> str:
         return self.src[node.start_byte:node.end_byte].decode("utf-8", errors="replace")
@@ -106,6 +111,11 @@ class _Walker:
         if kind == "list_lit":
             self.walk_list(node, owner, top)
             return
+        if kind in _SYMBOLS:
+            name = self.text(node)
+            if owner is not None and _GLOBAL_RE.match(name):
+                self.uses.append((owner, "read", name, _line(node)))
+            return
         if kind in ("quoting_lit", "var_quoting_lit"):
             value = _kids(node)
             if not value:
@@ -142,11 +152,13 @@ class _Walker:
                 self.walk(child, inner)
             return
         if verb == "setq":
-            if top:
-                for target in args[0::2]:
-                    name = self.text(target)
-                    if target.type in _SYMBOLS and _GLOBAL_RE.match(name):
+            for target in args[0::2]:
+                name = self.text(target)
+                if target.type in _SYMBOLS and _GLOBAL_RE.match(name):
+                    if top:
                         self.globals.append((name, _line(target)))
+                    elif owner is not None:
+                        self.uses.append((owner, "write", name, _line(target)))
             for value in args[1::2]:
                 self.walk(value, owner)
             return
@@ -159,6 +171,8 @@ class _Walker:
             if args and args[0].type in _SYMBOLS:
                 self.call(owner, args[0])
             return
+        if verb in ("load", "autoload") and args and args[0].type == "str_lit":
+            self.loads.append((self.string(args[0]), _line(node)))
         self.call(owner, head)
         if owner is not None:
             strings = [a for a in args if a.type == "str_lit"]
@@ -267,6 +281,24 @@ def extract_autolisp(path: Path) -> dict:
             out.ref("call", caller, line, name=name)
         elif len(targets) == 1:  # a recursive call is a self-loop, as upstream (S3-X1)
             out.edge(caller, targets[0], "calls", line, self_loop=True)
+    # A *global* only a defun sets gets its node at its first setq, INFERRED.
+    for _, how, name, line in walker.uses:
+        if how == "write" and name.casefold() not in seen_globals:
+            seen_globals.add(name.casefold())
+            out.node("global", name, line, confidence="INFERRED")
+    # Only a top-level global binds here; an INFERRED one may be defined at top
+    # level in another file, so the resolver picks (top-level first).
+    local_globals = {n["label"].casefold(): n["id"] for n in out.nodes
+                     if n.get("node_kind") == "global" and n.get("confidence") != "INFERRED"}
+    for owner, how, name, line in walker.uses:
+        relation = "reads_global" if how == "read" else "writes_global"
+        target = local_globals.get(name.casefold())
+        if target:
+            out.edge(nids[owner], target, relation, line)
+        else:
+            out.ref("global", nids[owner], line, unique=True, name=name, relation=relation)
+    for name, line in walker.loads:
+        out.ref("load", out.file_nid, line, unique=True, name=name)
     for owner, name, line, confidence in walker.dialogs:
         out.ref("dialog", nids[owner], line, name=name, confidence=confidence)
     for owner, key, action, line in walker.actions:

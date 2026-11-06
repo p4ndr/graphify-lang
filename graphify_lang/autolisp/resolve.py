@@ -14,10 +14,11 @@ from pathlib import Path
 
 from graphify.resolver_registry import LanguageResolver
 
-from graphify_lang._common import is_file_node, mark_shadows, pick_by_prefix, refs_of
+from graphify_lang._common import is_file_node, mark_shadows, pick_by_prefix, refs_of, source_of
 
 _OUR_SUFFIXES = (".lsp", ".mnl", ".dcl")
-_GROUP = {"function": "fn", "command": "fn", "dialog": "dialog", "module": "module"}
+_GROUP = {"function": "fn", "command": "fn", "dialog": "dialog", "module": "module", "global": "global"}
+_LOADABLE = (".lsp", ".mnl", ".fas", ".vlx")
 
 
 def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
@@ -48,6 +49,26 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
                           "confidence": confidence, "source_file": ref["source_file"],
                           "source_location": f"L{ref['line']}", "weight": 1.0, **extra})
 
+    def lookup_global(name: str, source_file: str, caller: str) -> tuple[str | None, str]:
+        """A *global*: a top-level definition first, then one only a defun sets."""
+        found = index.get("global", {}).get(name.casefold(), [])
+        top = [n for n in found if n.get("confidence") != "INFERRED"]
+        if top:
+            return pick_by_prefix(top, source_file, caller in shadowed)
+        # Only defun-set nodes (one per writing file): the nearest (the caller's own
+        # file shares the longest prefix), else the first by path, so every use meets.
+        target, confidence = pick_by_prefix(found, source_file, caller in shadowed)
+        if target is None and found:
+            return min(found, key=source_of)["id"], "INFERRED"
+        return target, confidence
+
+    loadable: dict[str, list[dict]] = {}    # file stem -> file nodes of our suffixes
+    for node in all_nodes:
+        sf = source_of(node)
+        if is_file_node(node) and sf.lower().endswith(_OUR_SUFFIXES[:2]):
+            loadable.setdefault(Path(sf).stem.casefold(), []).append(node)
+    unresolved: dict[str, list[str]] = {}   # file node id -> load names with no file
+
     refs = refs_of(per_file, "autolisp_refs")  # source = the current (salted) id
     dialogs_of: dict[str, list[str]] = {}
     # EXTRACTED dialog refs first so an INFERRED duplicate never wins the de-dup.
@@ -61,6 +82,19 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
         kind = ref["kind"]
         if kind == "call":
             add(ref["source"], *lookup("fn", ref["name"], ref["source_file"], ref["source"]), relation="calls", ref=ref)
+        elif kind == "global":
+            target, confidence = lookup_global(ref["name"], ref["source_file"], ref["source"])
+            add(ref["source"], target, confidence, relation=ref["relation"], ref=ref)
+        elif kind == "load":
+            target = Path(ref["name"].replace("\\", "/"))
+            if target.suffix.lower() in _LOADABLE or not target.suffix:
+                tgt, confidence = pick_by_prefix(loadable.get(target.stem.casefold(), []), ref["source_file"])
+            else:
+                tgt, confidence = None, "EXTRACTED"
+            if tgt:
+                add(ref["source"], tgt, confidence, relation="module_depends", ref=ref)
+            else:
+                unresolved.setdefault(ref["source"], []).append(ref["name"])
         elif kind == "depends":
             add(ref["source"], *lookup("module", ref["name"], ref["source_file"]), relation="module_depends", ref=ref)
         elif kind == "sidecar":
@@ -74,6 +108,10 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
             fn, confidence = lookup("fn", ref["name"], ref["source_file"])
             for dialog in dict.fromkeys(dialogs_of.get(ref["source"], ())):
                 add(dialog, fn, confidence, relation="dcl_action", ref=ref, key=ref["key"])
+    if unresolved:
+        for node in all_nodes:
+            if node["id"] in unresolved:
+                node["unresolved_loads"] = sorted(set(unresolved[node["id"]]))
 
 
 RESOLVER = LanguageResolver(name="autolisp", suffixes=frozenset(_OUR_SUFFIXES), resolve=resolve)

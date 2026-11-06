@@ -85,6 +85,37 @@ def test_cross_file_call_into_a_shadowed_module_is_extracted(tmp_path):
     assert any(n.get("shadow_of") for n in res["nodes"] if "logs" in str(n.get("source_file")))
 
 
+def test_shadow_caller_binds_inside_its_own_copy(tmp_path):
+    app = "(defun app:go () (a:one))\n(defun app:a () 1)\n(defun app:b () 2)\n(defun app:c () 3)\n(defun app:d () 4)\n"
+    for d in ("src", "logs"):
+        (tmp_path / d).mkdir()
+        (tmp_path / d / "lib.lsp").write_text(LIB)
+        (tmp_path / d / "app.lsp").write_text(app)
+    res = extract(sorted(tmp_path.rglob("*.lsp")), cache_root=tmp_path / ".cache", root=tmp_path)
+    nodes = {n["id"]: n for n in res["nodes"]}
+    calls = sorted((nodes[e["source"]]["source_file"], nodes[e["target"]]["source_file"], e["confidence"])
+                   for e in res["edges"] if e["relation"] == "calls" and nodes[e["target"]]["label"] == "a:one")
+    assert calls == [("logs/app.lsp", "logs/lib.lsp", "EXTRACTED"), ("src/app.lsp", "src/lib.lsp", "EXTRACTED")]
+
+
+def test_shadow_nodes_leave_god_nodes_and_lookups():
+    from graphify.analyze import god_nodes
+    from graphify.serve import _resolve_single_node, _score_nodes
+
+    G = nx.Graph()
+    G.add_node("live", label="a:x", source_file="src/a.lsp", node_kind="function")
+    G.add_node("copy", label="a:x", source_file="logs/a.lsp", node_kind="function", shadow_of="f")
+    G.add_node("only", label="a:old", source_file="logs/a.lsp", node_kind="function", shadow_of="f")
+    for i in range(5):
+        G.add_edge("copy", f"c{i}")
+    G.add_edge("live", "c0")
+    assert [g["id"] for g in god_nodes(G, top_n=1)] == ["live"]
+    assert _resolve_single_node(G, "a:x") == ("live", None)
+    assert _resolve_single_node(G, "a:old") == ("only", None)
+    assert _score_nodes(G, ["a:x"])[0][1] == "live"
+    assert _score_nodes(G, ["logs/a.lsp", "a:x"])[0][1] == "copy"
+
+
 def test_report_lists_shadow_copies():
     from graphify.report import _shadow_section
 
@@ -95,3 +126,6 @@ def test_report_lists_shadow_copies():
     assert "## Shadow copies (1 files)" in lines
     assert "- `logs/a.lsp` copies `src/a.lsp` - ignore line: `logs/a.lsp`" in lines
     assert _shadow_section(nx.Graph()) == []
+    from graphify.report import generate
+    text = generate(G, {}, {}, {}, [], [], {"total_files": 2, "total_words": 10}, {"input": 0, "output": 0}, "/r")
+    assert "## Shadow copies (1 files)" in text

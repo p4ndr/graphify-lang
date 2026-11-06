@@ -551,6 +551,9 @@ def _score_nodes(G: nx.Graph, terms: list[str]) -> list[tuple[float, str]]:
     return _score_query(G, terms, collect_per_term_seeds=False).ranked
 
 
+_SHADOW_DAMP = 0.01
+
+
 def _score_query(
     G: nx.Graph, terms: list[str], *, collect_per_term_seeds: bool
 ) -> _QueryScores:
@@ -614,6 +617,10 @@ def _score_query(
     for nid, data in node_iter:
         norm_label = data.get("norm_label") or _strip_diacritics(data.get("label") or "").lower()
         bare_label = norm_label.rstrip("()")
+        # A shadow copy (plan 06) ranks far below its live file unless a query
+        # term names a path inside it; a symbol only the copy has still matches.
+        damp = _SHADOW_DAMP if data.get("shadow_of") and not any(
+            "/" in t and t.lower() in (data.get("source_file") or "").lower() for t in terms) else 1.0
         # Tokenized form of the label (punctuation stripped, same transform as the
         # query). norm_label may still carry punctuation like ':' or '-', which a
         # tokenized query can never equal; comparing token-joined forms on both
@@ -712,6 +719,7 @@ def _score_query(
                 else:
                     singleton = 0.0
                 singleton += tier_value + substr_value + source_value + rationale_value + attr_value
+                singleton *= damp
                 if singleton > 0:
                     # Tie-break key mirrors the legacy sort+max(degree):
                     # (-singleton, -degree, label_len, nid) — the minimum
@@ -723,6 +731,7 @@ def _score_query(
                         best_by_term[t] = (key, nid)
         if tiered:
             score += tiered * (matched / n_terms) ** 2
+        score *= damp
         if score > 0:
             scored.append((score, nid))
     # Sort by score desc; break ties toward the shorter label so a concise exact
@@ -1594,7 +1603,12 @@ def _find_node_tiers(
         if len(preferred) == 1:
             source_exact = preferred + [nid for nid in source_exact if nid != preferred[0]]
 
-    return source_exact, exact, prefix, substring
+    # A tier with a live node drops its shadow copies (plan 06): the copy is
+    # neither the answer nor a rival. A tier of shadows only keeps them.
+    def live(tier: list[str]) -> list[str]:
+        kept = [nid for nid in tier if not G.nodes[nid].get("shadow_of")]
+        return kept or tier
+    return source_exact, live(exact), live(prefix), live(substring)
 
 
 def _find_node(G: nx.Graph, label: str) -> list[str]:

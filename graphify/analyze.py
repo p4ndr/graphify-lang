@@ -138,6 +138,8 @@ def god_nodes(G: nx.Graph, top_n: int = 10,
             continue
         if G.nodes[node_id].get("label", "") in _BUILTIN_NOISE_LABELS:
             continue
+        if G.nodes[node_id].get("shadow_of"):  # a stale copy of a live file (plan 06)
+            continue
         result.append({
             "id": node_id,
             "label": G.nodes[node_id].get("label", node_id),

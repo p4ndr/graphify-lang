@@ -145,13 +145,18 @@ def refs_of(per_file: list, refs_key: str) -> list[dict]:
             if (src := resolve_ref_id(res, r))]
 
 
-def pick_by_prefix(found: list[dict], source_file: str) -> tuple[str | None, str]:
+def pick_by_prefix(found: list[dict], source_file: str, shadow_caller: bool = False) -> tuple[str | None, str]:
     """(target id, confidence). One candidate: EXTRACTED. Several: the one sharing
     the longest directory prefix with ``source_file``, INFERRED (an archived copy
     must not capture live references); a tie on that prefix: None."""
-    live = [n for n in found if not n.get("shadow_of")]
-    if live:
-        found = live
+    # Plan 06: a live caller never binds to a shadow copy; a shadow caller binds
+    # inside its own directory first, so the copy stays a closed subgraph.
+    if shadow_caller:
+        side = [n for n in found if Path(source_of(n)).parent == Path(source_file).parent]
+    else:
+        side = [n for n in found if not n.get("shadow_of")]
+    if side:
+        found = side
     if len(found) <= 1:
         return (found[0]["id"] if found else None), "EXTRACTED"
     caller = Path(source_file).parts

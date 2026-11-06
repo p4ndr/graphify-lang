@@ -22,6 +22,7 @@ _GROUP = {"function": "fn", "command": "fn", "dialog": "dialog", "module": "modu
 
 def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
     mark_shadows(all_nodes, (".lsp", ".mnl"), frozenset({"function", "command"}))
+    shadowed = {n["id"] for n in all_nodes if n.get("shadow_of")}
     index: dict[str, dict[str, list[dict]]] = {}
     files: dict[str, list[dict]] = {}        # basename -> file nodes
     for node in all_nodes:
@@ -31,10 +32,10 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
         if group and str(node.get("source_file", "")).lower().endswith(_OUR_SUFFIXES):
             index.setdefault(group, {}).setdefault(str(node.get("label", "")).casefold(), []).append(node)
 
-    def lookup(group: str, name: str, source_file: str) -> tuple[str | None, str]:
+    def lookup(group: str, name: str, source_file: str, caller: str = "") -> tuple[str | None, str]:
         """(target id, confidence) by the shared prefix rule (an archived copy of a
         module must not capture calls from live code)."""
-        return pick_by_prefix(index.get(group, {}).get(name.casefold(), []), source_file)
+        return pick_by_prefix(index.get(group, {}).get(name.casefold(), []), source_file, caller in shadowed)
 
     seen = {(e.get("source"), e.get("target"), e.get("relation")) for e in all_edges}
 
@@ -59,7 +60,7 @@ def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
     for ref in refs:
         kind = ref["kind"]
         if kind == "call":
-            add(ref["source"], *lookup("fn", ref["name"], ref["source_file"]), relation="calls", ref=ref)
+            add(ref["source"], *lookup("fn", ref["name"], ref["source_file"], ref["source"]), relation="calls", ref=ref)
         elif kind == "depends":
             add(ref["source"], *lookup("module", ref["name"], ref["source_file"]), relation="module_depends", ref=ref)
         elif kind == "sidecar":

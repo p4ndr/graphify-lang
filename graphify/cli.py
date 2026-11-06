@@ -1305,6 +1305,7 @@ def dispatch_command(cmd: str) -> None:
         except Exception as exc:
             print(f"error: could not load graph: {exc}", file=sys.stderr)
             sys.exit(1)
+        G.graph["built_at_commit"] = _raw.get("built_at_commit")  # plan 06 staleness line
         import time as _time
         _t0 = _time.perf_counter()
         _mode = "dfs" if use_dfs else "bfs"

@@ -129,3 +129,68 @@ def test_report_lists_shadow_copies():
     from graphify.report import generate
     text = generate(G, {}, {}, {}, [], [], {"total_files": 2, "total_words": 10}, {"input": 0, "output": 0}, "/r")
     assert "## Shadow copies (1 files)" in text
+
+
+def _qgraph() -> nx.Graph:
+    G = nx.Graph()
+    G.add_node("a", label="ust:rget", source_file="src/a.lsp")
+    G.add_node("b", label="Say()", source_file="src/b.cs")
+    G.add_edge("a", "b")
+    return G
+
+
+def test_query_names_a_symbol_it_could_not_find():
+    from graphify.serve import _query_graph_text
+
+    text = _query_graph_text(_qgraph(), "ust:bench-say callers")
+    assert text.splitlines()[0].startswith("no exact match for 'ust:bench-say'; nearest: ")
+    assert not _query_graph_text(_qgraph(), "ust:rget").startswith("no exact match")
+    assert not _query_graph_text(_qgraph(), "say callers").startswith("no exact match")
+
+
+def test_query_names_a_stale_graph(tmp_path):
+    from graphify.serve import _query_graph_text
+
+    _git(tmp_path, "init", "-q")
+    (tmp_path / "a.txt").write_text("1")
+    _git(tmp_path, "add", "a.txt")
+    _git(tmp_path, "commit", "-qm", "one")
+    built = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp_path, capture_output=True, text=True).stdout.strip()
+    (tmp_path / "graphify-out").mkdir()
+    gp = str(tmp_path / "graphify-out" / "graph.json")
+    G = _qgraph()
+    G.graph["built_at_commit"] = built
+    assert "graph built at" not in _query_graph_text(G, "ust:rget", graph_path=gp)
+    (tmp_path / "a.txt").write_text("2")
+    _git(tmp_path, "commit", "-qam", "two")
+    first = _query_graph_text(G, "ust:rget", graph_path=gp).splitlines()[0]
+    assert first.startswith(f"graph built at {built[:8]}, HEAD is ") and "(1 commits); run graphify update " in first
+
+
+def test_loaded_graph_keeps_built_at_commit(tmp_path):
+    import json
+
+    from graphify.serve import _load_graph
+
+    gp = tmp_path / "graph.json"
+    gp.write_text(json.dumps({"directed": False, "multigraph": False, "graph": {}, "nodes": [{"id": "a"}],
+                              "links": [], "built_at_commit": "abc123"}))
+    assert _load_graph(str(gp)).graph["built_at_commit"] == "abc123"
+
+
+def test_cli_query_prints_the_staleness_line(tmp_path):
+    import json
+    import sys
+
+    _git(tmp_path, "init", "-q")
+    (tmp_path / "a.txt").write_text("1")
+    _git(tmp_path, "add", "a.txt")
+    _git(tmp_path, "commit", "-qm", "one")
+    (tmp_path / "graphify-out").mkdir()
+    gp = tmp_path / "graphify-out" / "graph.json"
+    gp.write_text(json.dumps({"directed": False, "multigraph": False, "graph": {},
+                              "nodes": [{"id": "a", "label": "ust:rget", "source_file": "a.lsp"}],
+                              "links": [], "built_at_commit": "0" * 40}))
+    out = subprocess.run([sys.executable, "-m", "graphify", "query", "ust:rget", "--graph", str(gp)],
+                         capture_output=True, text=True, cwd=tmp_path)
+    assert "graph built at 00000000, HEAD is " in out.stdout, out.stdout + out.stderr

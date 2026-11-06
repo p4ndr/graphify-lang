@@ -74,6 +74,7 @@ def _load_graph(graph_path: str) -> nx.Graph:
         except TypeError:
             G = json_graph.node_link_graph(data)
         G.graph["_logical_directed"] = _logical_directed
+        G.graph["built_at_commit"] = data.get("built_at_commit")  # plan 06 staleness line
         # Attach the work-memory overlay (derived sidecar next to graph.json) so
         # the query/MCP read surface can annotate NODE lines display-only. Empty
         # when no sidecar exists, leaving un-annotated output byte-identical.
@@ -1399,8 +1400,10 @@ def _query_graph_text(
             t: nid for t, nid in best_seed_by_term.items() if t not in intent
         }
     start_nodes = _pick_seeds(qs.ranked, G=G, best_seed_by_term=best_seed_by_term)
+    notes = _miss_lines(G, question, start_nodes) + _staleness_lines(G, graph_path)
+    lead = "".join(f"{line}\n" for line in notes)
     if not start_nodes:
-        return "No matching nodes found."
+        return lead + "No matching nodes found."
     resolved_filters, filter_source = _resolve_context_filters(question, context_filters)
     traversal_graph = _filter_graph_by_context(_traversal_view(G), resolved_filters)
     nodes, edges = _dfs(traversal_graph, start_nodes, depth) if mode == "dfs" else _bfs(traversal_graph, start_nodes, depth)
@@ -1426,7 +1429,48 @@ def _query_graph_text(
     # Pass the seeds so the queried symbol renders first and survives truncation
     # (#BUG2): a branch merge had silently dropped this argument, leaving the
     # seed-first ordering as dead code.
-    return header + _subgraph_to_text(traversal_graph, nodes, edges, token_budget, seeds=start_nodes)
+    return lead + header + _subgraph_to_text(traversal_graph, nodes, edges, token_budget, seeds=start_nodes)
+
+
+_SYMBOL_TERM = re.compile(r"[:*-]|\(\)$")
+
+
+def _miss_lines(G: nx.Graph, question: str, start_nodes: list[str]) -> list[str]:
+    """``no exact match`` lines (plan 06): a symbol-shaped query word (holds ``:``,
+    ``-`` or ``*``, or ends in ``()``) that no node label equals. The traversal
+    then starts from fuzzy matches, which the caller must not take for the symbol."""
+    lines = []
+    for raw in dict.fromkeys(question.split()):
+        word = raw.strip(",.;?!'\"`")
+        if not word or not _SYMBOL_TERM.search(word):
+            continue
+        norm = _strip_diacritics(word).lower()
+        if _label_has_literal_exact_match(G, " ".join(_search_tokens(word)), norm):
+            continue
+        nearest = ", ".join(str(G.nodes[n].get("label", n)) for n in start_nodes[:5]) or "none"
+        lines.append(f"no exact match for '{word}'; nearest: {nearest}")
+    return lines
+
+
+def _staleness_lines(G: nx.Graph, graph_path: str | None) -> list[str]:
+    """``graph built at X, HEAD is Y`` (plan 06): the graph's ``built_at_commit``
+    is not HEAD of the repo holding the graph. No git, no commit: no line."""
+    built = G.graph.get("built_at_commit")
+    if not built or not graph_path:
+        return []
+    import subprocess as _sp
+    repo = Path(graph_path).resolve().parent
+    try:
+        head = _sp.run(["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, timeout=3)
+        if head.returncode != 0 or head.stdout.strip() == built:
+            return []
+        count = _sp.run(["git", "rev-list", "--count", f"{built}..HEAD"], cwd=repo, capture_output=True,
+                        text=True, timeout=3)
+    except (OSError, _sp.SubprocessError):
+        return []
+    n = count.stdout.strip() if count.returncode == 0 else "?"
+    return [f"graph built at {built[:8]}, HEAD is {head.stdout.strip()[:8]} ({n} commits); "
+            f"run graphify update {repo.parent}"]
 
 
 def _resolve_path_scoped_symbol(G: nx.Graph, path_part: str, symbol_part: str) -> list[str]:

@@ -15,6 +15,36 @@ This document is a LIVE file containing a list of TASKS that have been carried o
 
 ## 3. TASK LIST
 
+### `[x]` T44 | Plan 06 S5: global read/write edges and load/autoload edges
+
+- `[x]` T44.1 | reads_global / writes_global edges
+- `[x]` T44.2 | load / autoload depends refs with unresolved-load report line
+- `[x]` T44.3 | Tests incl. variable argument and unresolved name
+
+### `[x]` T43 | Plan 06 S4: query miss line and staleness line (CLI and MCP)
+
+- `[x]` T43.1 | Miss line for symbol-shaped terms with no exact label
+- `[x]` T43.2 | built_at_commit vs HEAD staleness line
+- `[x]` T43.3 | Tests for both paths
+
+### `[x]` T42 | Plan 06 S3: query ranking, god_nodes and get_neighbors skip shadows
+
+- `[x]` T42.1 | Skip shadow_of nodes in start ranking, god_nodes, get_neighbors ambiguity
+- `[x]` T42.2 | Rebuild ust copy in scratch; verify one ust:rget god node, one get_neighbors answer
+- Needs: T41
+
+### `[x]` T41 | Plan 06 S2: shadow-copy pairing, shadow_of, pick_by_prefix drop, report section
+
+- `[x]` T41.1 | Pairing + shadow_of marking + pick_by_prefix drop
+- `[x]` T41.2 | Report section with .graphifyignore lines
+- `[x]` T41.3 | Tests: logs copy, commit-time pick, tie, under-80% not shadow
+- Needs: T40
+
+### `[x]` T40 | Plan 06 S1: AutoLISP baseline numbers (INFERRED share, duplicate labels, unlinked globals, module_depends)
+
+- `[x]` T40.1 | Extend tools/measure_autolisp.py
+- `[x]` T40.2 | Run on ust copy and autolisp-htt; write numbers into plan §5
+
 ### `[x]` T38 | Fix H1 residual: bmake and cc-kb resolvers miss duplicate-basename file nodes on incremental builds (case_008 §5; use graphify.build._is_file_node_label; same-basename E5 fixtures; release lang.5)
 
 ### `[x]` T37 | P05-S006 (rr-s6) Tests, docs, release lang.4 — M12 M11 N1 N2 PR drafts

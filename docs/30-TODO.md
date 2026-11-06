@@ -55,39 +55,9 @@ This document is a LIVE file containing a list of TASKS to be carried out.
 
 ### `[ ]` T39 | cc-kb incremental asymmetry: a changed doc gets a `cites` edge whose reverse an unchanged doc already holds (pair dedupe is undirected; the reverse edge is not in the resolver's all_edges); measured ~/.claude cc-IP000.012 -> cc-CR000.001 (case_008 §6)
 
-### `[ ]` T40 | Plan 06 S1: AutoLISP baseline numbers (INFERRED share, duplicate labels, unlinked globals, module_depends)
+### `[~]` T45 | Plan 06 S6-S8: re-measure, hand-offs, release wheel
 
-- `[ ]` T40.1 | Extend tools/measure_autolisp.py
-- `[ ]` T40.2 | Run on ust copy and autolisp-htt; write numbers into plan §5
-
-### `[ ]` T41 | Plan 06 S2: shadow-copy pairing, shadow_of, pick_by_prefix drop, report section
-
-- `[ ]` T41.1 | Pairing + shadow_of marking + pick_by_prefix drop
-- `[ ]` T41.2 | Report section with .graphifyignore lines
-- `[ ]` T41.3 | Tests: logs copy, commit-time pick, tie, under-80% not shadow
-- Needs: T40
-
-### `[ ]` T42 | Plan 06 S3: query ranking, god_nodes and get_neighbors skip shadows
-
-- `[ ]` T42.1 | Skip shadow_of nodes in start ranking, god_nodes, get_neighbors ambiguity
-- `[ ]` T42.2 | Rebuild ust copy in scratch; verify one ust:rget god node, one get_neighbors answer
-- Needs: T41
-
-### `[ ]` T43 | Plan 06 S4: query miss line and staleness line (CLI and MCP)
-
-- `[ ]` T43.1 | Miss line for symbol-shaped terms with no exact label
-- `[ ]` T43.2 | built_at_commit vs HEAD staleness line
-- `[ ]` T43.3 | Tests for both paths
-
-### `[ ]` T44 | Plan 06 S5: global read/write edges and load/autoload edges
-
-- `[ ]` T44.1 | reads_global / writes_global edges
-- `[ ]` T44.2 | load / autoload depends refs with unresolved-load report line
-- `[ ]` T44.3 | Tests incl. variable argument and unresolved name
-
-### `[ ]` T45 | Plan 06 S6-S8: re-measure, hand-offs, release wheel
-
-- `[ ]` T45.1 | S6 re-measure ust and autolisp-htt against §5
-- `[ ]` T45.2 | S7 hand-off texts + PENDING items
+- `[x]` T45.1 | S6 re-measure ust and autolisp-htt against §5
+- `[x]` T45.2 | S7 hand-off texts + PENDING items
 - `[ ]` T45.3 | S8 bump version, tag, build wheel, pipx install, verify
 - Needs: T41, T42, T43, T44

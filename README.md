@@ -584,10 +584,14 @@ rewrites the shared `settings.json`. Rollback to stock:
 
 ## Status
 
-- **Released**: `v0.9.68+lang.5`, installed in the pipx venv (T38: the
-  bmake, cc-kb and AutoLISP resolvers recognise a file node by upstream's
-  `_is_file_node_label`, so incremental builds keep edges into files whose
-  basename collides). Plan 05 (review remediation,
+- **Released**: `v0.9.68+lang.6`, installed in the pipx venv (plan 06,
+  `docs/plans/06-autolisp-graph-quality-shadow-copies-freshness-inferred-calls-and-global-edges.md`:
+  AutoLISP shadow copies (`shadow_of`) leave god nodes, query ranking and
+  lookups; `query` prints `no exact match` and `graph built at X, HEAD is Y`
+  lines; `*global*` read/write edges; string-literal `load` / `autoload`
+  edges). `v0.9.68+lang.5` (T38): the bmake, cc-kb and AutoLISP resolvers
+  recognise a file node by upstream's `_is_file_node_label`, so incremental
+  builds keep edges into files whose basename collides. Plan 05 (review remediation,
   `docs/plans/05-review-remediation-cc-cr000-001.md`) shipped as
   `v0.9.68+lang.4` from `rr-fix`, rebased onto upstream 0.9.68.
 - **Languages**: 9 registered plugins. `graphify lang list` shows them:

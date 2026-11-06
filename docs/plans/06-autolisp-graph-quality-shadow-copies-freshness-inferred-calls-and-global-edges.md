@@ -99,22 +99,29 @@ Measured with `tools/measure_autolisp.py --graph` on fresh `.venv/bin/graphify u
 
 | Number | ust S1 | ust S6 | autolisp-htt S1 | autolisp-htt S6 |
 | :-- | --: | --: | --: | --: |
-| AutoLISP `calls` edges | 28,240 | S6 | 41,357 | S6 |
-| INFERRED share of `calls` | 55.9% | S6 | 0.0% | S6 |
-| EXTRACTED `calls` | 12,456 | S6 | 41,357 | S6 |
-| Function labels defined in 2+ files (all / live) | 2,364 / 2,364 | S6 | 30 / 30 | S6 |
-| Shadow files / nodes | 0 / 0 | S6 | 0 / 0 | S6 |
-| Repeated labels in the AutoLISP top 10 by degree | 4 | S6 | 0 | S6 |
-| `global` nodes / with a use edge | 222 / 0 | S6 | 1,063 / 0 | S6 |
-| `module_depends` edges | 8 | S6 | 0 | S6 |
+| AutoLISP `calls` edges | 28,240 | 28,304 | 41,357 | 41,357 |
+| INFERRED share of `calls` | 55.9% | 0.1% | 0.0% | 0.0% |
+| EXTRACTED `calls` | 12,456 | 28,281 | 41,357 | 41,357 |
+| Function labels defined in 2+ files (all / live) | 2,364 / 2,364 | 2,364 / 4 | 30 / 30 | 30 / 30 |
+| Shadow files / nodes | 0 / 0 | 31 / 2,779 | 0 / 0 | 0 / 0 |
+| Repeated labels in the AutoLISP top 10 by degree | 4 | 0 | 0 | 0 |
+| `global` nodes / with a use edge | 222 / 0 | 866 / 795 | 1,063 / 0 | 1,637 / 1,134 |
+| `module_depends` edges | 8 | 8 | 0 | 0 |
+| All edges | 63,695 | 66,733 (+4.8%) | 63,300 | 68,167 (+7.7%) |
 
+S6 notes: the 31 ust shadows are 30 of the 32 `logs/` copies (`logs/ust.lsp` and `logs/ust-test.lsp` have no live
+twin) plus `lib/alsp-lib/tests/perfprobe.lsp` (older commit than `tests/perfprobe.lsp`). The new global nodes are
+defun-set globals (INFERRED, one per writing file). Neither corpus has a string-literal `load` / `autoload` in code,
+so their `module_depends` count is unchanged; the tests cover that path.
 
-- [ ] The ust rebuild (scratch output) has no AutoLISP god node twice, and the report lists the 32 `logs/` shadows.
-- [ ] The INFERRED share of AutoLISP `calls` edges in ust is below 5% (from 45%).
-- [ ] A query for a symbol that is not in the graph prints the miss line first. A graph that is not at HEAD prints the staleness line.
-- [ ] Every ust `global` node that a defun uses has at least one `reads_global` or `writes_global` edge.
-- [ ] A string-literal `load` / `autoload` gives a `module_depends` edge, or an unresolved-load report line.
-- [ ] The full graphify-lang suite passes, and the autolisp-htt rebuild has no fewer EXTRACTED `calls` edges than before.
+- [x] The ust rebuild (scratch output) has no AutoLISP god node twice, and the report lists the `logs/` shadows
+  (30 of 32; 2 have no live twin).
+- [x] The INFERRED share of AutoLISP `calls` edges in ust is below 5% (from 45%).
+- [x] A query for a symbol that is not in the graph prints the miss line first. A graph that is not at HEAD prints the staleness line.
+- [x] Every ust `global` node that a defun uses has at least one `reads_global` or `writes_global` edge.
+- [x] A string-literal `load` / `autoload` gives a `module_depends` edge, or an unresolved-load report line.
+- [x] The full graphify-lang suite passes (except 20 erlang / r / solidity / vbnet / ollama tests that fail the same
+  way before plan 06), and the autolisp-htt rebuild has no fewer EXTRACTED `calls` edges than before.
 
 ## 6. Risks and open questions
 

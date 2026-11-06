@@ -93,6 +93,24 @@ def _learning_section(lines: list, learning: dict | None, top_n: int = 10) -> No
                          + (f" -> {nodes}" if nodes else ""))
 
 
+def _shadow_section(G: nx.Graph) -> list[str]:
+    """``## Shadow copies``: files a language plugin marked ``shadow_of`` (a stale
+    copy of a live file), each with the ``.graphifyignore`` line that drops it."""
+    pairs: dict[str, str] = {}
+    for _, d in G.nodes(data=True):
+        live = d.get("shadow_of")
+        if live and d.get("source_file"):
+            pairs.setdefault(str(d["source_file"]), str(G.nodes[live].get("source_file", live)) if live in G else live)
+    if not pairs:
+        return []
+    lines = ["", f"## Shadow copies ({len(pairs)} files)",
+             "Stale copies of live files. Queries and god nodes prefer the live file. "
+             "Add the `.graphifyignore` line to leave a copy out of the graph."]
+    for shadow, live in sorted(pairs.items()):
+        lines.append(f"- `{shadow}` copies `{live}` - ignore line: `{shadow}`")
+    return lines
+
+
 def generate(
     G: nx.Graph,
     communities: dict[int, list[str]],
@@ -265,6 +283,8 @@ def generate(
                 lines.append(f"- {length}-file cycle: `{cycle_path}`")
         else:
             lines.append("- None detected.")
+
+    lines += _shadow_section(G)
 
     hyperedges = G.graph.get("hyperedges", [])
     if hyperedges:

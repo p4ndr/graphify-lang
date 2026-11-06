@@ -14,13 +14,14 @@ from pathlib import Path
 
 from graphify.resolver_registry import LanguageResolver
 
-from graphify_lang._common import is_file_node, pick_by_prefix, refs_of
+from graphify_lang._common import is_file_node, mark_shadows, pick_by_prefix, refs_of
 
 _OUR_SUFFIXES = (".lsp", ".mnl", ".dcl")
 _GROUP = {"function": "fn", "command": "fn", "dialog": "dialog", "module": "module"}
 
 
 def resolve(per_file: list, all_nodes: list, all_edges: list) -> None:
+    mark_shadows(all_nodes, (".lsp", ".mnl"), frozenset({"function", "command"}))
     index: dict[str, dict[str, list[dict]]] = {}
     files: dict[str, list[dict]] = {}        # basename -> file nodes
     for node in all_nodes:

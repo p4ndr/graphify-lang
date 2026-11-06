@@ -16,7 +16,10 @@ contracts every plugin follows, in one place.
 - ``is_file_node``: a file node by upstream's own test, so the path-suffix
   label a colliding basename persists (#2032) still counts (T38).
 - ``pick_by_prefix``: one candidate, or the one sharing the longest directory
-  prefix with the source (INFERRED); a tie resolves to nothing.
+  prefix with the source (INFERRED); a tie resolves to nothing. Shadow-copy
+  candidates are dropped first (plan 06 §3.1).
+- ``mark_shadows``: pairs same-basename files whose definitions mostly match and
+  marks the stale copy's nodes ``shadow_of`` (plan 06 §3.1).
 - ``load_manifest`` / ``load_builtins``: a package's TOML manifest and its
   ``builtins_file`` / ``builtins_prefixes`` / ``case_insensitive`` filter.
 - ``line_index``: offset -> line for one text, built once per extraction.
@@ -24,6 +27,7 @@ contracts every plugin follows, in one place.
 from __future__ import annotations
 
 import re
+import subprocess
 from bisect import bisect_left
 from dataclasses import replace
 from pathlib import Path
@@ -145,6 +149,9 @@ def pick_by_prefix(found: list[dict], source_file: str) -> tuple[str | None, str
     """(target id, confidence). One candidate: EXTRACTED. Several: the one sharing
     the longest directory prefix with ``source_file``, INFERRED (an archived copy
     must not capture live references); a tie on that prefix: None."""
+    live = [n for n in found if not n.get("shadow_of")]
+    if live:
+        found = live
     if len(found) <= 1:
         return (found[0]["id"] if found else None), "EXTRACTED"
     caller = Path(source_file).parts
@@ -160,6 +167,85 @@ def pick_by_prefix(found: list[dict], source_file: str) -> tuple[str | None, str
     if scores[0][0] == scores[1][0]:
         return None, "EXTRACTED"
     return scores[0][1], "INFERRED"
+
+
+SHADOW_SEGMENTS = frozenset({"log", "logs", "archive", "backup", "old", "bak", "tmp"})
+SHADOW_OVERLAP = 0.8
+
+
+def _commit_time(path: str) -> int | None:
+    """Last git commit time of ``path`` (an absolute path), or None."""
+    p = Path(path)
+    if not p.is_absolute() or not p.parent.is_dir():
+        return None
+    try:
+        out = subprocess.run(["git", "log", "-1", "--format=%ct", "--", p.name], cwd=p.parent,
+                             capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return int(out.stdout) if out.returncode == 0 and out.stdout.strip().isdigit() else None
+
+
+def _shadow_segment(path: str, other: str) -> bool:
+    """Whether ``path`` has a ``SHADOW_SEGMENTS`` directory below the part it
+    shares with ``other`` (so a scan root under /tmp counts for neither)."""
+    a, b = Path(path).parts[:-1], Path(other).parts[:-1]
+    n = 0
+    while n < min(len(a), len(b)) and a[n] == b[n]:
+        n += 1
+    return any(part.casefold() in SHADOW_SEGMENTS for part in a[n:])
+
+
+def mark_shadows(all_nodes: list, suffixes: tuple, kinds: frozenset) -> list[tuple[str, str | None, str]]:
+    """Mark stale copies (plan 06 §3.1). Files with the same basename pair up when
+    ``SHADOW_OVERLAP`` of the smaller file's ``kinds`` labels are in the other.
+    The shadow is the one with a ``SHADOW_SEGMENTS`` directory, else the older
+    git commit; equal or unknown is a tie (no shadow). Every node of a shadow
+    file gets ``shadow_of`` = the live file's node id. Returns (shadow, live, reason) per
+    pair, live None and reason "tie" for a tie."""
+    names: dict[str, set[str]] = {}
+    for node in all_nodes:
+        sf = source_of(node)
+        if sf.lower().endswith(suffixes) and node.get("node_kind") in kinds:
+            names.setdefault(sf, set()).add(str(node.get("label", "")).casefold())
+    by_base: dict[str, list[str]] = {}
+    for sf in names:
+        by_base.setdefault(Path(sf).name.casefold(), []).append(sf)
+    shadow_of: dict[str, str] = {}
+    pairs: list[tuple[str, str | None, str]] = []
+    times: dict[str, int | None] = {}
+
+    def when(sf: str) -> int | None:
+        if sf not in times:
+            times[sf] = _commit_time(sf)
+        return times[sf]
+    for group in by_base.values():
+        group.sort()
+        for i, a in enumerate(group):
+            for b in group[i + 1:]:
+                small = min(len(names[a]), len(names[b]))
+                if not small or len(names[a] & names[b]) / small < SHADOW_OVERLAP:
+                    continue
+                seg_a, seg_b = _shadow_segment(a, b), _shadow_segment(b, a)
+                if seg_a != seg_b:
+                    shadow, live, reason = (a, b, "path") if seg_a else (b, a, "path")
+                else:
+                    ta, tb = when(a), when(b)
+                    if ta is None or tb is None or ta == tb:
+                        pairs.append((a, None, "tie"))
+                        continue
+                    shadow, live, reason = (a, b, "older") if ta < tb else (b, a, "older")
+                if shadow not in shadow_of:
+                    shadow_of[shadow] = live
+                    pairs.append((shadow, live, reason))
+    if shadow_of:
+        # The live file's node id: portable, unlike the absolute path a fresh node carries.
+        file_id = {source_of(n): n["id"] for n in all_nodes if is_file_node(n)}
+        for node in all_nodes:
+            live = shadow_of.get(source_of(node))
+            if live and live in file_id:
+                node["shadow_of"] = file_id[live]
+    return pairs
 
 
 def load_manifest(pkg_file: str, toml: str, **fields) -> LanguageManifest:

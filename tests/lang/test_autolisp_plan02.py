@@ -167,7 +167,8 @@ def test_resolver_registered_once():
 
 
 def test_duplicate_definition_resolves_to_nearest_copy(tmp_path):
-    """An archived copy must not capture live calls; the nearer definition wins, INFERRED."""
+    """An archived copy must not capture live calls. Since plan 06 the Archive copy
+    is a shadow (``shadow_of``), so the live definition is the only candidate: EXTRACTED."""
     (tmp_path / "src" / "core").mkdir(parents=True)
     (tmp_path / "Archive" / "core").mkdir(parents=True)
     (tmp_path / "src" / "core" / "err.lsp").write_text("(defun err:trap (f) (princ))\n")
@@ -177,4 +178,4 @@ def test_duplicate_definition_resolves_to_nearest_copy(tmp_path):
     graph = extract(files, cache_root=tmp_path / "cache", root=tmp_path)
     src = {n["id"]: n["source_file"] for n in graph["nodes"]}
     calls = [(src[e["source"]], src[e["target"]], e["confidence"]) for e in graph["edges"] if e["relation"] == "calls"]
-    assert calls == [("src/db.lsp", "src/core/err.lsp", "INFERRED")]
+    assert calls == [("src/db.lsp", "src/core/err.lsp", "EXTRACTED")]

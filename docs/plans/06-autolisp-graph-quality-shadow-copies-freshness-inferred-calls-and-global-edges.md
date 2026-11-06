@@ -3,9 +3,10 @@
 This plan makes AutoLISP graphs give one clear answer per symbol: stale copies of a module are marked, a stale graph is
 named, cross-file calls are EXTRACTED when they can be, and global variables and `load` calls get edges.
 
-- Status: DRAFT
+- Status: ACTIVE
 - Created: 2026-11-06
-- Tasks: <TASK numbers in docs/30-TODO.md, when ACTIVE>
+- Tasks: T40, T41, T42, T43, T44, T45
+- Stages: S1=T40; S2=T41; S3=T42; S4=T43; S5=T44; S6=T45
 
 ## 1. Goal
 
@@ -92,6 +93,21 @@ Out of scope here (each one is other repos' work, done as a hand-off):
 | S8 | Rebuild the pinned wheel, as in README 'Installing the fork', and update `CHANGELOG.md`. | `graphify lang list` runs from the new wheel |
 
 ## 5. Acceptance criteria
+
+Measured with `tools/measure_autolisp.py --graph` on fresh `.venv/bin/graphify update` builds of scratch clones
+(ust `7a01984`, autolisp-htt `b1b253a1`):
+
+| Number | ust S1 | ust S6 | autolisp-htt S1 | autolisp-htt S6 |
+| :-- | --: | --: | --: | --: |
+| AutoLISP `calls` edges | 28,240 | S6 | 41,357 | S6 |
+| INFERRED share of `calls` | 55.9% | S6 | 0.0% | S6 |
+| EXTRACTED `calls` | 12,456 | S6 | 41,357 | S6 |
+| Function labels defined in 2+ files (all / live) | 2,364 / 2,364 | S6 | 30 / 30 | S6 |
+| Shadow files / nodes | 0 / 0 | S6 | 0 / 0 | S6 |
+| Repeated labels in the AutoLISP top 10 by degree | 4 | S6 | 0 | S6 |
+| `global` nodes / with a use edge | 222 / 0 | S6 | 1,063 / 0 | S6 |
+| `module_depends` edges | 8 | S6 | 0 | S6 |
+
 
 - [ ] The ust rebuild (scratch output) has no AutoLISP god node twice, and the report lists the 32 `logs/` shadows.
 - [ ] The INFERRED share of AutoLISP `calls` edges in ust is below 5% (from 45%).
